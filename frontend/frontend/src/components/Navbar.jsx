@@ -1,24 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiPost, clearToken } from '../api.js';
-import { useFrontendPolish } from './FrontendPolish.jsx';
+
+const navigation = [
+  ['/dashboard', 'Dashboard', 'fa-chart-line'],
+  ['/jobs', 'Jobs', 'fa-briefcase'],
+  ['/analyze', 'Analyze', 'fa-code-compare'],
+  ['/talent', 'Talent', 'fa-users'],
+  ['/clients', 'Clients', 'fa-building'],
+  ['/vendors', 'Vendors', 'fa-handshake'],
+  ['/admin/workflow', 'Workflow', 'fa-screwdriver-wrench'],
+  ['/hiring-pipeline', 'Pipeline', 'fa-route'],
+  ['/insights', 'Reports', 'fa-chart-bar'],
+];
 
 function Navbar() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [colorTheme, setColorTheme] = useState(() => {
-    if (localStorage.getItem('color_theme_version') !== 'ember-v1') {
-      localStorage.setItem('color_theme_version', 'ember-v1');
-      localStorage.setItem('color_theme', 'warm');
-      return 'warm';
-    }
-    return localStorage.getItem('color_theme') || 'warm';
-  });
-  const polish = useFrontendPolish();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef(null);
 
-  useEffect(() => {
-    document.body.classList.toggle('theme-warm', colorTheme === 'warm');
-  }, [colorTheme]);
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+    if (window.matchMedia('(max-width: 820px)').matches) menuButton.current?.focus();
+  };
 
   const handleLogout = async () => {
     try {
@@ -31,80 +38,44 @@ function Navbar() {
   };
 
   const isActive = (path) =>
-    location.pathname === path || location.pathname.startsWith(path + '/')
-      ? 'nav-link active'
-      : 'nav-link';
-
-  const toggleColorTheme = () => {
-    const next = colorTheme === 'warm' ? 'classic' : 'warm';
-    localStorage.setItem('color_theme', next);
-    setColorTheme(next);
-  };
+    location.pathname === path || location.pathname.startsWith(path + '/');
 
   return (
-    <nav className="navbar navbar-koyeb navbar-clean">
-      <div className="nav-container">
-        <Link to="/welcome" className="nav-brand" aria-label="Open welcome page">
-          <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX" className="nav-logo"
+    <>
+        <button ref={menuButton} type="button" className="workspace-menu-toggle"
+          aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
+          aria-expanded={menuOpen} aria-controls="workspace-navigation"
+          onClick={() => setMenuOpen(open => !open)}>
+          <i className={`fas ${menuOpen ? 'fa-times' : 'fa-bars'}`} aria-hidden="true"></i>
+        </button>
+<aside id="workspace-navigation" className={`workspace-sidebar${menuOpen ? ' workspace-sidebar-open' : ''}`}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && menuOpen) { event.preventDefault(); closeMenu(); }
+        }}>
+        <Link to="/welcome" className="workspace-brand" aria-label="Open welcome page" onClick={closeMenu}>
+          <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX"
             onError={(e) => { e.target.style.display = 'none'; }} />
         </Link>
-        <div className="nav-links">
-          <Link to="/dashboard" className={isActive('/dashboard')}>
-            <i className="fas fa-chart-line"></i><span>Dashboard</span>
-          </Link>
-          <Link to="/jobs" className={isActive('/jobs')}>
-            <i className="fas fa-briefcase"></i><span>Jobs</span>
-          </Link>
-          <Link to="/analyze" className={isActive('/analyze')}>
-            <i className="fas fa-code-compare"></i><span>Analyze</span>
-          </Link>
-          <Link to="/talent" className={isActive('/talent')}>
-            <i className="fas fa-users"></i><span>Talent</span>
-          </Link>
-          <Link to="/clients" className={isActive('/clients')}>
-            <i className="fas fa-building"></i><span>Clients</span>
-          </Link>
-          <Link to="/vendors" className={isActive('/vendors')}>
-            <i className="fas fa-handshake"></i><span>Vendors</span>
-          </Link>
-          <Link to="/admin/workflow" className={isActive('/admin/workflow')}>
-            <i className="fas fa-screwdriver-wrench"></i><span>Workflow</span>
-          </Link>
-          <Link to="/hiring-pipeline" className={isActive('/hiring-pipeline')}>
-            <i className="fas fa-route"></i><span>Pipeline</span>
-          </Link>
-          <Link to="/insights" className={isActive('/insights')}>
-            <i className="fas fa-chart-bar"></i><span>Reports</span>
-          </Link>
-        </div>
-        <div className="nav-user">
-          <Link to="/profile" className={isActive('/profile')}>
+        <nav className="workspace-links" aria-label="Main navigation">
+          {navigation.map(([path, label, icon]) => (
+            <Link key={path} to={path}
+              className={`workspace-nav-link${isActive(path) ? ' active' : ''}`}
+              aria-current={isActive(path) ? 'page' : undefined} onClick={closeMenu}>
+              <i className={`fas ${icon}`} aria-hidden="true"></i><span>{label}</span>
+            </Link>
+          ))}
+        </nav>
+        <div className="workspace-account">
+          <Link to="/profile" className={`workspace-nav-link${isActive('/profile') ? ' active' : ''}`}
+            aria-current={isActive('/profile') ? 'page' : undefined} onClick={closeMenu}>
             <i className="fas fa-user-circle"></i><span>Profile</span>
           </Link>
-          <button
-            type="button"
-            onClick={polish.toggle}
-            className="nav-link nav-design-toggle"
-            title={polish.enabled ? 'Disable interface polish' : 'Enable interface polish'}
-            aria-label={polish.enabled ? 'Disable interface polish' : 'Enable interface polish'}
-          >
-            <i className={polish.enabled ? 'fas fa-wand-magic-sparkles' : 'fas fa-wand-magic'}></i>
-          </button>
-          <button
-            type="button"
-            onClick={toggleColorTheme}
-            className="nav-link nav-design-toggle"
-            title={colorTheme === 'warm' ? 'Use current blue theme' : 'Use graphite ember theme'}
-            aria-label={colorTheme === 'warm' ? 'Use current blue theme' : 'Use graphite ember theme'}
-          >
-            <i className="fas fa-palette"></i>
-          </button>
-          <button onClick={handleLogout} className="nav-link logout">
+          <button type="button" onClick={handleLogout} className="workspace-nav-link">
             <i className="fas fa-sign-out-alt"></i><span>Exit</span>
           </button>
         </div>
-      </div>
-    </nav>
+      </aside>
+    </>
   );
 }
 

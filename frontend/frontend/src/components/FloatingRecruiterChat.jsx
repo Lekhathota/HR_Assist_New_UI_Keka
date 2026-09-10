@@ -246,7 +246,9 @@ function FloatingRecruiterChat() {
       )}
 
       <button type="button" className="floating-chat-toggle" aria-label="Open recruiter assistant" onClick={() => setOpen(prev => !prev)}>
-        <img src="/ShimentoX-Mark.webp" alt="" className="floating-chat-toggle-mark" aria-hidden="true" />
+        <span className="floating-chat-logo-frame" aria-hidden="true">
+          <img src="/ShimentoX-Logo.png" alt="" className="floating-chat-toggle-mark" />
+        </span>
       </button>
     </div>
   );

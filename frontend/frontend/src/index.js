@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App.jsx';
+import { AppearanceProvider } from './components/AppearanceProvider.jsx';
+// Load the reference theme after every existing page stylesheet.
+import './styles/reference-theme.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+root.render(<AppearanceProvider><App /></AppearanceProvider>);

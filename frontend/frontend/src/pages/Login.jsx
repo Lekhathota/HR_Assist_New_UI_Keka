@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiPost, saveToken } from '../api.js';
 import '../styles/login.css';
 
+
 const LOGIN_INTRO_SEEN_KEY = 'shimentox_login_intro_seen';
 const LOGIN_USER_KEY = 'recruitment_assist_user';
 
@@ -52,26 +53,13 @@ function Login() {
   };
 
   return (
-    <div className="login-page">
-      <div className="video-overlay"></div>
-
+    <div className="login-page login-full">
       <section className="login-visual-panel" aria-label="ShimentoX talent intelligence">
-        <div className="login-visual-brain" aria-hidden="true">
-          <video className="login-visual-brain-video" autoPlay muted loop playsInline>
-            <source src="https://shimentox.ai/wp-content/uploads/2024/12/Ai-Footage-Homepage.mp4" type="video/mp4" />
-          </video>
-        </div>
         <div className="login-visual-brand">
-          <img
-            src="/ShimentoX-Light-Logo.webp"
-            alt="ShimentoX"
-            className="login-visual-logo"
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
+          <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX" className="login-visual-logo" />
           <span>Talent Intelligence Platform</span>
         </div>
       </section>
-
       <section className="login-auth-panel" aria-label="Sign in">
         {showIntro && (
           <section className="login-startup" aria-label="ShimentoX startup sequence">
@@ -99,15 +87,6 @@ function Login() {
 
         {!showIntro && (
           <div className="login-container login-container-ready">
-            <div className="login-header">
-              <img
-                src="/ShimentoX-Light-Logo.webp"
-                alt="ShimentoX"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <p>Talent Intelligence Platform</p>
-            </div>
-
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="username"><i className="fas fa-user"></i> Username</label>

@@ -1,8 +1,10 @@
 import React from 'react';
+import { useAppearance } from './AppearanceProvider.jsx';
 import Navbar from './Navbar.jsx';
 import FloatingRecruiterChat from './FloatingRecruiterChat.jsx';
 
 function Layout({ children }) {
+  const { colorTheme } = useAppearance();
   return (
     <div className="app-shell">
       <img
@@ -13,14 +15,14 @@ function Layout({ children }) {
         onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
       <Navbar />
+      <div className="workspace-content">
       <main className="main-container">
         {children}
       </main>
-      <FloatingRecruiterChat />
       <footer className="app-footer">
         <div className="app-footer-brand">
           <img
-            src="/ShimentoX-Light-Logo.webp"
+            src={colorTheme === 'warm' ? '/ShimentoX-Logo.png' : '/ShimentoX-Light-Logo.webp'}
             alt="ShimentoX"
             className="app-footer-logo"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -42,6 +44,8 @@ function Layout({ children }) {
           </a>
         </nav>
       </footer>
+      </div>
+      <FloatingRecruiterChat />
     </div>
   );
 }

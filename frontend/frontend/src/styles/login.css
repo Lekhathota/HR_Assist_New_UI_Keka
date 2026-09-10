@@ -80,44 +80,6 @@ body:has(.login-page) {
     animation: login-left-brand-enter 0.72s ease both;
 }
 
-.login-visual-brain {
-    position: relative;
-    z-index: 1;
-    width: min(930px, 112%);
-    aspect-ratio: 1.22;
-    overflow: hidden;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    mix-blend-mode: screen;
-    opacity: 1;
-    margin-top: clamp(0.8rem, 3vh, 2.3rem);
-    -webkit-mask-image: radial-gradient(ellipse at 44% 50%, #000 0%, #000 52%, rgba(0, 0, 0, 0.7) 68%, transparent 86%);
-    mask-image: radial-gradient(ellipse at 44% 50%, #000 0%, #000 52%, rgba(0, 0, 0, 0.7) 68%, transparent 86%);
-    animation: login-left-brand-enter 0.72s ease both;
-}
-
-.login-visual-brain::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-        radial-gradient(ellipse at 44% 50%, transparent 0%, transparent 44%, rgba(15, 20, 40, 0.2) 68%, rgba(15, 20, 40, 0.82) 92%),
-        linear-gradient(180deg, rgba(15, 20, 40, 0.08), rgba(15, 20, 40, 0.3));
-    mix-blend-mode: multiply;
-}
-
-.login-visual-brain-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: 43% center;
-    opacity: 0.74;
-    transform: scale(1.33);
-    filter: grayscale(0.32) saturate(0.72) contrast(1.34) brightness(0.78) hue-rotate(8deg);
-}
-
 .login-visual-logo {
     width: clamp(170px, 22vw, 320px);
     height: auto;
@@ -545,8 +507,7 @@ body:has(.login-page) {
     .login-startup-scan,
     .login-startup-status span,
     .login-visual-brand,
-    .login-visual-logo,
-    .login-visual-brain {
+    .login-visual-logo {
         animation: none !important;
     }
 
