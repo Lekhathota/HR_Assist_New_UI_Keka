@@ -56,7 +56,7 @@ function Login() {
     <div className="login-page login-full">
       <section className="login-visual-panel" aria-label="ShimentoX talent intelligence">
         <div className="login-visual-brand">
-          <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX" className="login-visual-logo" />
+          <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX" className="login-visual-logo login-logo-alive" />
           <span>Talent Intelligence Platform</span>
         </div>
       </section>
