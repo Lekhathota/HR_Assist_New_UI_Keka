@@ -1,0 +1,315 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 1664 >>
+stream
+BT /F2 20 Tf 44.0 549.0 Td (Agentic Screening Feature) Tj ET
+BT /F1 10 Tf 44.0 528.0 Td (Custom Python orchestration for HR resume screening) Tj ET
+q 1.0 w 44.0 513.0 m 798.0 513.0 l S Q
+BT /F2 14 Tf 44.0 500.0 Td (What this feature does) Tj ET
+BT /F1 10 Tf 56.0 476.0 Td (- Recruiter submits a JD and resumes or existing candidate IDs through Flask APIs.) Tj ET
+BT /F1 10 Tf 56.0 458.0 Td (- Main HR Orchestrator creates a run record and routes the task to the correct workflow.) Tj ET
+BT /F1 10 Tf 56.0 440.0 Td (- Screening Workflow runs specialized agents in sequence: JD, Resume, Matching, Ranking, Summary.) Tj ET
+BT /F1 10 Tf 56.0 422.0 Td (- OpenAI is used through the local llm_extraction helper where extraction or scoring needs LLM support.) Tj ET
+BT /F1 10 Tf 56.0 404.0 Td (- LangChain and LangGraph are listed as dependencies, but this code path is a custom Python pipeline.) Tj ET
+BT /F2 14 Tf 44.0 378.0 Td (Key modules) Tj ET
+BT /F1 10 Tf 56.0 355.0 Td (- routes/agentic_routes.py: API layer for /api/agentic/run and /api/agentic/screening.) Tj ET
+BT /F1 10 Tf 56.0 337.0 Td (- orchestration/main_orchestrator.py: creates run IDs, stores status, and dispatches task types.) Tj ET
+BT /F1 10 Tf 56.0 319.0 Td (- workflows/screening_workflow.py: sequential screening pipeline.) Tj ET
+BT /F1 10 Tf 56.0 301.0 Td (- agents/*.py: role-specific Python agents.) Tj ET
+BT /F1 10 Tf 56.0 283.0 Td (- tools/*.py and services/*.py: reusable database, extraction, matching, and persistence logic.) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist - Agentic Screening Feature) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 4918 >>
+stream
+BT /F2 20 Tf 44.0 549.0 Td (Architecture Diagram) Tj ET
+BT /F1 10 Tf 44.0 528.0 Td (Runtime structure of the custom agent pipeline) Tj ET
+q 1.0 w 44.0 513.0 m 798.0 513.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 48.0 455.0 130.0 54.0 re B Q
+BT /F2 11 Tf 58.0 490.0 Td (Recruiter UI) Tj ET
+BT /F1 8 Tf 58.0 473.0 Td (Uploads JD/resumes) Tj ET
+BT /F1 8 Tf 58.0 462.0 Td (Starts screening) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 226.0 455.0 150.0 54.0 re B Q
+BT /F2 11 Tf 236.0 490.0 Td (Flask API Routes) Tj ET
+BT /F1 8 Tf 236.0 473.0 Td (/api/agentic/run) Tj ET
+BT /F1 8 Tf 236.0 462.0 Td (/api/agentic/screening) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 424.0 455.0 165.0 54.0 re B Q
+BT /F2 11 Tf 434.0 490.0 Td (Main HR Orchestrator) Tj ET
+BT /F1 8 Tf 434.0 473.0 Td (Detects task type) Tj ET
+BT /F1 8 Tf 434.0 462.0 Td (Creates agent_run) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 638.0 455.0 130.0 54.0 re B Q
+BT /F2 11 Tf 648.0 490.0 Td (MongoDB) Tj ET
+BT /F1 8 Tf 648.0 473.0 Td (agent_runs) Tj ET
+BT /F1 8 Tf 648.0 462.0 Td (candidates, JDs) Tj ET
+q 1.2 w 178.0 482.0 m 226.0 482.0 l S Q
+q 1.0 w 226.0 482.0 m 218.0 487.0 l S Q
+q 1.0 w 226.0 482.0 m 218.0 477.0 l S Q
+q 1.2 w 376.0 482.0 m 424.0 482.0 l S Q
+q 1.0 w 424.0 482.0 m 416.0 487.0 l S Q
+q 1.0 w 424.0 482.0 m 416.0 477.0 l S Q
+q 1.2 w 589.0 482.0 m 638.0 482.0 l S Q
+q 1.0 w 638.0 482.0 m 630.0 487.0 l S Q
+q 1.0 w 638.0 482.0 m 630.0 477.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 70.0 330.0 120.0 62.0 re B Q
+BT /F2 11 Tf 80.0 373.0 Td (JD Agent) Tj ET
+BT /F1 8 Tf 80.0 356.0 Td (Loads JD row) Tj ET
+BT /F1 8 Tf 80.0 345.0 Td (Normalizes JD JSON) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 220.0 330.0 130.0 62.0 re B Q
+BT /F2 11 Tf 230.0 373.0 Td (Resume Agent) Tj ET
+BT /F1 8 Tf 230.0 356.0 Td (Existing candidates) Tj ET
+BT /F1 8 Tf 230.0 345.0 Td (Uploaded resumes) Tj ET
+BT /F1 8 Tf 230.0 334.0 Td (Extracts JSON) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 380.0 330.0 130.0 62.0 re B Q
+BT /F2 11 Tf 390.0 373.0 Td (Matching Agent) Tj ET
+BT /F1 8 Tf 390.0 356.0 Td (Compares JD/resume) Tj ET
+BT /F1 8 Tf 390.0 345.0 Td (Persists match) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 540.0 330.0 125.0 62.0 re B Q
+BT /F2 11 Tf 550.0 373.0 Td (Ranking Agent) Tj ET
+BT /F1 8 Tf 550.0 356.0 Td (Sorts by score) Tj ET
+BT /F1 8 Tf 550.0 345.0 Td (Splits selected/rejected) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 695.0 330.0 110.0 62.0 re B Q
+BT /F2 11 Tf 705.0 373.0 Td (Summary Agent) Tj ET
+BT /F1 8 Tf 705.0 356.0 Td (Builds recruiter) Tj ET
+BT /F1 8 Tf 705.0 345.0 Td (summary) Tj ET
+q 1.2 w 506.0 455.0 m 130.0 392.0 l S Q
+q 1.0 w 130.0 392.0 m 138.0 397.0 l S Q
+q 1.0 w 130.0 392.0 m 138.0 387.0 l S Q
+q 1.2 w 190.0 361.0 m 220.0 361.0 l S Q
+q 1.0 w 220.0 361.0 m 212.0 366.0 l S Q
+q 1.0 w 220.0 361.0 m 212.0 356.0 l S Q
+q 1.2 w 350.0 361.0 m 380.0 361.0 l S Q
+q 1.0 w 380.0 361.0 m 372.0 366.0 l S Q
+q 1.0 w 380.0 361.0 m 372.0 356.0 l S Q
+q 1.2 w 510.0 361.0 m 540.0 361.0 l S Q
+q 1.0 w 540.0 361.0 m 532.0 366.0 l S Q
+q 1.0 w 540.0 361.0 m 532.0 356.0 l S Q
+q 1.2 w 665.0 361.0 m 695.0 361.0 l S Q
+q 1.0 w 695.0 361.0 m 687.0 366.0 l S Q
+q 1.0 w 695.0 361.0 m 687.0 356.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 145.0 205.0 170.0 60.0 re B Q
+BT /F2 11 Tf 155.0 246.0 Td (Tools Layer) Tj ET
+BT /F1 8 Tf 155.0 229.0 Td (jd_tools.py) Tj ET
+BT /F1 8 Tf 155.0 218.0 Td (resume_tools.py) Tj ET
+BT /F1 8 Tf 155.0 207.0 Td (matching_tools.py) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 385.0 205.0 170.0 60.0 re B Q
+BT /F2 11 Tf 395.0 246.0 Td (Service Layer) Tj ET
+BT /F1 8 Tf 395.0 229.0 Td (candidate_service.py) Tj ET
+BT /F1 8 Tf 395.0 218.0 Td (matching_service.py) Tj ET
+BT /F1 8 Tf 395.0 207.0 Td (jd_service.py) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 625.0 205.0 145.0 60.0 re B Q
+BT /F2 11 Tf 635.0 246.0 Td (OpenAI Helper) Tj ET
+BT /F1 8 Tf 635.0 229.0 Td (llm_extraction.py) Tj ET
+BT /F1 8 Tf 635.0 218.0 Td (gpt-4o-mini default) Tj ET
+q 1.2 w 285.0 330.0 m 235.0 265.0 l S Q
+q 1.0 w 235.0 265.0 m 230.0 273.0 l S Q
+q 1.0 w 235.0 265.0 m 240.0 273.0 l S Q
+q 1.2 w 445.0 330.0 m 470.0 265.0 l S Q
+q 1.0 w 470.0 265.0 m 465.0 273.0 l S Q
+q 1.0 w 470.0 265.0 m 475.0 273.0 l S Q
+q 1.2 w 285.0 205.0 m 385.0 235.0 l S Q
+q 1.0 w 385.0 235.0 m 377.0 240.0 l S Q
+q 1.0 w 385.0 235.0 m 377.0 230.0 l S Q
+q 1.2 w 555.0 235.0 m 625.0 235.0 l S Q
+q 1.0 w 625.0 235.0 m 617.0 240.0 l S Q
+q 1.0 w 625.0 235.0 m 617.0 230.0 l S Q
+BT /F2 10 Tf 70.0 150.0 Td (Note: This architecture is agentic by design, but it is not implemented with LangGraph nodes or LangChain runnables.) Tj ET
+BT /F1 10 Tf 70.0 132.0 Td (The agents are normal Python functions with tracing and shared helper tools.) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist - Agentic Screening Feature) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 3247 >>
+stream
+BT /F2 20 Tf 44.0 549.0 Td (Use Case Diagram) Tj ET
+BT /F1 10 Tf 44.0 528.0 Td (Main actors and system responsibilities) Tj ET
+q 1.0 w 44.0 513.0 m 798.0 513.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 56.0 392.0 112.0 55.0 re B Q
+BT /F2 11 Tf 66.0 428.0 Td (Recruiter) Tj ET
+BT /F1 8 Tf 66.0 411.0 Td (Primary user) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 56.0 285.0 112.0 55.0 re B Q
+BT /F2 11 Tf 66.0 321.0 Td (Admin/User) Tj ET
+BT /F1 8 Tf 66.0 304.0 Td (Views data) Tj ET
+BT /F1 8 Tf 66.0 293.0 Td (Manages app) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 650.0 392.0 112.0 55.0 re B Q
+BT /F2 11 Tf 660.0 428.0 Td (OpenAI API) Tj ET
+BT /F1 8 Tf 660.0 411.0 Td (LLM extraction) Tj ET
+BT /F1 8 Tf 660.0 400.0 Td (LLM scoring) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 650.0 285.0 112.0 55.0 re B Q
+BT /F2 11 Tf 660.0 321.0 Td (MongoDB) Tj ET
+BT /F1 8 Tf 660.0 304.0 Td (Stores runs) Tj ET
+BT /F1 8 Tf 660.0 293.0 Td (Stores HR data) Tj ET
+q 0.98 0.98 0.95 rg 0.20 0.28 0.35 RG 1.2 w 270.0 455.0 245.0 38.0 re B Q
+BT /F2 11 Tf 286.0 469.0 Td (Start Agentic Screening) Tj ET
+q 0.98 0.98 0.95 rg 0.20 0.28 0.35 RG 1.2 w 270.0 398.0 245.0 38.0 re B Q
+BT /F2 11 Tf 286.0 412.0 Td (Upload Resumes) Tj ET
+q 0.98 0.98 0.95 rg 0.20 0.28 0.35 RG 1.2 w 270.0 341.0 245.0 38.0 re B Q
+BT /F2 11 Tf 286.0 355.0 Td (Screen Candidate Against JD) Tj ET
+q 0.98 0.98 0.95 rg 0.20 0.28 0.35 RG 1.2 w 270.0 284.0 245.0 38.0 re B Q
+BT /F2 11 Tf 286.0 298.0 Td (Rank Candidates) Tj ET
+q 0.98 0.98 0.95 rg 0.20 0.28 0.35 RG 1.2 w 270.0 227.0 245.0 38.0 re B Q
+BT /F2 11 Tf 286.0 241.0 Td (View Screening Summary) Tj ET
+q 0.98 0.98 0.95 rg 0.20 0.28 0.35 RG 1.2 w 270.0 170.0 245.0 38.0 re B Q
+BT /F2 11 Tf 286.0 184.0 Td (Audit Agent Run) Tj ET
+q 1.2 w 168.0 420.0 m 270.0 474.0 l S Q
+q 1.0 w 270.0 474.0 m 262.0 479.0 l S Q
+q 1.0 w 270.0 474.0 m 262.0 469.0 l S Q
+q 1.2 w 168.0 420.0 m 270.0 417.0 l S Q
+q 1.0 w 270.0 417.0 m 262.0 422.0 l S Q
+q 1.0 w 270.0 417.0 m 262.0 412.0 l S Q
+q 1.2 w 168.0 420.0 m 270.0 360.0 l S Q
+q 1.0 w 270.0 360.0 m 262.0 365.0 l S Q
+q 1.0 w 270.0 360.0 m 262.0 355.0 l S Q
+q 1.2 w 168.0 420.0 m 270.0 303.0 l S Q
+q 1.0 w 270.0 303.0 m 265.0 311.0 l S Q
+q 1.0 w 270.0 303.0 m 275.0 311.0 l S Q
+q 1.2 w 168.0 420.0 m 270.0 246.0 l S Q
+q 1.0 w 270.0 246.0 m 265.0 254.0 l S Q
+q 1.0 w 270.0 246.0 m 275.0 254.0 l S Q
+q 1.2 w 168.0 312.0 m 270.0 189.0 l S Q
+q 1.0 w 270.0 189.0 m 265.0 197.0 l S Q
+q 1.0 w 270.0 189.0 m 275.0 197.0 l S Q
+q 1.2 w 515.0 360.0 m 650.0 420.0 l S Q
+q 1.0 w 650.0 420.0 m 642.0 425.0 l S Q
+q 1.0 w 650.0 420.0 m 642.0 415.0 l S Q
+q 1.2 w 515.0 303.0 m 650.0 312.0 l S Q
+q 1.0 w 650.0 312.0 m 642.0 317.0 l S Q
+q 1.0 w 650.0 312.0 m 642.0 307.0 l S Q
+q 1.2 w 515.0 189.0 m 650.0 312.0 l S Q
+q 1.0 w 650.0 312.0 m 642.0 317.0 l S Q
+q 1.0 w 650.0 312.0 m 642.0 307.0 l S Q
+BT /F1 10 Tf 72.0 110.0 Td (Recruiter goal: quickly identify selected, rejected, and top-ranked candidates for a JD.) Tj ET
+BT /F1 10 Tf 72.0 92.0 Td (System goal: keep every run traceable with run_id, task_type, input, output, status, and errors.) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist - Agentic Screening Feature) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 3990 >>
+stream
+BT /F2 20 Tf 44.0 549.0 Td (Flow Chart Diagram) Tj ET
+BT /F1 10 Tf 44.0 528.0 Td (Detailed screening flow from request to result) Tj ET
+q 1.0 w 44.0 513.0 m 798.0 513.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 500.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 523.0 Td (Request received) Tj ET
+BT /F1 8 Tf 332.0 506.0 Td (Flask route collects form/json and files) Tj ET
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 440.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 463.0 Td (Create run_id) Tj ET
+BT /F1 8 Tf 332.0 446.0 Td (Main orchestrator stores running status) Tj ET
+q 1.2 w 432.0 500.0 m 432.0 482.0 l S Q
+q 1.0 w 432.0 482.0 m 427.0 490.0 l S Q
+q 1.0 w 432.0 482.0 m 437.0 490.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 380.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 403.0 Td (JD Agent) Tj ET
+BT /F1 8 Tf 332.0 386.0 Td (Load JD and normalized JD JSON) Tj ET
+q 1.2 w 432.0 440.0 m 432.0 422.0 l S Q
+q 1.0 w 432.0 422.0 m 427.0 430.0 l S Q
+q 1.0 w 432.0 422.0 m 437.0 430.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 320.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 343.0 Td (Resume Agent) Tj ET
+BT /F1 8 Tf 332.0 326.0 Td (Load existing candidates and extract uploaded resumes) Tj ET
+q 1.2 w 432.0 380.0 m 432.0 362.0 l S Q
+q 1.0 w 432.0 362.0 m 427.0 370.0 l S Q
+q 1.0 w 432.0 362.0 m 437.0 370.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 260.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 283.0 Td (Matching Agent) Tj ET
+BT /F1 8 Tf 332.0 266.0 Td (Compare each profile against the JD and persist comparison) Tj ET
+q 1.2 w 432.0 320.0 m 432.0 302.0 l S Q
+q 1.0 w 432.0 302.0 m 427.0 310.0 l S Q
+q 1.0 w 432.0 302.0 m 437.0 310.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 200.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 223.0 Td (Ranking Agent) Tj ET
+BT /F1 8 Tf 332.0 206.0 Td (Sort by match_score descending) Tj ET
+q 1.2 w 432.0 260.0 m 432.0 242.0 l S Q
+q 1.0 w 432.0 242.0 m 427.0 250.0 l S Q
+q 1.0 w 432.0 242.0 m 437.0 250.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 140.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 163.0 Td (Summary Agent) Tj ET
+BT /F1 8 Tf 332.0 146.0 Td (Create recruiter-facing summary and attach errors) Tj ET
+q 1.2 w 432.0 200.0 m 432.0 182.0 l S Q
+q 1.0 w 432.0 182.0 m 427.0 190.0 l S Q
+q 1.0 w 432.0 182.0 m 437.0 190.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 322.0 80.0 220.0 42.0 re B Q
+BT /F2 11 Tf 332.0 103.0 Td (Return response) Tj ET
+BT /F1 8 Tf 332.0 86.0 Td (Update agent_run as completed or failed) Tj ET
+q 1.2 w 432.0 140.0 m 432.0 122.0 l S Q
+q 1.0 w 432.0 122.0 m 427.0 130.0 l S Q
+q 1.0 w 432.0 122.0 m 437.0 130.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 80.0 246.0 160.0 78.0 re B Q
+BT /F2 11 Tf 90.0 305.0 Td (Error Handling) Tj ET
+BT /F1 8 Tf 90.0 288.0 Td (Resume errors collected) Tj ET
+BT /F1 8 Tf 90.0 277.0 Td (Matching errors collected) Tj ET
+BT /F1 8 Tf 90.0 266.0 Td (Fatal errors mark run failed) Tj ET
+q 1.2 w 322.0 281.0 m 240.0 281.0 l S Q
+q 1.0 w 240.0 281.0 m 248.0 286.0 l S Q
+q 1.0 w 240.0 281.0 m 248.0 276.0 l S Q
+q 1.2 w 240.0 281.0 m 322.0 160.0 l S Q
+q 1.0 w 322.0 160.0 m 317.0 168.0 l S Q
+q 1.0 w 322.0 160.0 m 327.0 168.0 l S Q
+q 0.96 0.98 1.00 rg 0.20 0.28 0.35 RG 1.2 w 610.0 246.0 150.0 78.0 re B Q
+BT /F2 11 Tf 620.0 305.0 Td (Database Writes) Tj ET
+BT /F1 8 Tf 620.0 288.0 Td (candidate records) Tj ET
+BT /F1 8 Tf 620.0 277.0 Td (comparison rows) Tj ET
+BT /F1 8 Tf 620.0 266.0 Td (agent_runs output) Tj ET
+q 1.2 w 542.0 281.0 m 610.0 281.0 l S Q
+q 1.0 w 610.0 281.0 m 602.0 286.0 l S Q
+q 1.0 w 610.0 281.0 m 602.0 276.0 l S Q
+q 1.2 w 610.0 281.0 m 542.0 101.0 l S Q
+q 1.0 w 542.0 101.0 m 537.0 109.0 l S Q
+q 1.0 w 542.0 101.0 m 547.0 109.0 l S Q
+BT /F2 10 Tf 72.0 48.0 Td (Ranking detail: the current Ranking Agent uses deterministic sorting by match_score, not an LLM call.) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist - Agentic Screening Feature) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+8 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+9 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+11 0 obj
+<< /Type /Pages /Kids [7 0 R 8 0 R 9 0 R 10 0 R] /Count 4 >>
+endobj
+12 0 obj
+<< /Type /Catalog /Pages 11 0 R >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000001876 00000 n 
+0000006846 00000 n 
+0000010145 00000 n 
+0000014187 00000 n 
+0000014324 00000 n 
+0000014461 00000 n 
+0000014598 00000 n 
+0000014736 00000 n 
+0000014813 00000 n 
+trailer
+<< /Size 13 /Root 12 0 R >>
+startxref
+14864
+%%EOF

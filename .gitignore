@@ -1,0 +1,25 @@
+.env
+.venv/
+backend/.env
+backend/.venv/
+frontend/.env
+node_modules/
+frontend/node_modules/
+__pycache__/
+
+# Environment variables (database credentials, API keys)
+
+.env
+ 
+# Dependency folders (Node.js/Python)
+
+node_modules/
+
+__pycache__/
+
+venv/
+ 
+# OS generated files
+
+.DS_Store
+ 

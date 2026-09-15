@@ -1,0 +1,168 @@
+/* ========== PROFILE EXTRA STYLES ========== */
+
+.profile-alert-spacing {
+    margin-bottom: 1.5rem;
+}
+
+.profile-grid-gap {
+    gap: 2rem;
+}
+
+/* Profile section box */
+.profile-box {
+    background: linear-gradient(135deg, rgba(26, 31, 58, 0.9), rgba(45, 53, 97, 0.9));
+    border: 1px solid rgba(239, 122, 45, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 0 20px rgba(239, 122, 45, 0.1);
+}
+
+.profile-box-title {
+    color: #ef7a2d;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+
+/* Activity stats */
+.profile-activity-section {
+    margin-top: 2rem;
+}
+
+.profile-activity-title {
+    color: #ef7a2d;
+    margin-bottom: 1rem;
+}
+
+.profile-activity-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.profile-activity-card {
+    background: rgba(239, 122, 45, 0.05);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid rgba(239, 122, 45, 0.1);
+}
+
+.profile-activity-label {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+}
+
+.profile-activity-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.profile-activity-blue   { color: #3498db; }
+.profile-activity-green  { color: #27ae60; }
+.profile-activity-orange { color: #f39c12; }
+.profile-activity-purple { color: #9b59b6; }
+
+/* Update form */
+.profile-update-title {
+    color: #ef7a2d;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+
+.profile-form-btn {
+    width: 100%;
+}
+
+.profile-hr {
+    border-color: rgba(239, 122, 45, 0.2);
+    margin: 1.5rem 0;
+}
+
+.profile-password-title {
+    color: #ef7a2d;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+/* Preferences box */
+.profile-prefs-box {
+    margin-top: 2rem;
+}
+
+.profile-prefs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.profile-pref-card {
+    background: rgba(239, 122, 45, 0.05);
+    padding: 1.2rem;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(239, 122, 45, 0.1);
+}
+
+.profile-pref-name {
+    color: #fff;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+
+.profile-pref-icon {
+    margin-right: 0.5rem;
+    color: #ef7a2d;
+}
+
+.profile-pref-desc {
+    color: #aaa;
+    font-size: 0.85rem;
+}
+
+/* Toggle switch */
+.profile-toggle {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.profile-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.profile-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #ef7a2d;
+    border-radius: 26px;
+    transition: 0.3s;
+}
+
+/* JdCreate extra */
+.jd-create-label-color {
+    color: #ef7a2d;
+}
+
+.jd-create-file-icon {
+    margin-right: 10px;
+}
+
+.jd-create-error {
+    color: #e74c3c;
+    margin-bottom: 1rem;
+    padding: 0.8rem;
+    background: #fadbd8;
+    border-radius: 6px;
+}

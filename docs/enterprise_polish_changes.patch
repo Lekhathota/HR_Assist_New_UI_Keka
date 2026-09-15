@@ -1,0 +1,618 @@
+﻿diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/App.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/App.jsx
+index ed5c360..5de9d88 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/App.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/App.jsx
+@@ -12,6 +12,7 @@ import CandidateProfile from './pages/CandidateProfile.jsx';
+ import Reports from './pages/Reports.jsx';
+ import Profile from './pages/Profile.jsx';
+ import { getToken } from './api.js';
++import { ConfirmProvider, ToastHost } from './components/EnterpriseFeedback.jsx';
+ 
+ import './styles/style.css';
+ 
+@@ -27,7 +28,9 @@ function ProtectedRoute({ children }) {
+ function App() {
+   return (
+     <Router>
+-      <Routes>
++      <ConfirmProvider>
++        <ToastHost />
++        <Routes>
+ 
+         <Route path="/" element={<Navigate to="/login" replace />} />
+ 
+@@ -47,7 +50,8 @@ function App() {
+ 
+         <Route path="*" element={<Navigate to="/login" replace />} />
+ 
+-      </Routes>
++        </Routes>
++      </ConfirmProvider>
+     </Router>
+   );
+ }
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/CandidateProfile.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/CandidateProfile.jsx
+index 74f2f35..6e013a0 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/CandidateProfile.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/CandidateProfile.jsx
+@@ -1,6 +1,7 @@
+ import React, { useState, useEffect } from 'react';
+ import { useParams, useNavigate } from 'react-router-dom';
+ import Layout from '../components/Layout.jsx';
++import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
+ import { apiGet, apiPost } from '../api.js';
+ import '../styles/profile.css';
+ import '../styles/candidates.css';
+@@ -23,6 +24,7 @@ function formatJdUploadDateTime(value) {
+ function CandidateProfile() {
+   const { candidateId } = useParams();
+   const navigate = useNavigate();
++  const confirm = useConfirm();
+   const [candidate, setCandidate] = useState(null);
+   const [deleting, setDeleting] = useState(false);
+ 
+@@ -34,23 +36,31 @@ function CandidateProfile() {
+ 
+   const handleRemove = async () => {
+     if (!candidate) return;
+-    if (!window.confirm(`Remove candidate "${candidate.name}" from the repository? This cannot be undone.`)) return;
++    const approved = await confirm({
++      title: 'Remove candidate',
++      message: `Remove candidate "${candidate.name}" from the repository? This cannot be undone.`,
++      confirmLabel: 'Remove Candidate',
++      icon: 'fas fa-user-times',
++      danger: true,
++    });
++    if (!approved) return;
+     setDeleting(true);
+     try {
+       const { ok, data } = await apiPost(`/api/candidates/${candidateId}/delete`, {});
+       if (ok && data.success) {
++        toast({ type: 'success', message: 'Candidate removed.' });
+         navigate('/talent');
+       } else {
+-        window.alert(data.error || 'Could not remove candidate.');
++        toast({ type: 'error', message: data.error || 'Could not remove candidate.' });
+       }
+     } catch {
+-      window.alert('Remove failed. Please try again.');
++      toast({ type: 'error', message: 'Remove failed. Please try again.' });
+     } finally {
+       setDeleting(false);
+     }
+   };
+ 
+-  if (!candidate) return <Layout><div className="profile-loading">Loading...</div></Layout>;
++  if (!candidate) return <Layout><div className="profile-loading"><SkeletonBlock variant="profile" count={3} /></div></Layout>;
+ 
+   const sd = candidate.structured_data || {};
+   const totalExperience = Number(sd.total_experience_years || 0);
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Dashboard.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Dashboard.jsx
+index 175884b..c50e96a 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Dashboard.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Dashboard.jsx
+@@ -1,6 +1,7 @@
+ import React, { useState, useEffect, useRef } from 'react';
+ import { Link } from 'react-router-dom';
+ import Layout from '../components/Layout.jsx';
++import { SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
+ import { apiGet } from '../api.js';
+ import '../styles/dashboard.css';
+ import '../styles/dashboard_extra.css';
+@@ -15,6 +16,7 @@ function Dashboard() {
+   const [candidates, setCandidates]               = useState([]);
+   const [teamData, setTeamData]                   = useState([]);
+   const [searchTerm, setSearchTerm]               = useState('');
++  const [dashboardLoading, setDashboardLoading]    = useState(true);
+   const startDateRef = useRef(null);
+   const endDateRef   = useRef(null);
+   const fpStart      = useRef(null);
+@@ -27,7 +29,7 @@ function Dashboard() {
+       setRecentCandidates(data.recent_candidates || []);
+       setRecentComparisons(data.recent_comparisons || []);
+       setCandidates(data.candidates || []);
+-    }).catch(() => {});
++    }).catch(() => {}).finally(() => setDashboardLoading(false));
+ 
+     apiGet('/api/dashboard/team').then(data => {
+       setTeamData(Array.isArray(data) ? data : []);
+@@ -65,6 +67,9 @@ function Dashboard() {
+         <h1><i className="fas fa-chart-line"></i> Dashboard</h1>
+ 
+         {/* Metrics */}
++        {dashboardLoading ? (
++          <SkeletonBlock variant="metrics" count={10} />
++        ) : (
+         <div className="metrics">
+           {[
+             { label: 'Total Jobs',           val: metrics.total_jds,           cls: 'card',         to: '/jobs' },
+@@ -90,6 +95,7 @@ function Dashboard() {
+             );
+           })}
+         </div>
++        )}
+ 
+         {/* Analytics */}
+         <h2><i className="fas fa-chart-bar"></i> Recruitment Analytics</h2>
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdCreate.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdCreate.jsx
+index aab6425..9a95f8b 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdCreate.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdCreate.jsx
+@@ -1,6 +1,7 @@
+ import React, { useState, useRef } from 'react';
+ import { Link, useNavigate } from 'react-router-dom';
+ import Layout from '../components/Layout.jsx';
++import { toast } from '../components/EnterpriseFeedback.jsx';
+ import { apiPostForm } from '../api.js';
+ import '../styles/jd_create.css';
+ import '../styles/profile_extra.css';
+@@ -32,12 +33,17 @@ function JdCreate() {
+     try {
+       const { ok, data } = await apiPostForm('/api/jds/create', formData);
+       if (ok && data.success) {
++        toast({ type: 'success', message: 'Job description created.' });
+         navigate('/jobs');
+       } else {
+-        setError(data.error || 'Upload failed');
++        const message = data.error || 'Upload failed';
++        setError(message);
++        toast({ type: 'error', message });
+       }
+     } catch {
+-      setError('Upload failed. Please try again.');
++      const message = 'Upload failed. Please try again.';
++      setError(message);
++      toast({ type: 'error', message });
+     } finally {
+       setLoading(false);
+     }
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdDetails.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdDetails.jsx
+index 13001a3..cc7da11 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdDetails.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdDetails.jsx
+@@ -1,6 +1,7 @@
+ import React, { useState, useEffect, useMemo } from 'react';
+ import { Link, useParams, useNavigate } from 'react-router-dom';
+ import Layout from '../components/Layout.jsx';
++import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
+ import { apiGet, apiPost } from '../api.js';
+ import '../styles/jd_details_extra.css';
+ 
+@@ -40,6 +41,7 @@ function buildTimeOptions(blockedSlots) {
+ function JdDetails() {
+   const { jdId } = useParams();
+   const navigate = useNavigate();
++  const confirm = useConfirm();
+   const [jd, setJd]           = useState(null);
+   const [selected, setSelected] = useState([]);
+   const [rejected, setRejected] = useState([]);
+@@ -52,7 +54,6 @@ function JdDetails() {
+   const [blockedSlots, setBlockedSlots] = useState([]);
+   const [scheduleError, setScheduleError] = useState('');
+   const [scheduleSuccess, setScheduleSuccess] = useState('');
+-  const [scheduleNotice, setScheduleNotice] = useState(null);
+   const [loadingSlots, setLoadingSlots] = useState(false);
+   const [generatingEmail, setGeneratingEmail] = useState(false);
+   const [sendingEmail, setSendingEmail] = useState(false);
+@@ -104,25 +105,27 @@ function JdDetails() {
+     }
+   }, [timeOptions, interviewTime]);
+ 
+-  useEffect(() => {
+-    if (!scheduleNotice) return undefined;
+-    const timer = window.setTimeout(() => setScheduleNotice(null), 3000);
+-    return () => window.clearTimeout(timer);
+-  }, [scheduleNotice]);
+-
+   const handleRemove = async () => {
+     if (!jd) return;
+-    if (!window.confirm(`Remove "${jd.title}"? Related comparisons may be removed. This cannot be undone.`)) return;
++    const approved = await confirm({
++      title: 'Remove job description',
++      message: `Remove "${jd.title}"? Related comparisons may be removed. This cannot be undone.`,
++      confirmLabel: 'Remove JD',
++      icon: 'fas fa-trash-alt',
++      danger: true,
++    });
++    if (!approved) return;
+     setDeleting(true);
+     try {
+       const { ok, data } = await apiPost(`/api/jds/${jdId}/delete`, {});
+       if (ok && data.success) {
++        toast({ type: 'success', message: 'Job description removed.' });
+         navigate('/jobs');
+       } else {
+-        window.alert(data.error || 'Could not remove job description.');
++        toast({ type: 'error', message: data.error || 'Could not remove job description.' });
+       }
+     } catch {
+-      window.alert('Remove failed. Please try again.');
++      toast({ type: 'error', message: 'Remove failed. Please try again.' });
+     } finally {
+       setDeleting(false);
+     }
+@@ -207,17 +210,17 @@ function JdDetails() {
+       });
+       if (!ok || !data.success) {
+         setScheduleOpen(false);
+-        setScheduleNotice({ type: 'error', message: data.error || 'Email sending failed. Please try again.' });
++        toast({ type: 'error', message: data.error || 'Email sending failed. Please try again.' });
+         return;
+       }
+       const slots = await apiGet(`/api/interviews/blocked-slots?date=${encodeURIComponent(interviewDate)}`);
+       setBlockedSlots(slots.blocked_slots || []);
+       setScheduleSuccess('');
+       setScheduleOpen(false);
+-      setScheduleNotice({ type: 'success', message: 'Interview email sent successfully.' });
++      toast({ type: 'success', message: 'Interview email sent successfully.' });
+     } catch {
+       setScheduleOpen(false);
+-      setScheduleNotice({ type: 'error', message: 'Email sending failed. Please try again.' });
++      toast({ type: 'error', message: 'Email sending failed. Please try again.' });
+     } finally {
+       setSendingEmail(false);
+     }
+@@ -237,7 +240,7 @@ function JdDetails() {
+     );
+   }
+ 
+-  if (!jd) return <Layout><div className="jd-loading">Loading...</div></Layout>;
++  if (!jd) return <Layout><div className="jd-loading"><SkeletonBlock variant="detail" count={3} /></div></Layout>;
+ 
+   const pipelineStages = [
+     { label: 'Screening Passed', value: jd.selected_count }, { label: 'Recruiter Review', value: 0 },
+@@ -248,13 +251,6 @@ function JdDetails() {
+   return (
+     <Layout>
+       <div className="jd-details-container">
+-        {scheduleNotice && (
+-          <div className={`jd-schedule-toast jd-schedule-toast-${scheduleNotice.type}`} role="status">
+-            <i className={`fas ${scheduleNotice.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+-            {scheduleNotice.message}
+-          </div>
+-        )}
+-
+         <div className="jd-details-topbar">
+           <h1><i className="fas fa-file-alt"></i> {jd.title}</h1>
+           <Link to="/jobs" className="btn btn-secondary"><i className="fas fa-arrow-left"></i> Back to JDs</Link>
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdList.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdList.jsx
+index 15a1b68..f236361 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdList.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/JdList.jsx
+@@ -1,6 +1,7 @@
+ import React, { useState, useEffect, useCallback } from 'react';
+ import { Link } from 'react-router-dom';
+ import Layout from '../components/Layout.jsx';
++import { SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
+ import { apiGet } from '../api.js';
+ import '../styles/jd_list.css';
+ import '../styles/jd_list_extra.css';
+@@ -58,10 +59,7 @@ function JdList() {
+         </div>
+ 
+         {loading ? (
+-          <div className="jd-empty-state">
+-            <i className="fas fa-spinner fa-spin jd-empty-icon"></i>
+-            <h2 className="jd-empty-title">Loading Job Descriptions</h2>
+-          </div>
++          <SkeletonBlock variant="cards" count={4} />
+         ) : error ? (
+           <div className="jd-empty-state">
+             <i className="fas fa-exclamation-circle jd-empty-icon"></i>
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Profile.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Profile.jsx
+index f341a0d..c42abcd 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Profile.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/pages/Profile.jsx
+@@ -1,5 +1,6 @@
+ import React, { useState, useEffect } from 'react';
+ import Layout from '../components/Layout.jsx';
++import { toast } from '../components/EnterpriseFeedback.jsx';
+ import { apiGet, apiPost } from '../api.js';
+ import '../styles/profile.css';
+ import '../styles/profile_extra.css';
+@@ -21,13 +22,19 @@ function Profile() {
+     try {
+       const { ok, data } = await apiPost('/api/profile', form);
+       if (ok && data.success !== false) {
+-        setMessage(data.message || 'Profile updated successfully');
++        const message = data.message || 'Profile updated successfully';
++        setMessage(message);
++        toast({ type: 'success', message });
+         setForm(prev => ({ ...prev, current_password: '', new_password: '', confirm_password: '' }));
+       } else {
+-        setMessage(data.error || 'Could not update profile.');
++        const message = data.error || 'Could not update profile.';
++        setMessage(message);
++        toast({ type: 'error', message });
+       }
+     } catch {
+-      setMessage('Could not update profile. Check that the API server is running.');
++      const message = 'Could not update profile. Check that the API server is running.';
++      setMessage(message);
++      toast({ type: 'error', message });
+     }
+   };
+ 
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css
+index 90bbead..84d61dd 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css
+@@ -40,6 +40,35 @@ body {
+     overflow-x: hidden;
+ }
+ 
++html {
++    scrollbar-width: thin;
++    scrollbar-color: rgba(0, 212, 255, 0.72) rgba(15, 20, 40, 0.35);
++}
++
++::-webkit-scrollbar {
++    width: 11px;
++    height: 11px;
++}
++
++::-webkit-scrollbar-track {
++    background: rgba(15, 20, 40, 0.35);
++}
++
++::-webkit-scrollbar-thumb {
++    background: linear-gradient(180deg, rgba(0, 212, 255, 0.76), rgba(0, 184, 212, 0.54));
++    border: 3px solid rgba(15, 20, 40, 0.35);
++    border-radius: 999px;
++}
++
++::-webkit-scrollbar-thumb:hover {
++    background: linear-gradient(180deg, rgba(95, 251, 255, 0.9), rgba(0, 212, 255, 0.68));
++}
++
++:focus-visible {
++    outline: 3px solid rgba(0, 212, 255, 0.62);
++    outline-offset: 3px;
++}
++
+ /* ========== APP SHELL ========== */
+ /* Makes the whole app fill the viewport */
+ .app-shell {
+@@ -429,7 +458,8 @@ body {
+     .nav-link.active,
+     .app-footer::before,
+     .app-footer-social a,
+-    .ambient-sweep::before {
++    .ambient-sweep::before,
++    .enterprise-skeleton-item span {
+         animation: none !important;
+     }
+ }
+@@ -713,6 +743,14 @@ h3 {
+     color: #fff;
+ }
+ 
++.btn:disabled,
++button:disabled {
++    cursor: not-allowed;
++    opacity: 0.68;
++    transform: none !important;
++    box-shadow: none !important;
++}
++
+ .btn-primary   { background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); }
+ .btn-primary:hover { background: linear-gradient(135deg, var(--primary-light), var(--primary-color)); box-shadow: 0 0 25px rgba(0, 212, 255, 0.4); }
+ 
+@@ -752,6 +790,14 @@ table thead {
+     color: #fff;
+ }
+ 
++.table-container table thead th,
++.table-responsive table thead th {
++    position: sticky;
++    top: 0;
++    z-index: 2;
++    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
++}
++
+ table th {
+     padding: 1rem 1.2rem;
+     text-align: left;
+@@ -814,6 +860,182 @@ table tbody tr:last-child td { border-bottom: none; }
+     box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+ }
+ 
++.form-group input:invalid:not(:placeholder-shown),
++.form-group textarea:invalid:not(:placeholder-shown),
++.form-group select:invalid:not(:placeholder-shown) {
++    border-color: rgba(255, 68, 68, 0.68);
++    box-shadow: 0 0 0 3px rgba(255, 68, 68, 0.1);
++}
++
++/* ========== ENTERPRISE FEEDBACK ========== */
++.enterprise-toast-stack {
++    position: fixed;
++    top: 96px;
++    right: 28px;
++    z-index: 1400;
++    display: flex;
++    flex-direction: column;
++    gap: 0.75rem;
++    width: min(420px, calc(100vw - 2rem));
++    pointer-events: none;
++}
++
++.enterprise-toast {
++    display: flex;
++    align-items: center;
++    gap: 0.7rem;
++    padding: 1rem 1.1rem;
++    border-radius: 8px;
++    font-weight: 700;
++    color: #1a1f3a;
++    background: rgba(255, 255, 255, 0.96);
++    border: 1px solid rgba(0, 212, 255, 0.28);
++    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.26), 0 0 24px rgba(0, 212, 255, 0.12);
++    backdrop-filter: blur(12px);
++    animation: toast-enter 0.22s ease both;
++    pointer-events: auto;
++}
++
++.enterprise-toast i {
++    color: var(--accent-color);
++    font-size: 1.1rem;
++}
++
++.enterprise-toast-success i { color: #27ae60; }
++.enterprise-toast-error i { color: var(--danger-color); }
++
++@keyframes toast-enter {
++    from { opacity: 0; transform: translate3d(10px, -8px, 0); }
++    to   { opacity: 1; transform: translate3d(0, 0, 0); }
++}
++
++.enterprise-modal-backdrop {
++    position: fixed;
++    inset: 0;
++    z-index: 1300;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    padding: 1.25rem;
++    background: rgba(15, 20, 40, 0.68);
++    backdrop-filter: blur(8px);
++    animation: fadeIn 0.16s ease both;
++}
++
++.enterprise-confirm-dialog {
++    position: relative;
++    width: min(440px, 100%);
++    padding: 2rem;
++    text-align: center;
++    background: #fff;
++    border: 1px solid rgba(0, 212, 255, 0.24);
++    border-radius: 12px;
++    box-shadow: 0 28px 82px rgba(0, 0, 0, 0.32), 0 0 28px rgba(0, 212, 255, 0.12);
++    animation: card-rise-in 0.2s ease both;
++}
++
++.enterprise-confirm-close {
++    position: absolute;
++    top: 0.85rem;
++    right: 0.85rem;
++    width: 36px;
++    height: 36px;
++    border: 0;
++    border-radius: 6px;
++    background: rgba(15, 20, 40, 0.06);
++    color: var(--text-primary);
++    cursor: pointer;
++}
++
++.enterprise-confirm-icon {
++    width: 56px;
++    height: 56px;
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    margin-bottom: 1rem;
++    border-radius: 50%;
++    color: var(--accent-color);
++    background: rgba(0, 212, 255, 0.1);
++    font-size: 1.35rem;
++}
++
++.enterprise-confirm-dialog h2 {
++    margin: 0 0 0.65rem;
++    padding: 0;
++    border: 0;
++    color: var(--text-primary);
++    font-size: 1.35rem;
++}
++
++.enterprise-confirm-dialog p {
++    color: var(--text-secondary);
++    margin-bottom: 1.5rem;
++}
++
++.enterprise-confirm-actions {
++    display: flex;
++    justify-content: center;
++    gap: 0.8rem;
++    flex-wrap: wrap;
++}
++
++.enterprise-skeleton-wrap {
++    width: 100%;
++    display: grid;
++    gap: 1rem;
++}
++
++.enterprise-skeleton-cards {
++    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
++}
++
++.enterprise-skeleton-metrics {
++    grid-template-columns: repeat(5, 1fr);
++    margin-bottom: 2.5rem;
++}
++
++.enterprise-skeleton-detail,
++.enterprise-skeleton-profile {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++}
++
++.enterprise-skeleton-item {
++    min-height: 168px;
++    padding: 1.5rem;
++    border-radius: 12px;
++    background: rgba(255, 255, 255, 0.92);
++    box-shadow: 0 0 20px rgba(0, 212, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
++}
++
++.enterprise-skeleton-item span {
++    display: block;
++    height: 14px;
++    margin-bottom: 1rem;
++    border-radius: 999px;
++    background: linear-gradient(90deg, rgba(208, 216, 242, 0.62), rgba(255, 255, 255, 0.95), rgba(208, 216, 242, 0.62));
++    background-size: 220% 100%;
++    animation: skeleton-shimmer 1.35s ease-in-out infinite;
++}
++
++.enterprise-skeleton-item span:first-child {
++    width: 58%;
++    height: 18px;
++}
++
++.enterprise-skeleton-item span:nth-child(2) {
++    width: 84%;
++}
++
++.enterprise-skeleton-item span:nth-child(3) {
++    width: 42%;
++}
++
++@keyframes skeleton-shimmer {
++    from { background-position: 120% 0; }
++    to   { background-position: -120% 0; }
++}
++
+ /* ========== GRID LAYOUTS ========== */
+ .grid { display: grid; gap: 1.5rem; width: 100%; }
+ .grid-2 { grid-template-columns: repeat(2, 1fr); }
+@@ -963,6 +1185,19 @@ table tbody tr:last-child td { border-bottom: none; }
+     h1 { font-size: 1.7rem; }
+     h2 { font-size: 1.3rem; }
+     .metrics { grid-template-columns: repeat(2, 1fr); }
++    .enterprise-toast-stack {
++        top: 82px;
++        right: 1rem;
++        left: 1rem;
++        width: auto;
++    }
++    .enterprise-skeleton-metrics {
++        grid-template-columns: repeat(2, 1fr);
++    }
++    .enterprise-skeleton-detail,
++    .enterprise-skeleton-profile {
++        grid-template-columns: 1fr;
++    }
+     .app-footer {
+         align-items: flex-start;
+         flex-direction: column;

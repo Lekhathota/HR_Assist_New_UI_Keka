@@ -1,0 +1,495 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 2298 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (LangGraph Agent Architecture) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Understanding document for the Main HR Orchestrator and role-specific agents) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 504.0 Td (Purpose) Tj ET
+BT /F1 10 Tf 44.0 482.0 Td (This backend uses LangGraph as the orchestration framework. A single Main HR Orchestrator creates an agent run,) Tj ET
+BT /F1 10 Tf 44.0 468.0 Td (invokes a compiled StateGraph, and returns a stable API response. The graph uses one LLM Router Agent plus) Tj ET
+BT /F1 10 Tf 44.0 454.0 Td (deterministic fallback routing to send requests into specialized role paths.) Tj ET
+BT /F2 13 Tf 44.0 434.0 Td (Implemented shape) Tj ET
+BT /F1 9 Tf 56.0 412.0 Td (- API entrypoint: routes/agentic_routes.py receives JSON or multipart requests.) Tj ET
+BT /F1 9 Tf 56.0 397.0 Td (- Main orchestrator: orchestration/main_orchestrator.py creates run_id and records running/completed/failed state.) Tj ET
+BT /F1 9 Tf 56.0 382.0 Td (- LangGraph graph: orchestration/hr_graph.py builds StateGraph nodes and conditional edges.) Tj ET
+BT /F1 9 Tf 56.0 367.0 Td (- Router: agents/router_agent.py returns one route from screening, chat, jd, candidate, interview, dashboard,) Tj ET
+BT /F1 9 Tf 56.0 354.0 Td (reports, unsupported.) Tj ET
+BT /F1 9 Tf 56.0 339.0 Td (- Screening path: JD Agent -> Resume Agent -> Matching Agent -> Ranking Agent -> Summary Agent -> Final Response.) Tj ET
+BT /F1 9 Tf 56.0 324.0 Td (- Application paths: JD, candidate, interview, dashboard, reports use app_role_agent -> run_app_workflow.) Tj ET
+BT /F1 9 Tf 56.0 309.0 Td (- Chat path: recruiter_context -> recruiter_chat_agent -> Final Response.) Tj ET
+BT /F2 13 Tf 44.0 290.0 Td (Important concept) Tj ET
+BT /F1 10 Tf 44.0 268.0 Td (LangGraph is used for stateful orchestration and routing. LangChain is present as a dependency, but the implemented) Tj ET
+BT /F1 10 Tf 44.0 254.0 Td (graph nodes call local Python agents, workflows, services, database helpers, and the existing OpenAI helper instead of) Tj ET
+BT /F1 10 Tf 44.0 240.0 Td (LangChain runnable chains.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - LangGraph Agent Architecture Understanding Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 5148 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Architecture Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Runtime components and boundaries) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 45.0 455.0 118.0 54.0 re B Q
+BT /F2 10 Tf 54.0 492.0 Td (Frontend UI) Tj ET
+BT /F1 7 Tf 54.0 477.0 Td (Dashboard, Jobs) Tj ET
+BT /F1 7 Tf 54.0 467.0 Td (Analyze, Talent) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 205.0 455.0 136.0 54.0 re B Q
+BT /F2 10 Tf 214.0 492.0 Td (Flask API) Tj ET
+BT /F1 7 Tf 214.0 477.0 Td (/api/agentic/run) Tj ET
+BT /F1 7 Tf 214.0 467.0 Td (/api/compare) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 383.0 455.0 155.0 54.0 re B Q
+BT /F2 10 Tf 392.0 492.0 Td (Main HR Orchestrator) Tj ET
+BT /F1 7 Tf 392.0 477.0 Td (new run_id) Tj ET
+BT /F1 7 Tf 392.0 467.0 Td (agent_runs status) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 580.0 455.0 158.0 54.0 re B Q
+BT /F2 10 Tf 589.0 492.0 Td (LangGraph StateGraph) Tj ET
+BT /F1 7 Tf 589.0 477.0 Td (router node) Tj ET
+BT /F1 7 Tf 589.0 467.0 Td (conditional edges) Tj ET
+q 1.0 w 163.0 482.0 m 205.0 482.0 l S Q
+q 0.9 w 205.0 482.0 m 197.0 487.0 l S Q
+q 0.9 w 205.0 482.0 m 197.0 477.0 l S Q
+q 1.0 w 341.0 482.0 m 383.0 482.0 l S Q
+q 0.9 w 383.0 482.0 m 375.0 487.0 l S Q
+q 0.9 w 383.0 482.0 m 375.0 477.0 l S Q
+q 1.0 w 538.0 482.0 m 580.0 482.0 l S Q
+q 0.9 w 580.0 482.0 m 572.0 487.0 l S Q
+q 0.9 w 580.0 482.0 m 572.0 477.0 l S Q
+q 0.98 0.98 0.92 rg 0.18 0.24 0.32 RG 1.1 w 75.0 345.0 132.0 54.0 re B Q
+BT /F2 10 Tf 84.0 382.0 Td (LLM Router Agent) Tj ET
+BT /F1 7 Tf 84.0 367.0 Td (strict JSON route) Tj ET
+BT /F1 7 Tf 84.0 357.0 Td (fallback enabled) Tj ET
+q 0.95 0.99 0.95 rg 0.18 0.24 0.32 RG 1.1 w 252.0 345.0 132.0 54.0 re B Q
+BT /F2 10 Tf 261.0 382.0 Td (Screening Path) Tj ET
+BT /F1 7 Tf 261.0 367.0 Td (JD, Resume) Tj ET
+BT /F1 7 Tf 261.0 357.0 Td (Match, Rank, Summary) Tj ET
+q 0.95 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 429.0 345.0 132.0 54.0 re B Q
+BT /F2 10 Tf 438.0 382.0 Td (Chat Path) Tj ET
+BT /F1 7 Tf 438.0 367.0 Td (Context validate) Tj ET
+BT /F1 7 Tf 438.0 357.0 Td (Recruiter chat) Tj ET
+q 0.98 0.96 1.00 rg 0.18 0.24 0.32 RG 1.1 w 606.0 345.0 132.0 54.0 re B Q
+BT /F2 10 Tf 615.0 382.0 Td (App Role Path) Tj ET
+BT /F1 7 Tf 615.0 367.0 Td (JD, candidate) Tj ET
+BT /F1 7 Tf 615.0 357.0 Td (interview, dashboard) Tj ET
+q 1.0 w 659.0 455.0 m 141.0 399.0 l S Q
+q 0.9 w 141.0 399.0 m 149.0 404.0 l S Q
+q 0.9 w 141.0 399.0 m 149.0 394.0 l S Q
+q 1.0 w 141.0 345.0 m 318.0 399.0 l S Q
+q 0.9 w 318.0 399.0 m 310.0 404.0 l S Q
+q 0.9 w 318.0 399.0 m 310.0 394.0 l S Q
+q 1.0 w 141.0 345.0 m 495.0 399.0 l S Q
+q 0.9 w 495.0 399.0 m 487.0 404.0 l S Q
+q 0.9 w 495.0 399.0 m 487.0 394.0 l S Q
+q 1.0 w 141.0 345.0 m 672.0 399.0 l S Q
+q 0.9 w 672.0 399.0 m 664.0 404.0 l S Q
+q 0.9 w 672.0 399.0 m 664.0 394.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 86.0 225.0 170.0 62.0 re B Q
+BT /F2 10 Tf 95.0 270.0 Td (Role Agents) Tj ET
+BT /F1 7 Tf 95.0 255.0 Td (jd_agent.py) Tj ET
+BT /F1 7 Tf 95.0 245.0 Td (resume_agent.py) Tj ET
+BT /F1 7 Tf 95.0 235.0 Td (matching/ranking/summary) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 318.0 225.0 170.0 62.0 re B Q
+BT /F2 10 Tf 327.0 270.0 Td (Workflows) Tj ET
+BT /F1 7 Tf 327.0 255.0 Td (app_workflow.py) Tj ET
+BT /F1 7 Tf 327.0 245.0 Td (recruiter_chat_workflow.py) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 550.0 225.0 170.0 62.0 re B Q
+BT /F2 10 Tf 559.0 270.0 Td (Services and DB) Tj ET
+BT /F1 7 Tf 559.0 255.0 Td (services/*.py) Tj ET
+BT /F1 7 Tf 559.0 245.0 Td (database.py, MongoDB) Tj ET
+q 1.0 w 318.0 345.0 m 171.0 287.0 l S Q
+q 0.9 w 171.0 287.0 m 179.0 292.0 l S Q
+q 0.9 w 171.0 287.0 m 179.0 282.0 l S Q
+q 1.0 w 495.0 345.0 m 403.0 287.0 l S Q
+q 0.9 w 403.0 287.0 m 411.0 292.0 l S Q
+q 0.9 w 403.0 287.0 m 411.0 282.0 l S Q
+q 1.0 w 672.0 345.0 m 403.0 287.0 l S Q
+q 0.9 w 403.0 287.0 m 411.0 292.0 l S Q
+q 0.9 w 403.0 287.0 m 411.0 282.0 l S Q
+q 1.0 w 256.0 256.0 m 318.0 256.0 l S Q
+q 0.9 w 318.0 256.0 m 310.0 261.0 l S Q
+q 0.9 w 318.0 256.0 m 310.0 251.0 l S Q
+q 1.0 w 488.0 256.0 m 550.0 256.0 l S Q
+q 0.9 w 550.0 256.0 m 542.0 261.0 l S Q
+q 0.9 w 550.0 256.0 m 542.0 251.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 245.0 120.0 155.0 54.0 re B Q
+BT /F2 10 Tf 254.0 157.0 Td (OpenAI Helper) Tj ET
+BT /F1 7 Tf 254.0 142.0 Td (llm_extraction.py) Tj ET
+BT /F1 7 Tf 254.0 132.0 Td (router LLM call) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 465.0 120.0 155.0 54.0 re B Q
+BT /F2 10 Tf 474.0 157.0 Td (Trace Metadata) Tj ET
+BT /F1 7 Tf 474.0 142.0 Td (trace_start/end) Tj ET
+BT /F1 7 Tf 474.0 132.0 Td (agent_runs output) Tj ET
+q 1.0 w 171.0 225.0 m 245.0 174.0 l S Q
+q 0.9 w 245.0 174.0 m 237.0 179.0 l S Q
+q 0.9 w 245.0 174.0 m 237.0 169.0 l S Q
+q 1.0 w 403.0 225.0 m 465.0 174.0 l S Q
+q 0.9 w 465.0 174.0 m 457.0 179.0 l S Q
+q 0.9 w 465.0 174.0 m 457.0 169.0 l S Q
+q 1.0 w 635.0 225.0 m 543.0 174.0 l S Q
+q 0.9 w 543.0 174.0 m 551.0 179.0 l S Q
+q 0.9 w 543.0 174.0 m 551.0 169.0 l S Q
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - LangGraph Agent Architecture Understanding Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 3400 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Use Case Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Actors and LangGraph-backed capabilities) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 55.0 400.0 115.0 48.0 re B Q
+BT /F2 10 Tf 64.0 431.0 Td (Recruiter) Tj ET
+BT /F1 7 Tf 64.0 416.0 Td (Primary user) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 55.0 285.0 115.0 48.0 re B Q
+BT /F2 10 Tf 64.0 316.0 Td (Admin/User) Tj ET
+BT /F1 7 Tf 64.0 301.0 Td (Profile, reports) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 642.0 400.0 115.0 48.0 re B Q
+BT /F2 10 Tf 651.0 431.0 Td (OpenAI API) Tj ET
+BT /F1 7 Tf 651.0 416.0 Td (Router/extraction) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 642.0 285.0 115.0 48.0 re B Q
+BT /F2 10 Tf 651.0 316.0 Td (MongoDB) Tj ET
+BT /F1 7 Tf 651.0 301.0 Td (HR data, runs) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 466.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 479.0 Td (Run resume screening) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 415.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 428.0 Td (Ask recruiter chat question) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 364.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 377.0 Td (Manage job descriptions) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 313.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 326.0 Td (View/manage candidates) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 262.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 275.0 Td (Schedule interview) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 211.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 224.0 Td (View dashboard and reports) Tj ET
+q 0.98 0.98 0.95 rg 0.18 0.24 0.32 RG 1.1 w 260.0 160.0 260.0 35.0 re B Q
+BT /F2 10 Tf 276.0 173.0 Td (Audit agent run state) Tj ET
+q 1.0 w 170.0 424.0 m 260.0 483.0 l S Q
+q 0.9 w 260.0 483.0 m 252.0 488.0 l S Q
+q 0.9 w 260.0 483.0 m 252.0 478.0 l S Q
+q 1.0 w 170.0 424.0 m 260.0 432.0 l S Q
+q 0.9 w 260.0 432.0 m 252.0 437.0 l S Q
+q 0.9 w 260.0 432.0 m 252.0 427.0 l S Q
+q 1.0 w 170.0 424.0 m 260.0 381.0 l S Q
+q 0.9 w 260.0 381.0 m 252.0 386.0 l S Q
+q 0.9 w 260.0 381.0 m 252.0 376.0 l S Q
+q 1.0 w 170.0 424.0 m 260.0 330.0 l S Q
+q 0.9 w 260.0 330.0 m 255.0 338.0 l S Q
+q 0.9 w 260.0 330.0 m 265.0 338.0 l S Q
+q 1.0 w 170.0 424.0 m 260.0 279.0 l S Q
+q 0.9 w 260.0 279.0 m 255.0 287.0 l S Q
+q 0.9 w 260.0 279.0 m 265.0 287.0 l S Q
+q 1.0 w 170.0 424.0 m 260.0 228.0 l S Q
+q 0.9 w 260.0 228.0 m 255.0 236.0 l S Q
+q 0.9 w 260.0 228.0 m 265.0 236.0 l S Q
+q 1.0 w 170.0 309.0 m 260.0 177.0 l S Q
+q 0.9 w 260.0 177.0 m 255.0 185.0 l S Q
+q 0.9 w 260.0 177.0 m 265.0 185.0 l S Q
+q 1.0 w 520.0 467.0 m 642.0 424.0 l S Q
+q 0.9 w 642.0 424.0 m 634.0 429.0 l S Q
+q 0.9 w 642.0 424.0 m 634.0 419.0 l S Q
+q 1.0 w 520.0 364.0 m 642.0 309.0 l S Q
+q 0.9 w 642.0 309.0 m 634.0 314.0 l S Q
+q 0.9 w 642.0 309.0 m 634.0 304.0 l S Q
+q 1.0 w 520.0 177.0 m 642.0 309.0 l S Q
+q 0.9 w 642.0 309.0 m 637.0 301.0 l S Q
+q 0.9 w 642.0 309.0 m 647.0 301.0 l S Q
+BT /F2 10 Tf 76.0 103.0 Td (Use case boundary: users still call the same Flask APIs; LangGraph is an internal orchestration layer.) Tj ET
+BT /F1 10 Tf 76.0 85.0 Td (The Router Agent is the only component that decides the global route.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - LangGraph Agent Architecture Understanding Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 4265 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Flow Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (End-to-end graph execution flow) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 505.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 526.0 Td (API request) Tj ET
+BT /F1 7 Tf 329.0 511.0 Td (JSON or multipart form data) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 455.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 476.0 Td (Main HR Orchestrator) Tj ET
+BT /F1 7 Tf 329.0 461.0 Td (create run_id and running status) Tj ET
+q 1.0 w 435.0 505.0 m 435.0 493.0 l S Q
+q 0.9 w 435.0 493.0 m 430.0 501.0 l S Q
+q 0.9 w 435.0 493.0 m 440.0 501.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 405.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 426.0 Td (router_node) Tj ET
+BT /F1 7 Tf 329.0 411.0 Td (LLM Router Agent + deterministic fallback) Tj ET
+q 1.0 w 435.0 455.0 m 435.0 443.0 l S Q
+q 0.9 w 435.0 443.0 m 430.0 451.0 l S Q
+q 0.9 w 435.0 443.0 m 440.0 451.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 355.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 376.0 Td (conditional edge) Tj ET
+BT /F1 7 Tf 329.0 361.0 Td (screening, chat, app role, unsupported) Tj ET
+q 1.0 w 435.0 405.0 m 435.0 393.0 l S Q
+q 0.9 w 435.0 393.0 m 430.0 401.0 l S Q
+q 0.9 w 435.0 393.0 m 440.0 401.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 285.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 306.0 Td (specialized path) Tj ET
+BT /F1 7 Tf 329.0 291.0 Td (execute role-specific graph nodes) Tj ET
+q 1.0 w 435.0 355.0 m 435.0 323.0 l S Q
+q 0.9 w 435.0 323.0 m 430.0 331.0 l S Q
+q 0.9 w 435.0 323.0 m 440.0 331.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 215.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 236.0 Td (final_response) Tj ET
+BT /F1 7 Tf 329.0 221.0 Td (normalize output shape) Tj ET
+q 1.0 w 435.0 285.0 m 435.0 253.0 l S Q
+q 0.9 w 435.0 253.0 m 430.0 261.0 l S Q
+q 0.9 w 435.0 253.0 m 440.0 261.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 165.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 186.0 Td (agent_run update) Tj ET
+BT /F1 7 Tf 329.0 171.0 Td (completed or failed) Tj ET
+q 1.0 w 435.0 215.0 m 435.0 203.0 l S Q
+q 0.9 w 435.0 203.0 m 430.0 211.0 l S Q
+q 0.9 w 435.0 203.0 m 440.0 211.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 320.0 115.0 230.0 38.0 re B Q
+BT /F2 10 Tf 329.0 136.0 Td (API response) Tj ET
+BT /F1 7 Tf 329.0 121.0 Td (frontend receives stable response) Tj ET
+q 1.0 w 435.0 165.0 m 435.0 153.0 l S Q
+q 0.9 w 435.0 153.0 m 430.0 161.0 l S Q
+q 0.9 w 435.0 153.0 m 440.0 161.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 60.0 270.0 180.0 76.0 re B Q
+BT /F2 10 Tf 69.0 329.0 Td (Screening Branch) Tj ET
+BT /F1 7 Tf 69.0 314.0 Td (JD Agent) Tj ET
+BT /F1 7 Tf 69.0 304.0 Td (Resume Agent) Tj ET
+BT /F1 7 Tf 69.0 294.0 Td (Matching Agent) Tj ET
+BT /F1 7 Tf 69.0 284.0 Td (Ranking Agent) Tj ET
+BT /F1 7 Tf 69.0 274.0 Td (Summary Agent) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 600.0 270.0 180.0 76.0 re B Q
+BT /F2 10 Tf 609.0 329.0 Td (Other Branches) Tj ET
+BT /F1 7 Tf 609.0 314.0 Td (Chat path) Tj ET
+BT /F1 7 Tf 609.0 304.0 Td (JD path) Tj ET
+BT /F1 7 Tf 609.0 294.0 Td (Candidate path) Tj ET
+BT /F1 7 Tf 609.0 284.0 Td (Interview path) Tj ET
+BT /F1 7 Tf 609.0 274.0 Td (Dashboard/reports) Tj ET
+q 1.0 w 320.0 374.0 m 240.0 325.0 l S Q
+q 0.9 w 240.0 325.0 m 248.0 330.0 l S Q
+q 0.9 w 240.0 325.0 m 248.0 320.0 l S Q
+q 1.0 w 550.0 374.0 m 600.0 325.0 l S Q
+q 0.9 w 600.0 325.0 m 592.0 330.0 l S Q
+q 0.9 w 600.0 325.0 m 592.0 320.0 l S Q
+q 1.0 w 240.0 270.0 m 320.0 234.0 l S Q
+q 0.9 w 320.0 234.0 m 312.0 239.0 l S Q
+q 0.9 w 320.0 234.0 m 312.0 229.0 l S Q
+q 1.0 w 600.0 270.0 m 550.0 234.0 l S Q
+q 0.9 w 550.0 234.0 m 558.0 239.0 l S Q
+q 0.9 w 550.0 234.0 m 558.0 229.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 60.0 145.0 180.0 56.0 re B Q
+BT /F2 10 Tf 69.0 184.0 Td (Unsupported/Error) Tj ET
+BT /F1 7 Tf 69.0 169.0 Td (raise ValueError) Tj ET
+BT /F1 7 Tf 69.0 159.0 Td (mark run failed) Tj ET
+q 1.0 w 320.0 374.0 m 240.0 173.0 l S Q
+q 0.9 w 240.0 173.0 m 235.0 181.0 l S Q
+q 0.9 w 240.0 173.0 m 245.0 181.0 l S Q
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - LangGraph Agent Architecture Understanding Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 3227 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (UML Sequence Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Request lifecycle through the graph) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.1 w 48.0 500.0 105.0 34.0 re B Q
+BT /F2 10 Tf 57.0 517.0 Td (Frontend) Tj ET
+q 0.6 w 100.0 500.0 m 100.0 75.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.1 w 170.0 500.0 105.0 34.0 re B Q
+BT /F2 10 Tf 179.0 517.0 Td (API Route) Tj ET
+q 0.6 w 222.0 500.0 m 222.0 75.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.1 w 292.0 500.0 105.0 34.0 re B Q
+BT /F2 10 Tf 301.0 517.0 Td (Orchestrator) Tj ET
+q 0.6 w 344.0 500.0 m 344.0 75.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.1 w 414.0 500.0 105.0 34.0 re B Q
+BT /F2 10 Tf 423.0 517.0 Td (LangGraph) Tj ET
+q 0.6 w 466.0 500.0 m 466.0 75.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.1 w 536.0 500.0 105.0 34.0 re B Q
+BT /F2 10 Tf 545.0 517.0 Td (Agents) Tj ET
+q 0.6 w 588.0 500.0 m 588.0 75.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.1 w 658.0 500.0 105.0 34.0 re B Q
+BT /F2 10 Tf 667.0 517.0 Td (DB/Services) Tj ET
+q 0.6 w 710.0 500.0 m 710.0 75.0 l S Q
+q 1.0 w 100.0 470.0 m 222.0 470.0 l S Q
+q 0.9 w 222.0 470.0 m 214.0 475.0 l S Q
+q 0.9 w 222.0 470.0 m 214.0 465.0 l S Q
+BT /F1 7 Tf 106.0 478.0 Td (POST /api/agentic/run) Tj ET
+q 1.0 w 222.0 430.0 m 344.0 430.0 l S Q
+q 0.9 w 344.0 430.0 m 336.0 435.0 l S Q
+q 0.9 w 344.0 430.0 m 336.0 425.0 l S Q
+BT /F1 7 Tf 228.0 438.0 Td (run_main_orchestrator) Tj ET
+q 1.0 w 344.0 390.0 m 710.0 390.0 l S Q
+q 0.9 w 710.0 390.0 m 702.0 395.0 l S Q
+q 0.9 w 710.0 390.0 m 702.0 385.0 l S Q
+BT /F1 7 Tf 350.0 398.0 Td (create_agent_run running) Tj ET
+q 1.0 w 344.0 350.0 m 466.0 350.0 l S Q
+q 0.9 w 466.0 350.0 m 458.0 355.0 l S Q
+q 0.9 w 466.0 350.0 m 458.0 345.0 l S Q
+BT /F1 7 Tf 350.0 358.0 Td (invoke StateGraph) Tj ET
+q 1.0 w 466.0 310.0 m 588.0 310.0 l S Q
+q 0.9 w 588.0 310.0 m 580.0 315.0 l S Q
+q 0.9 w 588.0 310.0 m 580.0 305.0 l S Q
+BT /F1 7 Tf 472.0 318.0 Td (router_node route_request) Tj ET
+q 1.0 w 466.0 270.0 m 588.0 270.0 l S Q
+q 0.9 w 588.0 270.0 m 580.0 275.0 l S Q
+q 0.9 w 588.0 270.0 m 580.0 265.0 l S Q
+BT /F1 7 Tf 472.0 278.0 Td (execute selected path nodes) Tj ET
+q 1.0 w 588.0 230.0 m 710.0 230.0 l S Q
+q 0.9 w 710.0 230.0 m 702.0 235.0 l S Q
+q 0.9 w 710.0 230.0 m 702.0 225.0 l S Q
+BT /F1 7 Tf 594.0 238.0 Td (load/persist data) Tj ET
+q 1.0 w 466.0 190.0 m 344.0 190.0 l S Q
+q 0.9 w 344.0 190.0 m 352.0 195.0 l S Q
+q 0.9 w 344.0 190.0 m 352.0 185.0 l S Q
+BT /F1 7 Tf 350.0 198.0 Td (final_response) Tj ET
+q 1.0 w 344.0 150.0 m 710.0 150.0 l S Q
+q 0.9 w 710.0 150.0 m 702.0 155.0 l S Q
+q 0.9 w 710.0 150.0 m 702.0 145.0 l S Q
+BT /F1 7 Tf 350.0 158.0 Td (update_agent_run completed) Tj ET
+q 1.0 w 344.0 110.0 m 222.0 110.0 l S Q
+q 0.9 w 222.0 110.0 m 230.0 115.0 l S Q
+q 0.9 w 222.0 110.0 m 230.0 105.0 l S Q
+BT /F1 7 Tf 228.0 118.0 Td (return result) Tj ET
+q 1.0 w 222.0 80.0 m 100.0 80.0 l S Q
+q 0.9 w 100.0 80.0 m 108.0 85.0 l S Q
+q 0.9 w 100.0 80.0 m 108.0 75.0 l S Q
+BT /F1 7 Tf 106.0 88.0 Td (JSON response) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - LangGraph Agent Architecture Understanding Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 3532 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (UML State and Class View) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Shared state object and graph node responsibilities) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 64.0 500.0 Td (StateGraph state model) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 64.0 330.0 275.0 142.0 re B Q
+BT /F2 10 Tf 73.0 455.0 Td (HRGraphState) Tj ET
+BT /F1 7 Tf 73.0 440.0 Td (payload: request payload) Tj ET
+BT /F1 7 Tf 73.0 430.0 Td (username, run_id, task_type) Tj ET
+BT /F1 7 Tf 73.0 420.0 Td (route, route_decision) Tj ET
+BT /F1 7 Tf 73.0 410.0 Td (jd_id, jd_context, resume_context) Tj ET
+BT /F1 7 Tf 73.0 400.0 Td (match_context, ranked_context) Tj ET
+BT /F1 7 Tf 73.0 390.0 Td (summary, errors) Tj ET
+BT /F1 7 Tf 73.0 380.0 Td (path_result, final_response) Tj ET
+BT /F2 13 Tf 430.0 500.0 Td (State transitions) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 430.0 448.0 150.0 36.0 re B Q
+BT /F2 10 Tf 439.0 467.0 Td (START) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 430.0 395.0 150.0 36.0 re B Q
+BT /F2 10 Tf 439.0 414.0 Td (router) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 250.0 315.0 150.0 45.0 re B Q
+BT /F2 10 Tf 259.0 343.0 Td (screening nodes) Tj ET
+BT /F1 7 Tf 259.0 328.0 Td (JD -> Resume -> Match) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 430.0 315.0 150.0 45.0 re B Q
+BT /F2 10 Tf 439.0 343.0 Td (chat nodes) Tj ET
+BT /F1 7 Tf 439.0 328.0 Td (context -> chat) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 610.0 315.0 150.0 45.0 re B Q
+BT /F2 10 Tf 619.0 343.0 Td (app_role_agent) Tj ET
+BT /F1 7 Tf 619.0 328.0 Td (workflow dispatch) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 430.0 230.0 150.0 36.0 re B Q
+BT /F2 10 Tf 439.0 249.0 Td (final_response) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.1 w 430.0 175.0 150.0 36.0 re B Q
+BT /F2 10 Tf 439.0 194.0 Td (END) Tj ET
+q 1.0 w 505.0 448.0 m 505.0 431.0 l S Q
+q 0.9 w 505.0 431.0 m 500.0 439.0 l S Q
+q 0.9 w 505.0 431.0 m 510.0 439.0 l S Q
+q 1.0 w 430.0 395.0 m 325.0 360.0 l S Q
+q 0.9 w 325.0 360.0 m 333.0 365.0 l S Q
+q 0.9 w 325.0 360.0 m 333.0 355.0 l S Q
+q 1.0 w 505.0 395.0 m 505.0 360.0 l S Q
+q 0.9 w 505.0 360.0 m 500.0 368.0 l S Q
+q 0.9 w 505.0 360.0 m 510.0 368.0 l S Q
+q 1.0 w 580.0 395.0 m 685.0 360.0 l S Q
+q 0.9 w 685.0 360.0 m 677.0 365.0 l S Q
+q 0.9 w 685.0 360.0 m 677.0 355.0 l S Q
+q 1.0 w 325.0 315.0 m 505.0 266.0 l S Q
+q 0.9 w 505.0 266.0 m 497.0 271.0 l S Q
+q 0.9 w 505.0 266.0 m 497.0 261.0 l S Q
+q 1.0 w 505.0 315.0 m 505.0 266.0 l S Q
+q 0.9 w 505.0 266.0 m 500.0 274.0 l S Q
+q 0.9 w 505.0 266.0 m 510.0 274.0 l S Q
+q 1.0 w 685.0 315.0 m 505.0 266.0 l S Q
+q 0.9 w 505.0 266.0 m 513.0 271.0 l S Q
+q 0.9 w 505.0 266.0 m 513.0 261.0 l S Q
+q 1.0 w 505.0 230.0 m 505.0 211.0 l S Q
+q 0.9 w 505.0 211.0 m 500.0 219.0 l S Q
+q 0.9 w 505.0 211.0 m 510.0 219.0 l S Q
+BT /F2 12 Tf 64.0 270.0 Td (Node rule) Tj ET
+BT /F1 9 Tf 76.0 248.0 Td (- Each graph node receives HRGraphState and returns a) Tj ET
+BT /F1 9 Tf 76.0 235.0 Td (partial state update.) Tj ET
+BT /F1 9 Tf 76.0 222.0 Td (- Only router_node chooses the global route.) Tj ET
+BT /F1 9 Tf 76.0 209.0 Td (- final_response_node creates the API-facing response) Tj ET
+BT /F1 9 Tf 76.0 196.0 Td (shape.) Tj ET
+BT /F1 9 Tf 76.0 183.0 Td (- Fatal exceptions are caught by the main orchestrator and) Tj ET
+BT /F1 9 Tf 76.0 170.0 Td (mark the run failed.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - LangGraph Agent Architecture Understanding Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+15 0 obj
+<< /Type /Pages /Kids [9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R] /Count 6 >>
+endobj
+16 0 obj
+<< /Type /Catalog /Pages 15 0 R >>
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000002510 00000 n 
+0000007710 00000 n 
+0000011162 00000 n 
+0000015479 00000 n 
+0000018758 00000 n 
+0000022342 00000 n 
+0000022479 00000 n 
+0000022617 00000 n 
+0000022755 00000 n 
+0000022893 00000 n 
+0000023031 00000 n 
+0000023169 00000 n 
+0000023262 00000 n 
+trailer
+<< /Size 17 /Root 16 0 R >>
+startxref
+23313
+%%EOF

@@ -1,0 +1,281 @@
+/* ========== DASHBOARD EXTRA STYLES ========== */
+
+@keyframes dashboard-soft-rise {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes dashboard-progress-grow {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+.dashboard-metric-card {
+    position: relative;
+    min-height: 132px;
+    display: grid;
+    align-content: center;
+    gap: 0.35rem;
+    padding: 1rem;
+    overflow: hidden;
+    color: #ffffff;
+    background: rgba(15, 20, 40, 0.5);
+    border: 1px solid rgba(239, 122, 45, 0.18);
+    border-radius: 8px;
+    box-shadow: none;
+    text-align: left;
+    text-decoration: none;
+    transition: none;
+    animation: dashboard-soft-rise 0.42s ease var(--delay) both;
+}
+
+.dashboard-metric-card::before {
+    display: none;
+}
+
+.dashboard-metric-icon {
+    position: relative;
+    z-index: 1;
+    width: auto;
+    height: auto;
+    display: inline-block;
+    margin: 0;
+    color: var(--accent-color);
+    background: transparent;
+    box-shadow: none;
+    font-size: 1.2rem;
+}
+
+.dashboard-metric-card h4 {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.25;
+    text-transform: none;
+}
+
+.dashboard-metric-card > small {
+    position: relative;
+    z-index: 1;
+    display: block;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.dashboard-metric-card span {
+    position: relative;
+    z-index: 1;
+    display: block;
+    color: #ffffff;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.dashboard-metric-card.success span,
+.dashboard-metric-card.warning span,
+.dashboard-metric-card.danger span {
+    color: #ffffff;
+}
+
+.dashboard-metric-card:hover,
+.dashboard-metric-card:focus-visible {
+    background: rgba(15, 20, 40, 0.5);
+    border-color: rgba(239, 122, 45, 0.18);
+    box-shadow: none;
+    transform: none;
+    text-decoration: none;
+}
+
+.dashboard-metric-card:hover h4,
+.dashboard-metric-card:focus-visible h4 {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.dashboard-metric-card:hover > small,
+.dashboard-metric-card:focus-visible > small {
+    color: rgba(255, 255, 255, 0.58);
+}
+
+.dashboard-metric-card:hover span,
+.dashboard-metric-card:focus-visible span {
+    color: #ffffff;
+    text-shadow: none;
+}
+
+.dashboard-metric-link {
+    cursor: pointer;
+}
+
+.dashboard-metric-link:focus-visible {
+    outline: 3px solid rgba(239, 122, 45, 0.65);
+    outline-offset: 4px;
+}
+
+.dashboard-jd-item-meta {
+    font-size: 0.85rem;
+    color: #ffffff;
+    margin-top: 0.3rem;
+}
+
+.dashboard-jd-item-status {
+    font-size: 0.9rem;
+    color: #ffffff;
+    margin-top: 0.3rem;
+}
+
+.dashboard-recent-activity-title {
+    margin-top: 3rem;
+    color: #ef7a2d;
+    text-shadow: 0 0 10px rgba(239, 122, 45, 0.5);
+    margin-bottom: 1.5rem;
+}
+
+.activity-card {
+    background: linear-gradient(135deg, rgba(26, 31, 58, 0.8), rgba(45, 53, 97, 0.8));
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(239, 122, 45, 0.1);
+    border: 1px solid rgba(239, 122, 45, 0.2);
+}
+
+.activity-card-title {
+    color: #ef7a2d;
+}
+
+.activity-card .list-group-item a,
+.dashboard-comparison-title {
+    color: #ef7a2d;
+    font-weight: 700;
+}
+
+.activity-card .list-group-item a:hover,
+.activity-card .list-group-item a:focus-visible {
+    color: #ffffff;
+}
+
+.funnel-section {
+    margin-top: 1.5rem;
+}
+
+.funnel-item {
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-funnel-stats,
+.dashboard-team-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0 1.25rem;
+}
+
+.dashboard-funnel-stats div,
+.dashboard-team-overview div {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 70px;
+    padding: 0.85rem;
+    border: 1px solid rgba(239, 122, 45, 0.18);
+    border-radius: 8px;
+    background: rgba(15, 20, 40, 0.42);
+    animation: dashboard-soft-rise 0.42s ease both;
+}
+
+.dashboard-funnel-stats strong,
+.dashboard-team-overview strong {
+    display: block;
+    color: #ffffff;
+    font-size: 1.45rem;
+    line-height: 1;
+}
+
+.dashboard-funnel-stats span,
+.dashboard-team-overview small {
+    display: block;
+    margin-top: 0.25rem;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.dashboard-team-overview i {
+    color: var(--accent-color);
+    font-size: 1.05rem;
+}
+
+.progress-label {
+    align-items: flex-start;
+}
+
+.progress-label span {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.progress-label small,
+.progress-label em {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.76rem;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.progress-label span:last-child {
+    justify-items: end;
+}
+
+.dashboard-progress-bar {
+    transform-origin: left center;
+    animation: dashboard-progress-grow 0.82s ease-out both;
+}
+
+.table_block tbody tr {
+    animation: dashboard-soft-rise 0.28s ease both;
+}
+
+.list-item-empty {
+    color: #fff;
+    text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-metric-card,
+    .dashboard-funnel-stats div,
+    .dashboard-team-overview div,
+    .dashboard-progress-bar,
+    .table_block tbody tr {
+        animation: none !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .dashboard-metric-card {
+        min-height: 120px;
+        padding: 1rem;
+    }
+
+    .dashboard-metric-icon {
+        font-size: 1.1rem;
+    }
+
+    .dashboard-metric-card h4 {
+        font-size: 0.88rem;
+    }
+}

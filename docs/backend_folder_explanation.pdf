@@ -1,0 +1,221 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 2372 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Backend Folder Explanation) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (RecruitmentAssist backend structure and responsibilities) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (Backend architecture in one sentence) Tj ET
+BT /F1 10 Tf 44.0 478.0 Td (The backend is a Flask application split into routes, services, database helpers, agentic workflows, tools, and safety) Tj ET
+BT /F1 10 Tf 44.0 464.0 Td (layers so normal HR features and AI assistant features can share the same data safely.) Tj ET
+BT /F2 13 Tf 44.0 442.0 Td (How the main layers connect) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 64.0 372.0 120.0 48.0 re B Q
+BT /F2 10 Tf 73.0 403.0 Td (routes) Tj ET
+BT /F1 7 Tf 73.0 389.0 Td (HTTP API) Tj ET
+BT /F1 7 Tf 73.0 379.0 Td (auth + JSON) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 226.0 372.0 120.0 48.0 re B Q
+BT /F2 10 Tf 235.0 403.0 Td (services) Tj ET
+BT /F1 7 Tf 235.0 389.0 Td (business logic) Tj ET
+BT /F1 7 Tf 235.0 379.0 Td (feature rules) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 388.0 372.0 120.0 48.0 re B Q
+BT /F2 10 Tf 397.0 403.0 Td (database.py) Tj ET
+BT /F1 7 Tf 397.0 389.0 Td (runtime CRUD) Tj ET
+BT /F1 7 Tf 397.0 379.0 Td (Mongo helpers) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 550.0 372.0 120.0 48.0 re B Q
+BT /F2 10 Tf 559.0 403.0 Td (agents) Tj ET
+BT /F1 7 Tf 559.0 389.0 Td (AI reasoning) Tj ET
+BT /F1 7 Tf 559.0 379.0 Td (drafts + answers) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 690.0 372.0 100.0 48.0 re B Q
+BT /F2 10 Tf 699.0 403.0 Td (tools) Tj ET
+BT /F1 7 Tf 699.0 389.0 Td (safe data) Tj ET
+BT /F1 7 Tf 699.0 379.0 Td (actions) Tj ET
+q 1.0 w 184.0 396.0 m 226.0 396.0 l S Q
+q 1.0 w 346.0 396.0 m 388.0 396.0 l S Q
+q 1.0 w 508.0 396.0 m 550.0 396.0 l S Q
+q 1.0 w 670.0 396.0 m 690.0 396.0 l S Q
+BT /F1 9 Tf 56.0 328.0 Td (- Routes are the API boundary.) Tj ET
+BT /F1 9 Tf 56.0 315.0 Td (- Services hold normal product behavior.) Tj ET
+BT /F1 9 Tf 56.0 302.0 Td (- Agents, workflows, tools, schemas, and security support the recruiter assistant and agentic screening flow.) Tj ET
+BT /F1 9 Tf 56.0 289.0 Td (- Root files like app.py and database.py wire the application together.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend Folder Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 2295 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Backend Folders - Part 1) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Each folder's purpose and common files) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 11 Tf 44.0 500.0 Td (agents) Tj ET
+BT /F2 10 Tf 164.0 500.0 Td (AI role modules) Tj ET
+BT /F1 9 Tf 164.0 483.0 Td (Contains specialized agent logic: router, JD, resume, matching, ranking, summary,) Tj ET
+BT /F1 9 Tf 164.0 471.0 Td (interview, and recruiter chat agents. These modules decide or generate intelligent) Tj ET
+BT /F1 9 Tf 164.0 459.0 Td (responses, but still rely on tools/services for data and side effects.) Tj ET
+BT /F1 8 Tf 164.0 447.0 Td (Key files: router_agent.py, recruiter_agent.py, resume_agent.py, matching_agent.py) Tj ET
+BT /F2 11 Tf 44.0 426.0 Td (app) Tj ET
+BT /F2 10 Tf 164.0 426.0 Td (Core extraction and matching helpers) Tj ET
+BT /F1 9 Tf 164.0 409.0 Td (Older/core application utilities used by services: LLM extraction, regex fallback) Tj ET
+BT /F1 9 Tf 164.0 397.0 Td (extraction, text parsing, screening summaries, matching logic, and cleaning helpers.) Tj ET
+BT /F1 8 Tf 164.0 385.0 Td (Key files: llm_extraction.py, regex_extractor.py, text_extractor.py, matcher.py) Tj ET
+BT /F2 11 Tf 44.0 364.0 Td (database) Tj ET
+BT /F2 10 Tf 164.0 364.0 Td (Database setup and migration scripts) Tj ET
+BT /F1 9 Tf 164.0 347.0 Td (Operational scripts and SQL files for schema setup, migration, Mongo import, upload) Tj ET
+BT /F1 9 Tf 164.0 335.0 Td (import, seed data, and admin password fixes. Runtime database helpers live in) Tj ET
+BT /F1 9 Tf 164.0 323.0 Td (backend/database.py.) Tj ET
+BT /F1 8 Tf 164.0 311.0 Td (Key files: schema.sql, migrate_json_to_db.py, seed_mongo_data.py) Tj ET
+BT /F2 11 Tf 44.0 290.0 Td (orchestration) Tj ET
+BT /F2 10 Tf 164.0 290.0 Td (Agent routing and graph coordination) Tj ET
+BT /F1 9 Tf 164.0 273.0 Td (Coordinates agentic requests. The main orchestrator tracks runs, hr_graph routes tasks) Tj ET
+BT /F1 9 Tf 164.0 261.0 Td (through a graph of nodes, and tracing records readable execution events.) Tj ET
+BT /F1 8 Tf 164.0 249.0 Td (Key files: main_orchestrator.py, hr_graph.py, tracing.py) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend Folder Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 2382 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Backend Folders - Part 2) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Each folder's purpose and common files) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 11 Tf 44.0 500.0 Td (routes) Tj ET
+BT /F2 10 Tf 164.0 500.0 Td (Flask API endpoints) Tj ET
+BT /F1 9 Tf 164.0 483.0 Td (HTTP boundary for the backend. Routes receive frontend requests, validate/authenticate) Tj ET
+BT /F1 9 Tf 164.0 471.0 Td (them, call services or workflows, and return JSON responses.) Tj ET
+BT /F1 8 Tf 164.0 459.0 Td (Key files: candidate_routes.py, jd_routes.py, interview_routes.py, agentic_routes.py) Tj ET
+BT /F2 11 Tf 44.0 438.0 Td (schemas) Tj ET
+BT /F2 10 Tf 164.0 438.0 Td (Request validation models) Tj ET
+BT /F1 9 Tf 164.0 421.0 Td (Structured request validation for agentic payloads. It keeps chatbot/orchestrator inputs) Tj ET
+BT /F1 9 Tf 164.0 409.0 Td (predictable before they reach agents and tools.) Tj ET
+BT /F1 8 Tf 164.0 397.0 Td (Key files: agentic.py) Tj ET
+BT /F2 11 Tf 44.0 376.0 Td (security) Tj ET
+BT /F2 10 Tf 164.0 376.0 Td (Agent and tool safety controls) Tj ET
+BT /F1 9 Tf 164.0 359.0 Td (Safety rules for context size, prompt-injection detection, and tool policy. This folder) Tj ET
+BT /F1 9 Tf 164.0 347.0 Td (helps prevent unsafe assistant behavior and unconfirmed side effects.) Tj ET
+BT /F1 8 Tf 164.0 335.0 Td (Key files: context_safety.py, policy.py) Tj ET
+BT /F2 11 Tf 44.0 314.0 Td (services) Tj ET
+BT /F2 10 Tf 164.0 314.0 Td (Business logic layer) Tj ET
+BT /F1 9 Tf 164.0 297.0 Td (Feature logic used by routes: authentication, candidates, JDs, matching, interviews, and) Tj ET
+BT /F1 9 Tf 164.0 285.0 Td (reports. Services transform data and enforce app-level behavior.) Tj ET
+BT /F1 8 Tf 164.0 273.0 Td (Key files: candidate_service.py, interview_service.py, matching_service.py) Tj ET
+BT /F2 11 Tf 44.0 252.0 Td (static) Tj ET
+BT /F2 10 Tf 164.0 252.0 Td (Served static files and uploads) Tj ET
+BT /F1 9 Tf 164.0 235.0 Td (Stores static assets served by Flask, such as the ShimentoX logo and uploaded resume) Tj ET
+BT /F1 9 Tf 164.0 223.0 Td (files. Upload files are data artifacts, not application logic.) Tj ET
+BT /F1 8 Tf 164.0 211.0 Td (Key files: ShimentoX logo, uploads/) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend Folder Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 1948 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Backend Folders - Part 3) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Each folder's purpose and common files) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 11 Tf 44.0 500.0 Td (templates) Tj ET
+BT /F2 10 Tf 164.0 500.0 Td (Flask template placeholder) Tj ET
+BT /F1 9 Tf 164.0 483.0 Td (Reserved for server-rendered templates. In this project the React frontend is primary, so) Tj ET
+BT /F1 9 Tf 164.0 471.0 Td (this folder mostly exists for Flask compatibility.) Tj ET
+BT /F1 8 Tf 164.0 459.0 Td (Key files: .gitkeep) Tj ET
+BT /F2 11 Tf 44.0 438.0 Td (tests) Tj ET
+BT /F2 10 Tf 164.0 438.0 Td (Automated backend checks) Tj ET
+BT /F1 9 Tf 164.0 421.0 Td (Backend tests for safety and important behavior. These provide regression checks for) Tj ET
+BT /F1 9 Tf 164.0 409.0 Td (security hardening and can be expanded as the backend grows.) Tj ET
+BT /F1 8 Tf 164.0 397.0 Td (Key files: test_security_hardening.py) Tj ET
+BT /F2 11 Tf 44.0 376.0 Td (tools) Tj ET
+BT /F2 10 Tf 164.0 376.0 Td (Safe helper capabilities for agents) Tj ET
+BT /F1 9 Tf 164.0 359.0 Td (Small focused helpers that agents can call for app data or approved actions. The gateway) Tj ET
+BT /F1 9 Tf 164.0 347.0 Td (centralizes confirmation/policy checks for side-effecting tools.) Tj ET
+BT /F1 8 Tf 164.0 335.0 Td (Key files: recruiter_tools.py, matching_tools.py, tool_gateway.py) Tj ET
+BT /F2 11 Tf 44.0 314.0 Td (workflows) Tj ET
+BT /F2 10 Tf 164.0 314.0 Td (Multi-step application flows) Tj ET
+BT /F1 9 Tf 164.0 297.0 Td (Orchestrates larger processes like screening and recruiter chat by calling agents, tools,) Tj ET
+BT /F1 9 Tf 164.0 285.0 Td (and services in the right order.) Tj ET
+BT /F1 8 Tf 164.0 273.0 Td (Key files: app_workflow.py, screening_workflow.py, recruiter_chat_workflow.py) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend Folder Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 1636 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Backend Root Files) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Important files directly inside backend/) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 10 Tf 44.0 500.0 Td (app.py) Tj ET
+BT /F1 9 Tf 189.0 500.0 Td (Flask application entry point. Registers blueprints, static frontend serving,) Tj ET
+BT /F1 9 Tf 189.0 487.0 Td (CORS/session behavior, and API startup wiring.) Tj ET
+BT /F2 10 Tf 44.0 462.0 Td (database.py) Tj ET
+BT /F1 9 Tf 189.0 462.0 Td (Runtime database access layer. Centralizes Mongo/database CRUD helpers used by routes,) Tj ET
+BT /F1 9 Tf 189.0 449.0 Td (services, tools, and agents.) Tj ET
+BT /F2 10 Tf 44.0 424.0 Td (requirements.txt) Tj ET
+BT /F1 9 Tf 189.0 424.0 Td (Python dependencies for running the backend.) Tj ET
+BT /F2 10 Tf 44.0 399.0 Td (spa_urls.py) Tj ET
+BT /F1 9 Tf 189.0 399.0 Td (Frontend route allow-list/helper for serving the React single-page application.) Tj ET
+BT /F2 10 Tf 44.0 374.0 Td (.env / .env.example) Tj ET
+BT /F1 9 Tf 189.0 374.0 Td (Local configuration and example environment variables for database, SMTP, OpenAI, and) Tj ET
+BT /F1 9 Tf 189.0 361.0 Td (app secrets.) Tj ET
+BT /F2 13 Tf 44.0 332.0 Td (Folders usually ignored while explaining code) Tj ET
+BT /F1 9 Tf 44.0 310.0 Td (__pycache__ is Python bytecode cache generated automatically. static/uploads can contain user-uploaded resumes and) Tj ET
+BT /F1 9 Tf 44.0 297.0 Td (should be treated as runtime data rather than source code.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend Folder Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+9 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+13 0 obj
+<< /Type /Pages /Kids [8 0 R 9 0 R 10 0 R 11 0 R 12 0 R] /Count 5 >>
+endobj
+14 0 obj
+<< /Type /Catalog /Pages 13 0 R >>
+endobj
+xref
+0 15
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000002584 00000 n 
+0000004931 00000 n 
+0000007365 00000 n 
+0000009365 00000 n 
+0000011053 00000 n 
+0000011190 00000 n 
+0000011327 00000 n 
+0000011465 00000 n 
+0000011603 00000 n 
+0000011741 00000 n 
+0000011826 00000 n 
+trailer
+<< /Size 15 /Root 14 0 R >>
+startxref
+11877
+%%EOF

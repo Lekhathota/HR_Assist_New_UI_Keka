@@ -1,0 +1,76 @@
+
+    .candidate-container {
+        border: 1px solid #bdc3c7;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .select-all-bar {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #ecf0f1;
+        font-weight: bold;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .candidate-list-wrapper {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .candidate-item {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 12px !important;
+        padding: 10px 15px !important;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin: 0 !important;
+        width: 100%;
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+    .candidate-item:hover {
+        background-color: #f1f8ff;
+    }
+
+    .candidate-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 0;
+        flex-shrink: 0;
+        order: 0;
+    }
+
+    .candidate-item span {
+        font-size: 0.95rem;
+        color: #2c3e50;
+        order: 1;
+        text-align: left;
+    }
+
+    .comparison-container { animation: fadeIn 0.5s ease; }
+    .workflow-step { transition: all 0.3s ease; }
+    .workflow-step:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .progress {
+        background-color: #ecf0f1;
+        border-radius: 4px;
+        height: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        background-color: #27ae60;
+        height: 100%;
+        transition: width 0.3s ease;
+    }

@@ -1,0 +1,135 @@
+.workflow-admin-page {
+    display: grid;
+    gap: 1.2rem;
+}
+
+.workflow-admin-head,
+.workflow-admin-panel,
+.workflow-admin-metrics > div {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.workflow-admin-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.workflow-admin-head h1,
+.workflow-admin-panel h2 {
+    margin: 0;
+    color: #0f172a;
+}
+
+.workflow-admin-head p,
+.workflow-admin-panel p,
+.workflow-admin-item small {
+    margin: 0.25rem 0 0;
+    color: #64748b;
+}
+
+.workflow-admin-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.workflow-admin-metrics > div {
+    padding: 1rem;
+}
+
+.workflow-admin-metrics strong {
+    display: block;
+    font-size: 1.7rem;
+    color: #0f172a;
+}
+
+.workflow-admin-metrics span {
+    color: #64748b;
+    font-weight: 800;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+}
+
+.workflow-admin-panel {
+    padding: 1.1rem;
+}
+
+.workflow-admin-action,
+.workflow-admin-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.workflow-admin-action {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-top: 1rem;
+}
+
+.workflow-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-admin-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.workflow-admin-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.workflow-admin-item-readonly {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.workflow-admin-vendor-item {
+    grid-template-columns: minmax(220px, 0.9fr) minmax(240px, 1fr) auto;
+}
+
+.workflow-admin-item span,
+.workflow-admin-item small {
+    display: block;
+}
+
+.workflow-admin-item input,
+.workflow-admin-action input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.7rem;
+    font: inherit;
+}
+
+.workflow-admin-empty {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    color: #64748b;
+    background: #f8fafc;
+}
+
+@media (max-width: 900px) {
+    .workflow-admin-head,
+    .workflow-admin-action,
+    .workflow-admin-grid,
+    .workflow-admin-item,
+    .workflow-admin-vendor-item {
+        grid-template-columns: 1fr;
+    }
+}
+

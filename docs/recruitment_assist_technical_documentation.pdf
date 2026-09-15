@@ -1,0 +1,478 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 2257 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Recruitment Assist Technical Documentation) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Full-stack AI recruitment application) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (System Purpose) Tj ET
+BT /F1 10 Tf 44.0 478.0 Td (Recruitment Assist helps recruiters manage job descriptions, candidate profiles, resume/JD matching, assessments,) Tj ET
+BT /F1 10 Tf 44.0 464.0 Td (interviews, vendor fulfilment, dashboards, reports, and AI-assisted recruiter workflows.) Tj ET
+BT /F2 13 Tf 44.0 438.0 Td (Core Runtime) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 44.0 366.0 108.0 50.0 re B Q
+BT /F2 11 Tf 54.0 396.0 Td (React) Tj ET
+BT /F1 8 Tf 54.0 380.0 Td (User interface) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 168.0 366.0 108.0 50.0 re B Q
+BT /F2 11 Tf 178.0 396.0 Td (Flask) Tj ET
+BT /F1 8 Tf 178.0 380.0 Td (API backend) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 292.0 366.0 108.0 50.0 re B Q
+BT /F2 11 Tf 302.0 396.0 Td (MongoDB) Tj ET
+BT /F1 8 Tf 302.0 380.0 Td (Persistence) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 416.0 366.0 108.0 50.0 re B Q
+BT /F2 11 Tf 426.0 396.0 Td (OpenAI) Tj ET
+BT /F1 8 Tf 426.0 380.0 Td (AI extraction) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 540.0 366.0 108.0 50.0 re B Q
+BT /F2 11 Tf 550.0 396.0 Td (Agents) Tj ET
+BT /F1 8 Tf 550.0 380.0 Td (Workflow logic) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 664.0 366.0 108.0 50.0 re B Q
+BT /F2 11 Tf 674.0 396.0 Td (SMTP/Twilio) Tj ET
+BT /F1 8 Tf 674.0 380.0 Td (Messaging) Tj ET
+BT /F2 13 Tf 44.0 324.0 Td (Request Flow) Tj ET
+BT /F1 8 Tf 54.0 300.0 Td (- Recruiter/Admin uses the React frontend.) Tj ET
+BT /F1 8 Tf 54.0 287.0 Td (- frontend/src/api.js sends requests to Flask API endpoints.) Tj ET
+BT /F1 8 Tf 54.0 274.0 Td (- Routes call services, workflows, agents, or controlled tools.) Tj ET
+BT /F1 8 Tf 54.0 261.0 Td (- Services read/write MongoDB collections and integrate communication utilities.) Tj ET
+BT /F1 8 Tf 54.0 248.0 Td (- Agents use OpenAI and local context to parse, match, rank, summarize, and assist.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 4684 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Architecture Diagram) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (High-level application structure) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 48.0 452.0 120.0 54.0 re B Q
+BT /F2 10 Tf 58.0 488.0 Td (Users) Tj ET
+BT /F1 7 Tf 58.0 472.0 Td (Recruiter) Tj ET
+BT /F1 7 Tf 58.0 462.0 Td (Admin/Manager) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 210.0 452.0 135.0 54.0 re B Q
+BT /F2 10 Tf 220.0 488.0 Td (React Frontend) Tj ET
+BT /F1 7 Tf 220.0 472.0 Td (Pages) Tj ET
+BT /F1 7 Tf 220.0 462.0 Td (Components) Tj ET
+BT /F1 7 Tf 220.0 452.0 Td (api.js) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 386.0 452.0 135.0 54.0 re B Q
+BT /F2 10 Tf 396.0 488.0 Td (Flask API) Tj ET
+BT /F1 7 Tf 396.0 472.0 Td (Blueprint routes) Tj ET
+BT /F1 7 Tf 396.0 462.0 Td (Auth/session) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 562.0 452.0 120.0 54.0 re B Q
+BT /F2 10 Tf 572.0 488.0 Td (Services) Tj ET
+BT /F1 7 Tf 572.0 472.0 Td (Business rules) Tj ET
+BT /F1 7 Tf 572.0 462.0 Td (Persistence) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 706.0 452.0 92.0 54.0 re B Q
+BT /F2 10 Tf 716.0 488.0 Td (MongoDB) Tj ET
+BT /F1 7 Tf 716.0 472.0 Td (Collections) Tj ET
+BT /F1 7 Tf 716.0 462.0 Td (Indexes) Tj ET
+q 0.7 w 168.0 479.0 m 210.0 479.0 l S Q
+q 0.7 w 210.0 479.0 m 202.0 484.0 l S Q
+q 0.7 w 210.0 479.0 m 202.0 474.0 l S Q
+q 0.7 w 345.0 479.0 m 386.0 479.0 l S Q
+q 0.7 w 386.0 479.0 m 378.0 484.0 l S Q
+q 0.7 w 386.0 479.0 m 378.0 474.0 l S Q
+q 0.7 w 521.0 479.0 m 562.0 479.0 l S Q
+q 0.7 w 562.0 479.0 m 554.0 484.0 l S Q
+q 0.7 w 562.0 479.0 m 554.0 474.0 l S Q
+q 0.7 w 682.0 479.0 m 706.0 479.0 l S Q
+q 0.7 w 706.0 479.0 m 698.0 484.0 l S Q
+q 0.7 w 706.0 479.0 m 698.0 474.0 l S Q
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 92.0 320.0 145.0 66.0 re B Q
+BT /F2 10 Tf 102.0 368.0 Td (Orchestration) Tj ET
+BT /F1 7 Tf 102.0 352.0 Td (main_orchestrator.py) Tj ET
+BT /F1 7 Tf 102.0 342.0 Td (hr_graph.py) Tj ET
+BT /F1 7 Tf 102.0 332.0 Td (tracing.py) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 278.0 320.0 145.0 66.0 re B Q
+BT /F2 10 Tf 288.0 368.0 Td (Workflows) Tj ET
+BT /F1 7 Tf 288.0 352.0 Td (screening) Tj ET
+BT /F1 7 Tf 288.0 342.0 Td (recruiter chat) Tj ET
+BT /F1 7 Tf 288.0 332.0 Td (app workflow) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 464.0 320.0 145.0 66.0 re B Q
+BT /F2 10 Tf 474.0 368.0 Td (Agents) Tj ET
+BT /F1 7 Tf 474.0 352.0 Td (JD/resume) Tj ET
+BT /F1 7 Tf 474.0 342.0 Td (matching/ranking) Tj ET
+BT /F1 7 Tf 474.0 332.0 Td (summary/chat) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 650.0 320.0 120.0 66.0 re B Q
+BT /F2 10 Tf 660.0 368.0 Td (OpenAI) Tj ET
+BT /F1 7 Tf 660.0 352.0 Td (Extraction) Tj ET
+BT /F1 7 Tf 660.0 342.0 Td (Generation) Tj ET
+q 0.7 w 454.0 452.0 m 164.0 386.0 l S Q
+q 0.7 w 164.0 386.0 m 172.0 391.0 l S Q
+q 0.7 w 164.0 386.0 m 172.0 381.0 l S Q
+q 0.7 w 237.0 353.0 m 278.0 353.0 l S Q
+q 0.7 w 278.0 353.0 m 270.0 358.0 l S Q
+q 0.7 w 278.0 353.0 m 270.0 348.0 l S Q
+q 0.7 w 423.0 353.0 m 464.0 353.0 l S Q
+q 0.7 w 464.0 353.0 m 456.0 358.0 l S Q
+q 0.7 w 464.0 353.0 m 456.0 348.0 l S Q
+q 0.7 w 609.0 353.0 m 650.0 353.0 l S Q
+q 0.7 w 650.0 353.0 m 642.0 358.0 l S Q
+q 0.7 w 650.0 353.0 m 642.0 348.0 l S Q
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 170.0 198.0 150.0 64.0 re B Q
+BT /F2 10 Tf 180.0 244.0 Td (Tools) Tj ET
+BT /F1 7 Tf 180.0 228.0 Td (jd_tools.py) Tj ET
+BT /F1 7 Tf 180.0 218.0 Td (resume_tools.py) Tj ET
+BT /F1 7 Tf 180.0 208.0 Td (matching_tools.py) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 390.0 198.0 150.0 64.0 re B Q
+BT /F2 10 Tf 400.0 244.0 Td (Tool Gateway) Tj ET
+BT /F1 7 Tf 400.0 228.0 Td (Policy checks) Tj ET
+BT /F1 7 Tf 400.0 218.0 Td (Audit output) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 610.0 198.0 140.0 64.0 re B Q
+BT /F2 10 Tf 620.0 244.0 Td (Security) Tj ET
+BT /F1 7 Tf 620.0 228.0 Td (policy.py) Tj ET
+BT /F1 7 Tf 620.0 218.0 Td (context_safety.py) Tj ET
+q 0.7 w 536.0 320.0 m 245.0 262.0 l S Q
+q 0.7 w 245.0 262.0 m 253.0 267.0 l S Q
+q 0.7 w 245.0 262.0 m 253.0 257.0 l S Q
+q 0.7 w 320.0 230.0 m 390.0 230.0 l S Q
+q 0.7 w 390.0 230.0 m 382.0 235.0 l S Q
+q 0.7 w 390.0 230.0 m 382.0 225.0 l S Q
+q 0.7 w 540.0 230.0 m 610.0 230.0 l S Q
+q 0.7 w 610.0 230.0 m 602.0 235.0 l S Q
+q 0.7 w 610.0 230.0 m 602.0 225.0 l S Q
+BT /F2 10 Tf 70.0 120.0 Td (The application keeps UI, API, business services, persistence, and agent behavior separated.) Tj ET
+BT /F1 10 Tf 70.0 102.0 Td (That separation makes the system easier to document, test, and extend.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 839 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Introduction) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- Recruitment Assist is a full-stack AI recruitment platform for managing clients, job descriptions,) Tj ET
+BT /F1 8 Tf 54.0 489.0 Td (candidates, resume screening, assessments, interviews, vendors, dashboards, reports, and recruiter) Tj ET
+BT /F1 8 Tf 54.0 478.0 Td (assistance.) Tj ET
+BT /F1 8 Tf 54.0 462.0 Td (- The application combines a React frontend, Flask backend, MongoDB persistence layer, OpenAI-based) Tj ET
+BT /F1 8 Tf 54.0 451.0 Td (extraction/generation, and local agent workflow modules.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 1187 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Technology Stack) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- Frontend: React 18, React Router DOM, Create React App, custom CSS, Flatpickr, jsPDF, xlsx, docx, and) Tj ET
+BT /F1 8 Tf 54.0 489.0 Td (file-saver.) Tj ET
+BT /F1 8 Tf 54.0 473.0 Td (- Backend: Python, Flask, Flask-CORS, Werkzeug, python-dotenv, Pydantic, and pytest.) Tj ET
+BT /F1 8 Tf 54.0 457.0 Td (- Database: MongoDB through PyMongo with indexes, integer counters, session tokens, audit logs, and cached) Tj ET
+BT /F1 8 Tf 54.0 446.0 Td (dashboard metrics.) Tj ET
+BT /F1 8 Tf 54.0 430.0 Td (- AI/workflows: OpenAI Python SDK, LangGraph/LangChain packages, local agents, workflow modules, and a) Tj ET
+BT /F1 8 Tf 54.0 419.0 Td (controlled tool gateway.) Tj ET
+BT /F1 8 Tf 54.0 403.0 Td (- Document processing: PyPDF2, PyMuPDF, pdfplumber, and python-docx.) Tj ET
+BT /F1 8 Tf 54.0 387.0 Td (- Communication: SMTP email and optional Twilio SMS.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 1668 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Project Structure) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- frontend/src/pages contains the main React screens: Dashboard, Candidates, JD pages, Comparison,) Tj ET
+BT /F1 8 Tf 54.0 489.0 Td (Interviews, Reports, Vendors, Assessments, Workflow Admin, and Profile.) Tj ET
+BT /F1 8 Tf 54.0 473.0 Td (- frontend/src/components contains shared layout, navigation, recruiter chat, and feedback components.) Tj ET
+BT /F1 8 Tf 54.0 457.0 Td (- backend/routes contains Flask blueprints grouped by feature.) Tj ET
+BT /F1 8 Tf 54.0 441.0 Td (- backend/services contains business logic for auth, JDs, candidates, matching, interviews, reports,) Tj ET
+BT /F1 8 Tf 54.0 430.0 Td (vendors, assessments, fulfilment, workflow admin, and prompts.) Tj ET
+BT /F1 8 Tf 54.0 414.0 Td (- backend/agents contains role-specific AI agents for routing, JD parsing, resume parsing, matching,) Tj ET
+BT /F1 8 Tf 54.0 403.0 Td (ranking, summaries, interviews, and recruiter chat.) Tj ET
+BT /F1 8 Tf 54.0 387.0 Td (- backend/tools contains controlled agent tools such as JD context loading, resume profile extraction,) Tj ET
+BT /F1 8 Tf 54.0 376.0 Td (matching persistence, recruiter context, and the tool gateway.) Tj ET
+BT /F1 8 Tf 54.0 360.0 Td (- backend/workflows and backend/orchestration contain multi-step workflows, the main orchestrator,) Tj ET
+BT /F1 8 Tf 54.0 349.0 Td (LangGraph state graph, and tracing.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 1347 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Backend Architecture) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- backend/app.py loads environment variables, creates the Flask app, configures upload limits and CORS,) Tj ET
+BT /F1 8 Tf 54.0 489.0 Td (registers feature blueprints, initializes MongoDB, and redirects non-API browser requests to the React) Tj ET
+BT /F1 8 Tf 54.0 478.0 Td (frontend.) Tj ET
+BT /F1 8 Tf 54.0 462.0 Td (- Routes validate HTTP inputs and return JSON responses.) Tj ET
+BT /F1 8 Tf 54.0 446.0 Td (- Services implement business rules, persistence workflows, matching, fulfilment, email/SMS handling,) Tj ET
+BT /F1 8 Tf 54.0 435.0 Td (assessment lifecycle, vendors, reporting, and workflow admin controls.) Tj ET
+BT /F1 8 Tf 54.0 419.0 Td (- Agents perform AI-assisted extraction, matching, ranking, summarization, interview content generation,) Tj ET
+BT /F1 8 Tf 54.0 408.0 Td (and recruiter chat.) Tj ET
+BT /F1 8 Tf 54.0 392.0 Td (- database.py centralizes MongoDB access, indexes, counters, serialization, audit logs, session tokens,) Tj ET
+BT /F1 8 Tf 54.0 381.0 Td (and dashboard metrics.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Length 930 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Frontend Architecture) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- The React frontend is a single-page application with protected routes.) Tj ET
+BT /F1 8 Tf 54.0 484.0 Td (- frontend/src/api.js centralizes backend communication and session token handling.) Tj ET
+BT /F1 8 Tf 54.0 468.0 Td (- Key screens include Dashboard, Job Description list/create/details, Candidates, Candidate Profile,) Tj ET
+BT /F1 8 Tf 54.0 457.0 Td (Comparison, Interviews, Reports, Vendors, Assessments, Workflow Admin, Login, and Profile.) Tj ET
+BT /F1 8 Tf 54.0 441.0 Td (- The frontend uses page-specific CSS files under frontend/src/styles plus shared application styles.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 7) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Length 1607 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Database Collections) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- users and user_session_tokens store login accounts and expiring API session tokens.) Tj ET
+BT /F1 8 Tf 54.0 484.0 Td (- clients and projects store account ownership metadata.) Tj ET
+BT /F1 8 Tf 54.0 468.0 Td (- job_descriptions store parsed JD data, categories, status, workflow state, and fulfilment counters.) Tj ET
+BT /F1 8 Tf 54.0 452.0 Td (- candidates store uploaded/internal/vendor candidates, resume metadata, structured profile data, category) Tj ET
+BT /F1 8 Tf 54.0 441.0 Td (fields, and hiring status.) Tj ET
+BT /F1 8 Tf 54.0 425.0 Td (- comparisons store JD-candidate match records, scores, summaries, selection status, and workflow) Tj ET
+BT /F1 8 Tf 54.0 414.0 Td (metadata.) Tj ET
+BT /F1 8 Tf 54.0 398.0 Td (- interviews store schedule data, email/SMS state, follow-up/cancellation content, and outcomes.) Tj ET
+BT /F1 8 Tf 54.0 382.0 Td (- vendors, jd_vendor_assignments, and vendor_email_logs support external vendor fulfilment and) Tj ET
+BT /F1 8 Tf 54.0 371.0 Td (communication.) Tj ET
+BT /F1 8 Tf 54.0 355.0 Td (- assessments, questions, candidate_answers, and assessment_results store assessment lifecycle data.) Tj ET
+BT /F1 8 Tf 54.0 339.0 Td (- agent_runs tracks agentic task execution, while audit_logs stores a hash-chained audit trail.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 8) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Length 1242 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (AI and Agentic Architecture) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- main_orchestrator.py creates run IDs, determines task type, records status, and dispatches work.) Tj ET
+BT /F1 8 Tf 54.0 484.0 Td (- hr_graph.py defines graph-based HR routing and state transitions.) Tj ET
+BT /F1 8 Tf 54.0 468.0 Td (- screening_workflow.py runs the JD, resume, matching, ranking, and summary sequence.) Tj ET
+BT /F1 8 Tf 54.0 452.0 Td (- recruiter_chat_workflow.py handles recruiter messages, context retrieval, answer generation, and action) Tj ET
+BT /F1 8 Tf 54.0 441.0 Td (proposals.) Tj ET
+BT /F1 8 Tf 54.0 425.0 Td (- router_agent.py, jd_agent.py, resume_agent.py, matching_agent.py, ranking_agent.py, summary_agent.py,) Tj ET
+BT /F1 8 Tf 54.0 414.0 Td (interview_agent.py, and recruiter_agent.py split AI responsibilities by role.) Tj ET
+BT /F1 8 Tf 54.0 398.0 Td (- tool_gateway.py and security/policy.py provide controlled tool execution and audit-aware guardrails.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 9) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Length 1001 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Security and Operations) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Technical documentation) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 8 Tf 54.0 500.0 Td (- Passwords use Werkzeug password hashing.) Tj ET
+BT /F1 8 Tf 54.0 484.0 Td (- API sessions use MongoDB-backed tokens with TTL.) Tj ET
+BT /F1 8 Tf 54.0 468.0 Td (- Uploaded filenames are sanitized and Flask enforces a maximum upload size.) Tj ET
+BT /F1 8 Tf 54.0 452.0 Td (- Audit logs use previous/current hashes to support tamper detection.) Tj ET
+BT /F1 8 Tf 54.0 436.0 Td (- Sensitive audit parameters are redacted before storage.) Tj ET
+BT /F1 8 Tf 54.0 420.0 Td (- Production should enable secure cookies, restricted CORS, HTTPS, managed secrets, controlled upload) Tj ET
+BT /F1 8 Tf 54.0 409.0 Td (storage, and least-privilege MongoDB credentials.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 10) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Length 1955 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (API Reference Summary) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Main endpoint groups) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (Auth/Profile) Tj ET
+BT /F1 8 Tf 192.0 500.0 Td (/api/login, /api/logout, /api/profile) Tj ET
+BT /F2 9 Tf 44.0 481.0 Td (Dashboard/Reports) Tj ET
+BT /F1 8 Tf 192.0 481.0 Td (/api/dashboard, /api/metrics/jd-performance, /api/reports, /api/report/email) Tj ET
+BT /F2 9 Tf 44.0 462.0 Td (Job Descriptions) Tj ET
+BT /F1 8 Tf 192.0 462.0 Td (/api/jds, /api/jds/create, /api/jds/<id>, delete endpoint) Tj ET
+BT /F2 9 Tf 44.0 443.0 Td (Candidates) Tj ET
+BT /F1 8 Tf 192.0 443.0 Td (/api/candidates, /api/candidates/<id>, /api/candidates/repair) Tj ET
+BT /F2 9 Tf 44.0 424.0 Td (Matching/Fulfilment) Tj ET
+BT /F1 8 Tf 192.0 424.0 Td (/api/compare, /api/jds/<id>/fulfilment, recalculate endpoint) Tj ET
+BT /F2 9 Tf 44.0 405.0 Td (Interviews) Tj ET
+BT /F1 8 Tf 192.0 405.0 Td (/api/interviews plus schedule, reschedule, email, follow-up, outcome, cancellation) Tj ET
+BT /F2 9 Tf 44.0 386.0 Td (Assessments) Tj ET
+BT /F1 8 Tf 192.0 386.0 Td (generate, lookup, save draft, question CRUD, preview, email, send, token, answer,) Tj ET
+BT /F1 8 Tf 192.0 375.0 Td (submit, result) Tj ET
+BT /F2 9 Tf 44.0 356.0 Td (Agentic) Tj ET
+BT /F1 8 Tf 192.0 356.0 Td (/api/agentic/run, /api/agentic/screening, /api/agentic/runs) Tj ET
+BT /F2 9 Tf 44.0 337.0 Td (Vendors) Tj ET
+BT /F1 8 Tf 192.0 337.0 Td (/api/vendors plus JD assignment, email, history, and candidate acceptance) Tj ET
+BT /F2 9 Tf 44.0 318.0 Td (Workflow Admin) Tj ET
+BT /F1 8 Tf 192.0 318.0 Td (/api/admin/workflow-readiness, backfill, required count, categories, overrides, timeline) Tj ET
+BT /F2 9 Tf 44.0 299.0 Td (Audit) Tj ET
+BT /F1 8 Tf 192.0 299.0 Td (/api/audit/logs) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 11) Tj ET
+endstream
+endobj
+14 0 obj
+<< /Length 2075 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Setup, Environment, Testing) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Operational guidance) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 12 Tf 44.0 500.0 Td (Setup Steps) Tj ET
+BT /F1 8 Tf 54.0 478.0 Td (- Create and activate a Python virtual environment.) Tj ET
+BT /F1 8 Tf 54.0 465.0 Td (- Install backend dependencies from backend/requirements.txt.) Tj ET
+BT /F1 8 Tf 54.0 452.0 Td (- Configure backend/.env with MongoDB, OpenAI, CORS, Flask, SMTP, and optional Twilio values.) Tj ET
+BT /F1 8 Tf 54.0 439.0 Td (- Install frontend dependencies in frontend with npm install.) Tj ET
+BT /F1 8 Tf 54.0 426.0 Td (- Run the Flask backend and React frontend, or use the root helper scripts when available.) Tj ET
+BT /F1 8 Tf 54.0 413.0 Td (- Run backend pytest tests and frontend build before handing off changes.) Tj ET
+BT /F2 12 Tf 44.0 388.0 Td (Important Environment Variables) Tj ET
+BT /F1 8 Tf 54.0 366.0 Td (- MONGODB_URI or MONGO_URI) Tj ET
+BT /F1 8 Tf 54.0 355.0 Td (- MONGODB_DB or MONGO_DB) Tj ET
+BT /F1 8 Tf 54.0 344.0 Td (- SECRET_KEY) Tj ET
+BT /F1 8 Tf 54.0 333.0 Td (- CORS_ORIGINS) Tj ET
+BT /F1 8 Tf 54.0 322.0 Td (- FRONTEND_URL) Tj ET
+BT /F1 8 Tf 434.0 366.0 Td (- OPENAI_API_KEY) Tj ET
+BT /F1 8 Tf 434.0 355.0 Td (- SMTP settings for email delivery) Tj ET
+BT /F1 8 Tf 434.0 344.0 Td (- Twilio settings for optional SMS) Tj ET
+BT /F1 8 Tf 434.0 333.0 Td (- SESSION_TOKEN_TTL_HOURS) Tj ET
+BT /F1 8 Tf 434.0 322.0 Td (- SEED_DEFAULT_USERS and local default user) Tj ET
+BT /F1 8 Tf 434.0 311.0 Td (passwords) Tj ET
+BT /F2 12 Tf 44.0 284.0 Td (Validation Checklist) Tj ET
+BT /F1 8 Tf 54.0 262.0 Td (- Run backend pytest tests.) Tj ET
+BT /F1 8 Tf 54.0 251.0 Td (- Run frontend build.) Tj ET
+BT /F1 8 Tf 54.0 240.0 Td (- Manually test login, JD upload, candidate upload, matching, assessments, interviews, vendors, workflow) Tj ET
+BT /F1 8 Tf 54.0 229.0 Td (admin, and reports.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 12) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Length 1610 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Deployment and Troubleshooting) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Production notes) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 12 Tf 44.0 500.0 Td (Deployment Guide) Tj ET
+BT /F1 8 Tf 54.0 478.0 Td (- Build the React frontend with npm run build.) Tj ET
+BT /F1 8 Tf 54.0 465.0 Td (- Deploy Flask behind a WSGI server or managed Python platform.) Tj ET
+BT /F1 8 Tf 54.0 452.0 Td (- Use MongoDB Atlas or another managed MongoDB deployment.) Tj ET
+BT /F1 8 Tf 54.0 439.0 Td (- Keep secrets outside source control.) Tj ET
+BT /F1 8 Tf 54.0 426.0 Td (- Configure production CORS origins, HTTPS, secure cookies, upload storage, and retention policy.) Tj ET
+BT /F2 12 Tf 44.0 401.0 Td (Troubleshooting) Tj ET
+BT /F1 8 Tf 54.0 379.0 Td (- Database unavailable: verify URI, network access, database permissions, and Atlas IP rules.) Tj ET
+BT /F1 8 Tf 54.0 368.0 Td (- Login failure: verify users, password hashes, and session token storage.) Tj ET
+BT /F1 8 Tf 54.0 357.0 Td (- Frontend cannot call backend: verify backend port, API base URL/proxy, and CORS origins.) Tj ET
+BT /F1 8 Tf 54.0 346.0 Td (- Parsing issues: check file type, upload folder, parser dependencies, and extraction logs.) Tj ET
+BT /F1 8 Tf 54.0 335.0 Td (- AI output issues: verify OPENAI_API_KEY, prompt inputs, and JSON parser fallbacks.) Tj ET
+BT /F1 8 Tf 54.0 324.0 Td (- Email/SMS failures: verify SMTP/Twilio configuration and recipient fields.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Technical Documentation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 13) Tj ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+17 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+18 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+19 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+20 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+21 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+22 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 9 0 R >>
+endobj
+23 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 10 0 R >>
+endobj
+24 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 11 0 R >>
+endobj
+25 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 12 0 R >>
+endobj
+26 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 13 0 R >>
+endobj
+27 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 14 0 R >>
+endobj
+28 0 obj
+<< /Type /Page /Parent 29 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 15 0 R >>
+endobj
+29 0 obj
+<< /Type /Pages /Kids [16 0 R 17 0 R 18 0 R 19 0 R 20 0 R 21 0 R 22 0 R 23 0 R 24 0 R 25 0 R 26 0 R 27 0 R 28 0 R] /Count 13 >>
+endobj
+30 0 obj
+<< /Type /Catalog /Pages 29 0 R >>
+endobj
+xref
+0 31
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000002469 00000 n 
+0000007205 00000 n 
+0000008095 00000 n 
+0000009334 00000 n 
+0000011054 00000 n 
+0000012453 00000 n 
+0000013434 00000 n 
+0000015094 00000 n 
+0000016389 00000 n 
+0000017443 00000 n 
+0000019451 00000 n 
+0000021579 00000 n 
+0000023242 00000 n 
+0000023380 00000 n 
+0000023518 00000 n 
+0000023656 00000 n 
+0000023794 00000 n 
+0000023932 00000 n 
+0000024070 00000 n 
+0000024208 00000 n 
+0000024347 00000 n 
+0000024486 00000 n 
+0000024625 00000 n 
+0000024764 00000 n 
+0000024903 00000 n 
+0000025042 00000 n 
+0000025186 00000 n 
+trailer
+<< /Size 31 /Root 30 0 R >>
+startxref
+25237
+%%EOF

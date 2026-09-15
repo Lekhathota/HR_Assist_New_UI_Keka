@@ -1,0 +1,116 @@
+
+/* Responsive Grid — 4 cards per row matching candidates page */
+    .grid-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 1200px) {
+        .grid-container { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 900px) {
+        .grid-container { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+        .grid-container { grid-template-columns: 1fr; }
+    }
+
+    .jd-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid var(--accent-color, #ef7a2d);
+        transition: all 0.3s ease;
+    }
+
+    .jd-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .jd-filter-bar {
+        background: #fff;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .jd-filter-bar input,
+    .jd-filter-bar select {
+        min-height: 52px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #fff;
+        color: #111827;
+        font-size: 1rem;
+        padding: 0.8rem 1rem;
+    }
+
+    .jd-filter-bar input {
+        flex: 1 1 420px;
+        min-width: 260px;
+    }
+
+    .jd-filter-bar select {
+        flex: 0 1 220px;
+        min-width: 180px;
+    }
+
+    .jd-filter-empty-state {
+        margin-bottom: 2rem;
+    }
+
+    .jd-category-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        width: fit-content;
+        max-width: 100%;
+        padding: 0.3rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid rgba(239, 122, 45, 0.35);
+        background: rgba(239, 122, 45, 0.1);
+        color: #ef7a2d;
+        font-size: 0.76rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .jd-category-pill.table-pill {
+        justify-content: center;
+    }
+
+    /* Icon Alignment */
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .meta-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    .jd-list-container {
+        animation: fadeIn 0.5s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }

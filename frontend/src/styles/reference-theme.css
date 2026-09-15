@@ -1,0 +1,743 @@
+/* T1 visual reference. Layout is shared; colors below are scoped to the saved
+   ShimentoX theme so the classic palette and preference controls remain available. */
+
+.app-shell {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 238px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.workspace-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.workspace-menu-toggle { display: none; }
+
+.workspace-sidebar {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  top: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  z-index: 101;
+  padding: 26px 15px 18px;
+  display: flex;
+  flex-direction: column;
+  background: var(--primary-dark);
+  color: #fff;
+}
+.workspace-brand { display: block; padding: 2px 10px 30px; flex-shrink: 0; }
+.workspace-brand img { display: block; width: 168px; max-width: 100%; height: auto; }
+.workspace-links { display: flex; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 5px; }
+.workspace-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 43px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  text-decoration: none;
+  background: transparent;
+  color: #b6b7be;
+  cursor: pointer;
+}
+.workspace-nav-link i { width: 18px; text-align: center; color: #8b8e98; }
+.workspace-nav-link:hover { color: #fff; background: #202128; text-decoration: none; }
+.workspace-nav-link.active { color: #fff; background: #202128; box-shadow: inset 3px 0 var(--accent-color); }
+.workspace-nav-link.active i { color: var(--accent-color); }
+.workspace-account { margin-top: auto; flex-shrink: 0; padding-top: 18px; border-top: 1px solid #29292e; }
+.workspace-links { padding-bottom: 24px; }
+.workspace-content {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-content > .main-container {
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 30px clamp(20px, 3vw, 44px) 40px;
+  overflow: visible;
+  z-index: auto;
+}
+.workspace-content > .app-footer { position: relative; flex-shrink: 0; min-width: 0; margin: 0; padding: 10px 28px; min-height: 64px; }
+.main-container > * { min-width: 0; }
+
+/* The reference palette replaces the previous graphite/ember overrides. */
+body.theme-shimento {
+  --primary-color: #141416;
+  --primary-light: #29292e;
+  --primary-dark: #0b0b0d;
+  --accent-color: #ef7a2d;
+  --accent-dark: #a64716;
+  --accent-light: #f5a536;
+  --success-color: #1f8f65;
+  --warning-color: #ad6411;
+  --danger-color: #c6382d;
+  --light-bg: #f5f4f1;
+  --lighter-bg: #fff;
+  --border-color: #e7e3dc;
+  --text-primary: #141416;
+  --text-secondary: #696b72;
+  --glow-color: #ef7a2d;
+  --ui-surface: #fff;
+  --ui-soft: #fff4eb;
+  --ui-inset: #f8f7f4;
+  --ui-shadow: 0 12px 36px rgba(19, 17, 15, .07);
+  --ui-gradient: linear-gradient(100deg, #f5a536, #ef7a2d, #e9472f);
+  color-scheme: light;
+  background: var(--light-bg);
+  color: var(--text-primary);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  scrollbar-color: #b5aea3 var(--light-bg);
+}
+body.theme-shimento ::-webkit-scrollbar-track { background: var(--light-bg); }
+body.theme-shimento ::-webkit-scrollbar-thumb { background: #b5aea3; border-color: var(--light-bg); }
+body.theme-shimento :focus-visible { outline: 3px solid #a64716; outline-offset: 3px; }
+
+
+
+body.theme-shimento .workspace-sidebar { background: #0b0b0d; }
+body.theme-shimento .workspace-nav-link.active { background: #201914; }
+body.theme-shimento .workspace-sidebar :focus-visible { outline-color: #f5a536; }
+body.theme-shimento .shimento-bg-logo { display: none; }
+
+/* Shared page typography and surfaces. Explicit classes avoid altering status
+   colors or the visibility/positioning that belongs to application behavior. */
+body.theme-shimento :is(h1, h2, h3, h4, h5, h6) { color: var(--text-primary); text-shadow: none; }
+body.theme-shimento h1 { font-size: clamp(26px, 2.6vw, 36px); letter-spacing: -.035em; line-height: 1.2; }
+body.theme-shimento h2 { border-color: var(--border-color); font-size: 19px; letter-spacing: -.02em; }
+body.theme-shimento :is(p, small, .text-muted, [class$="-subtitle"]) { color: var(--text-secondary); }
+body.theme-shimento :is(.welcome-container, .interviews-container, .clients-page, .vendors-page, .profile-container) { color: var(--text-primary); }
+body.theme-shimento :is(.page-title, .section-title, .white-card-title, .results-section-title,
+  .candidates-section-title, .jd-card-title, .dbBoxTitle, .activity-card-title,
+  .profile-box-title, .profile-section-title, .profile-sub-title) { color: var(--text-primary); text-shadow: none; }
+body.theme-shimento :is(.card, .jd-card, .candidate-card, .analytics-card, .activity-card,
+  .white-card, .profile-box, .profile-section-box, .reports-white-card, .reports-conversion-card,
+  .step-card, .results-empty, .results-export-bar, .form-container, .candidates-filter-bar,
+  .jd-filter-bar, .dbBox, .table-container, .welcome-section, .welcome-pipeline,
+  .welcome-briefing-card, .welcome-action-card, .welcome-activity-card, .dashboard-metric-card,
+  .clients-sidebar, .client-overview-card, .client-projects, .client-project-card,
+  .client-role-card, .client-metric-card, .client-info-item, .required-card,
+  .workflow-admin-head, .workflow-admin-panel, .interview-card, .interviews-toolbar,
+  .interviews-empty, .vendor-toolbar, .vendor-table-wrap, .vendors-empty,
+  .ab-question-card, .ab-settings, .ca-card, .ca-question-card, .ca-nav) {
+  color: var(--text-primary);
+  background: var(--ui-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: var(--ui-shadow);
+}
+body.theme-shimento :is(.jd-card, .candidate-card, .dashboard-metric-card, .welcome-action-card):hover {
+  border-color: #d6b399;
+  box-shadow: 0 12px 28px rgba(19, 17, 15, .1);
+  transform: translateY(-2px);
+}
+body.theme-shimento :is(.welcome-section, .welcome-pipeline) { padding: 20px; }
+body.theme-shimento :is(.dashboard-metric-card, .welcome-briefing-card, .kpi-card) { padding: 18px; border-radius: 18px; }
+body.theme-shimento :is(.card > span:not([class]), .kpi-number, .dashboard-metric-card span, .welcome-briefing-card strong) { color: var(--text-primary); }
+body.theme-shimento :is(.dashboard-metric-card h4, .kpi-label, .welcome-briefing-card span,
+  .vendor-metrics span, .workflow-admin-metrics span, .client-info-item span,
+  .client-overview-stats span, .client-role-counts span) { color: var(--text-secondary); }
+body.theme-shimento :is(.dashboard-metric-card span, .welcome-briefing-card strong, .kpi-number) {
+  font-size: 30px;
+  letter-spacing: -.035em;
+  text-shadow: none;
+}
+body.theme-shimento :is(.workflow-kpi-strip > div, .vendor-metrics > div, .workflow-admin-metrics > div,
+  .kpi-card, .client-overview-stats > div, .client-role-counts > div) {
+  background: #fff;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: none;
+}
+body.theme-shimento :is(.candidate-meta, .jd-card-meta, .profile-field, .profile-activity-label,
+  .dbBoxSubtitle, .date-label, .date-range-divider, .progress-label, .client-section-title span,
+  .client-list-item span, .vendor-form-grid span, .client-form-grid span,
+  .interview-card-detail, .interview-card-meta, .interviews-header p) { color: var(--text-secondary); }
+body.theme-shimento :is(.list-group-item a, .candidate-name, .client-project-card strong,
+  .client-role-card-head strong, .client-info-item strong, .vendor-metrics strong,
+  .workflow-kpi-strip strong, .profile-field strong, .welcome-pipeline-step strong,
+  .welcome-action-card strong, .welcome-activity-item a, .welcome-activity-item span) { color: var(--text-primary); }
+
+/* Forms retain their size/visibility rules, input types, and validation states. */
+body.theme-shimento :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select) {
+  color: var(--text-primary);
+  background: #fff;
+  border-color: #d9d4cb;
+  border-radius: 11px;
+  box-shadow: none;
+  color-scheme: light;
+}
+body.theme-shimento :is(input, textarea)::placeholder { color: #74716c; }
+body.theme-shimento :is(input, textarea, select):focus { border-color: #c06327; box-shadow: 0 0 0 3px rgba(239, 122, 45, .13); }
+body.theme-shimento :is(input, textarea, select):focus-visible { outline: 2px solid #a64716; outline-offset: 2px; }
+body.theme-shimento :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: #b6531c; }
+body.theme-shimento :is(.form-group label, .login-container label, .ab-label, .ca-code-label) { color: var(--text-primary); }
+body.theme-shimento .jd-create-container .form-container select.jd-create-select,
+body.theme-shimento .jd-create-container .form-container select.jd-create-select option { color: var(--text-primary); background: #fff; border-color: #d9d4cb; color-scheme: light; }
+body.theme-shimento :is(.drop-zone, .upload-zone, .file-upload-area, .file-info,
+  .candidate-container, .select-all-bar, .candidate-item, .list-group-item,
+  .welcome-pipeline-step, .profile-field, .profile-activity-card, .workflow-admin-item,
+  .ab-add-bar, .ab-empty, .client-list-item, .vendor-job-option,
+  .profile-resume-inner, .profile-jd-item, .profile-applied-role-item, .profile-screening-item) {
+  color: var(--text-primary);
+  background: var(--ui-inset);
+  border-color: var(--border-color);
+  border-radius: 12px;
+  box-shadow: none;
+}
+body.theme-shimento :is(.drop-zone--over, .client-list-item.active, .vendor-job-option.selected) { background: var(--ui-soft); border-color: #c06327; }
+body.theme-shimento :is(.drop-zone__thumb, .candidate-client-line, .welcome-eyebrow,
+  .welcome-action-card i, .welcome-briefing-card i, .dashboard-metric-icon,
+  .client-section-title h2, .client-metric-card i, .activity-card-title i) { color: var(--accent-dark); }
+
+body.theme-shimento :is(.btn, .ca-btn, .date-reset-btn, .login-container button[type="submit"]) {
+  border-radius: 999px;
+  font-weight: 750;
+  text-shadow: none;
+  box-shadow: none;
+}
+body.theme-shimento :is(.btn-primary, .ca-btn-primary, .date-reset-btn, .login-container button[type="submit"], .jd-create-container form button[type="submit"]) {
+  background: var(--ui-gradient);
+  border-color: transparent;
+  color: #141416;
+  box-shadow: none;
+}
+body.theme-shimento :is(.btn-secondary, .ca-btn-secondary) { background: #fff; border: 1px solid #d9d4cb; color: var(--text-primary); }
+body.theme-shimento :is(.btn-success, .ca-btn-success) { background: #187554; border-color: #187554; color: #fff; }
+body.theme-shimento .btn-danger { background: #b53028; border-color: #b53028; color: #fff; }
+body.theme-shimento .btn-warning { background: #fff0cf; border-color: #e0be80; color: #7c490c; }
+body.theme-shimento :is(.btn-info, .btn-outline-primary) { background: var(--ui-soft); border: 1px solid #ecc4a5; color: var(--accent-dark); }
+body.theme-shimento :is(.btn, .ca-btn):hover:not(:disabled) { filter: brightness(.97); box-shadow: 0 4px 12px rgba(19, 17, 15, .08); }
+body.theme-shimento :is(.badge, .tag, .candidate-category-pill, .profile-skill-badge) { border-radius: 999px; }
+body.theme-shimento .badge-primary { background: var(--ui-soft); color: var(--accent-dark); }
+body.theme-shimento :is(.badge-success, .status-selected) { background: #eaf7f1; color: #187554; }
+body.theme-shimento :is(.badge-danger, .status-rejected) { background: #fceceb; color: #a42c24; }
+
+/* Tables stay tables, with their existing columns and data intact. */
+body.theme-shimento :is(.table-container, .table-responsive, .vendor-table-wrap, .dbBoxBody,
+  .reports-white-card, .reports-table-wrapper, .candidates-table-wrapper) { overflow-x: auto; }
+body.theme-shimento table { border-collapse: collapse; }
+body.theme-shimento :is(table thead, table th, .reports-insights-heading, .dbBoxHeadView) {
+  background: #faf9f7;
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+body.theme-shimento table th { padding: 13px 15px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+body.theme-shimento :is(table td, table tbody tr, table tfoot, .table_block tbody tr.odd, .table_block tbody tr.even) {
+  background: #fff;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+body.theme-shimento table td { padding: 14px 15px; font-size: 13px; }
+body.theme-shimento table tbody tr:hover td { background: var(--ui-inset); }
+body.theme-shimento :is(.progress, .client-gap-bar) { background: #e8e4de; border-radius: 99px; }
+body.theme-shimento .progress-bar { background: var(--ui-gradient); box-shadow: none; }
+
+/* Welcome: preserve every existing section and data value. */
+body.theme-shimento .welcome-container { gap: 18px; }
+body.theme-shimento .welcome-hero {
+  min-height: 280px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  gap: 30px;
+  padding: 30px 34px;
+  background: #0e0e10;
+  color: #fff;
+  border: 0;
+  border-radius: 28px;
+  box-shadow: var(--ui-shadow);
+}
+body.theme-shimento .welcome-hero::before {
+  width: 360px;
+  height: 360px;
+  inset: -160px -120px auto auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 65%, rgba(245,165,54,.85), rgba(239,122,45,.55) 40%, rgba(233,71,47,.12) 67%, transparent 69%);
+  animation: none;
+  transform: none;
+}
+body.theme-shimento .welcome-hero-logo { width: 195px; filter: none; animation: none; margin-bottom: 18px; }
+body.theme-shimento .welcome-hero h1 { color: #fff; font-size: clamp(30px, 3vw, 42px); line-height: 1.08; text-shadow: none; }
+body.theme-shimento .welcome-hero .welcome-eyebrow { color: #ffbe7e; font-size: 11px; }
+body.theme-shimento .welcome-hero-text { color: #b9bbc1; font-size: 14px; line-height: 1.65; }
+body.theme-shimento .welcome-module-panel { padding: 14px; gap: 7px; background: rgba(255,255,255,.07); border: 1px solid #38383c; border-radius: 20px; }
+body.theme-shimento .welcome-module-row { padding: 10px; background: rgba(255,255,255,.045); border-color: #353539; border-radius: 12px; }
+body.theme-shimento .welcome-module-row strong { color: #fff; font-size: 13px; }
+body.theme-shimento .welcome-module-row small { color: #b9bbc1; font-size: 12px; }
+body.theme-shimento .welcome-module-row em { color: #79d1ae; }
+body.theme-shimento .welcome-module-dot { background: #79d1ae; box-shadow: none; }
+body.theme-shimento .welcome-pipeline::before { display: none; }
+body.theme-shimento .welcome-pipeline-step { min-height: 136px; padding: 14px; text-align: left; justify-items: start; }
+body.theme-shimento .welcome-pipeline-step:first-child { background: var(--ui-soft); border-color: #f1d5bf; }
+body.theme-shimento .welcome-pipeline-icon { width: 36px; height: 36px; background: var(--ui-soft); border-color: #f1d5bf; border-radius: 11px; box-shadow: none; color: var(--accent-dark); }
+body.theme-shimento .welcome-pipeline-step small { color: var(--text-secondary); }
+body.theme-shimento .welcome-action-card { padding: 16px; gap: 12px; }
+body.theme-shimento .welcome-action-card i { background: var(--ui-soft); border-color: #f1d5bf; box-shadow: none; }
+body.theme-shimento .welcome-action-card::before { display: none; }
+body.theme-shimento .welcome-activity-card { padding: 18px; }
+body.theme-shimento .welcome-activity-item { border-color: var(--border-color); }
+body.theme-shimento .welcome-activity-item small { color: var(--text-secondary); }
+
+/* Existing dialogs, feedback, date pickers and command palette. */
+body.theme-shimento :is(.enterprise-confirm-modal, .enterprise-confirm-dialog, .enterprise-toast,
+  .command-palette, .jd-schedule-modal, .jd-email-modal, .jd-modal,
+  .client-modal, .vendor-modal, .modal-content, .flatpickr-calendar) {
+  color: var(--text-primary);
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(19,17,15,.2);
+}
+body.theme-shimento :is(.command-palette-list button, .command-palette-empty,
+  .command-palette-input, .jd-modal-header, .vendor-modal-head, .client-modal-head) {
+  background: #fff;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+body.theme-shimento .command-palette-list button:hover { background: var(--ui-soft); }
+body.theme-shimento :is(.command-palette-list button i, .enterprise-confirm-icon) { background: var(--ui-soft); color: var(--accent-dark); }
+body.theme-shimento :is(.jd-modal-close, .vendor-modal-close, .client-modal-close) { color: var(--text-primary); background: var(--ui-inset); border-color: var(--border-color); }
+body.theme-shimento :is(.flatpickr-months, .flatpickr-month, .flatpickr-weekdays, .flatpickr-weekday,
+  .flatpickr-current-month, .flatpickr-time, .flatpickr-day) { background: #fff; color: var(--text-primary); border-color: var(--border-color); }
+body.theme-shimento .flatpickr-day.selected { background: #b6531c; color: #fff; border-color: #b6531c; }
+body.theme-shimento .flatpickr-day.today { border-color: #b6531c; }
+body.theme-shimento :is(.flatpickr-day.flatpickr-disabled, .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay) { color: #8b8882; }
+
+/* Keep the working assistant floating, styled like the reference's dark panel. */
+body.theme-shimento .floating-chat-panel { background: #111113; color: #fff; border: 1px solid #34343a; border-radius: 20px; box-shadow: var(--ui-shadow); }
+body.theme-shimento :is(.floating-chat-header, .floating-chat-input) { background: #111113; border-color: #34343a; }
+body.theme-shimento :is(.floating-chat-header strong, .floating-chat-header button, .floating-chat-bubble) { color: #f1f1f3; }
+body.theme-shimento :is(.floating-chat-empty p, .floating-chat-empty small) { color: #b9bbc1; }
+body.theme-shimento .floating-chat-bubble { background: #202024; border-color: #34343a; }
+body.theme-shimento :is(.floating-chat-actions button, .floating-chat-suggestions button, .floating-chat-starters button) { background: #2b211b; color: #ffc18b; border-color: #60412b; }
+body.theme-shimento .floating-chat-input input { background: #202024; color: #fff; border-color: #49494f; }
+body.theme-shimento .floating-chat-input input::placeholder { color: #b9bbc1; }
+body.theme-shimento .floating-chat-input button { background: var(--ui-gradient); color: #141416; }
+body.theme-shimento .floating-chat-toggle { background: #111113; border-color: #ef7a2d; box-shadow: 0 8px 24px rgba(19,17,15,.18); }
+
+body.theme-shimento .app-footer { background: #fff; color: var(--text-secondary); border-top: 1px solid var(--border-color); box-shadow: none; margin-top: 0; }
+body.theme-shimento .app-footer::before { display: none; }
+body.theme-shimento .app-footer-logo { background: #fff; padding: 0; border-radius: 0; filter: none; }
+body.theme-shimento .app-footer-social a { background: #fff; border-color: var(--border-color); animation: none; }
+body.theme-shimento .app-footer-social i { color: var(--accent-dark); filter: none; }
+
+/* Public pages receive the palette even on a fresh direct visit. */
+body.theme-shimento:has(.login-page) { display: block; overflow: auto; }
+body.theme-shimento .login-page { position: relative; min-height: 100vh; min-height: 100dvh; height: auto; background: var(--light-bg); }
+body.theme-shimento .video-overlay { background: var(--light-bg); }
+body.theme-shimento .login-visual-brand { color: #e0dcd6; text-shadow: none; }
+body.theme-shimento .login-visual-logo { filter: none; animation: none; }
+body.theme-shimento .login-container { background: #fff; color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: var(--ui-shadow); border-radius: 24px; }
+body.theme-shimento .login-header img { background: #fff; padding: 0; border-radius: 0; filter: none; animation: none; }
+body.theme-shimento .login-container input:focus { color: var(--text-primary); background: #fff; border-color: #c06327; box-shadow: 0 0 0 3px rgba(239,122,45,.13); }
+body.theme-shimento .login-startup { background: #111113; border-radius: 24px; }
+body.theme-shimento .login-startup-status { color: #ffc18b; }
+body.theme-shimento .login-auth-panel { min-height: 0; overflow: visible; }
+body.theme-shimento .ca-page { background: var(--light-bg); color: var(--text-primary); }
+body.theme-shimento :is(.ca-header, .ca-footer) { background: #111113; border-color: #34343a; color: #fff; }
+body.theme-shimento .ca-nav-item { color: var(--text-primary); border-radius: 10px; }
+body.theme-shimento .ca-nav-item.active { background: var(--ui-soft); border-color: #c06327; }
+body.theme-shimento .ca-nav-num { background: #e7e3dc; color: #141416; }
+body.theme-shimento .ca-nav-item.answered .ca-nav-num { background: #187554; color: #fff; }
+body.theme-shimento .ca-question-badge { background: var(--ui-soft); color: var(--accent-dark); border-radius: 999px; }
+body.theme-shimento .ca-code-input { background: #141416; color: #e7e3dc; border-color: #45454c; }
+body.theme-shimento .ca-code-input:focus { background: #141416; color: #e7e3dc; }
+body.theme-shimento .ca-option:hover { border-color: #c06327; background: var(--ui-soft); }
+body.theme-shimento .ca-brand i { color: #f5a536; }
+body.theme-shimento .ca-spinner { border-top-color: #c06327; }
+body.theme-shimento .ca-inline-error { background: #fceceb; color: #a42c24; border-color: #e8b5ae; }
+
+/* Page-specific details previously authored with fixed dark-theme colors. */
+body.theme-shimento :is(.analyze-jd-context, .analyze-result-card, .analyze-results-empty,
+  .clients-empty, .candidates-empty-state, .jd-empty-state, .jd-empty-card, .ab-modal) {
+  color: var(--text-primary);
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: var(--ui-shadow);
+}
+body.theme-shimento :is(.analyze-jd-context-grid > div, .analyze-explain-grid > div,
+  .analyze-run-summary span, .screening-batch-summary > div, .screening-summary-note,
+  .dashboard-funnel-stats > div, .dashboard-team-overview > div, .profile-ai-grid > div,
+  .profile-ai-recommendation, .profile-timeline-body, .profile-pref-card,
+  .vendor-email-attachments, .vendor-job-empty, .vendor-supply-panel, .upload-file-item) {
+  background: var(--ui-inset);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  border-radius: 12px;
+  box-shadow: none;
+}
+body.theme-shimento :is(.analyze-jd-context-grid strong, .analyze-explain-grid strong,
+  .screening-batch-summary strong, .dashboard-funnel-stats strong, .dashboard-team-overview strong,
+  .analytics-card strong, .profile-timeline-head strong, .profile-pref-name,
+  .profile-ai-bullet-list li, .client-role-metric-row strong, .client-overview-stats strong,
+  .vendor-email-attachments strong, .profile-field span, .profile-category-panel,
+  .vendor-supply-check, .upload-file-item button) { color: var(--text-primary); }
+body.theme-shimento :is(.analyze-jd-context-grid span, .analyze-jd-empty span,
+  .analyze-explain-grid span, .analyze-explain-grid em, .screening-batch-summary span,
+  .dashboard-funnel-stats span, .dashboard-team-overview small, .dashboard-jd-item-meta,
+  .dashboard-jd-item-status, .profile-timeline-head span, .profile-timeline-meta,
+  .profile-ai-grid em, .client-project-card span, .client-project-card em,
+  .client-role-metric-row, .vendor-email-grid span, .vendor-email-field span,
+  .vendor-assign-toolbar span, .vendor-job-option small, .dataTables_length,
+  .dataTables_filter, .dataTables_info, .list-item-empty, .profile-loading, .jd-loading,
+  .clients-empty, .client-list-empty, .interviews-day-header span, .screening-timeline-step) { color: var(--text-secondary); }
+body.theme-shimento :is(.analyze-skill-row span, .analyze-skill-row em, .profile-category-meta span,
+  .client-chip-row span, .client-role-card-head span, .vendor-email-attachment-list span,
+  .jd-category-pill, .candidate-category-pill, .vendor-file-picker) {
+  background: var(--ui-soft);
+  color: var(--accent-dark);
+  border-color: #ecc4a5;
+  border-radius: 999px;
+}
+body.theme-shimento .vendor-table td span:not([class]) { color: var(--text-secondary); }
+body.theme-shimento .vendor-table td small { color: var(--text-secondary); }
+body.theme-shimento :is(.client-account-id, .jd-section-heading, .jd-pipeline-title,
+  .back-link, .existing-candidates-label, .profile-pref-icon) { color: var(--accent-dark); }
+body.theme-shimento :is(.comparison-tab, .hp-main-tabs button, .interviews-tabs button, .paginate_button) {
+  color: var(--text-secondary);
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+}
+body.theme-shimento :is(.comparison-tab.active, .hp-main-tabs button.active, .interviews-tabs button.active,
+  .paginate_button.current, .paginate_button:hover:not(.disabled)) { background: var(--ui-soft); color: var(--accent-dark); border-color: #c06327; }
+body.theme-shimento .paginate_button.disabled { color: #76716a; background: var(--ui-inset); }
+body.theme-shimento .interviews-search { color: var(--text-secondary); background: #fff; border-color: var(--border-color); border-radius: 999px; }
+body.theme-shimento .date-range-picker-container { background: #fff; border-color: var(--border-color); box-shadow: none; }
+body.theme-shimento .dataTables_length select option,
+body.theme-shimento .form-group .step-jd-select,
+body.theme-shimento .form-group .step-jd-select:invalid,
+body.theme-shimento .form-group .step-jd-select:invalid:not(:placeholder-shown),
+body.theme-shimento .step-jd-select option { color: var(--text-primary); background: #fff; color-scheme: light; }
+/* The legacy candidate picker uses !important; match only those declarations. */
+body.theme-shimento :is(.candidate-container, .select-all-bar, .candidate-item) {
+  background: var(--ui-inset) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+body.theme-shimento .candidate-item span { color: var(--text-primary) !important; }
+body.theme-shimento .candidate-item:hover { background: var(--ui-soft) !important; }
+body.theme-shimento .dashboard-metric-card:is(:hover, :focus-visible) {
+  background: #fff;
+  border-color: #d6b399;
+  box-shadow: 0 12px 28px rgba(19,17,15,.1);
+}
+body.theme-shimento .dashboard-metric-card:is(:hover, :focus-visible) :is(h4, small) { color: var(--text-secondary); }
+body.theme-shimento .dashboard-metric-card:is(:hover, :focus-visible) span,
+body.theme-shimento .dashboard-metric-card:is(.success, .warning, .danger) span { color: var(--text-primary); }
+body.theme-shimento :is(.progress-label span, .analytics-card .list-group-item strong,
+  .dashboard-comparison-title, .dashboard-recent-activity-title) { color: var(--text-primary); }
+body.theme-shimento .activity-card .list-group-item a:is(:hover, :focus-visible) { color: var(--accent-dark); }
+body.theme-shimento .profile-hero { border-color: var(--border-color); }
+body.theme-shimento .profile-hero-name { background: none; -webkit-text-fill-color: currentColor; color: var(--text-primary); filter: none; }
+body.theme-shimento .profile-hero-avatar { background: var(--ui-gradient); color: #141416; box-shadow: none; }
+body.theme-shimento .profile-toggle-slider { background: #b6531c; }
+body.theme-shimento .screening-loader { background: var(--ui-soft); box-shadow: none; }
+body.theme-shimento .screening-loader-line { background: linear-gradient(90deg, transparent, #ef7a2d, #1f8f65, transparent); box-shadow: none; }
+body.theme-shimento .client-gap-bar span { background: var(--ui-gradient); }
+body.theme-shimento .result-progress-bar-rejected { background: linear-gradient(90deg, #c6382d, #a42c24); }
+body.theme-shimento :is(.result-score-selected, .profile-category-confidence) { color: #187554; }
+body.theme-shimento :is(.result-score-rejected, .upload-clear-btn) { color: #a42c24; }
+body.theme-shimento :is(.welcome-briefing-error, .vendor-alert-error, .flashes li) { color: #a42c24; background: #fceceb; border-color: #e8b5ae; }
+body.theme-shimento :is(.vendor-alert:not(.vendor-alert-error), .upload-warning-list > div,
+  .upload-remembered-note, .analyze-submit-error, .screening-error-panel) { color: #805019; background: #fff6e6; border-color: #e8ce9f; }
+body.theme-shimento :is(.enterprise-confirm-close, .command-palette-input kbd) { color: var(--text-secondary); background: var(--ui-inset); border-color: var(--border-color); }
+body.theme-shimento .flatpickr-day.inRange { background: var(--ui-soft); color: var(--text-primary); border-color: var(--ui-soft); box-shadow: -5px 0 0 var(--ui-soft), 5px 0 0 var(--ui-soft); }
+body.theme-shimento :is(.flatpickr-prev-month, .flatpickr-next-month) { color: var(--text-primary); fill: currentColor; }
+body.theme-shimento .ab-code-preview { background: #141416; color: #e7e3dc; }
+body.theme-shimento .floating-chat-message-user .floating-chat-bubble { background: #2b211b; color: #ffc18b; border-color: #60412b; }
+body.theme-shimento .login-startup-ring { border-color: #9a552a; box-shadow: 0 0 30px rgba(239,122,45,.12); }
+body.theme-shimento .login-startup-scan { background: linear-gradient(90deg, transparent, #f5a536, transparent); }
+body.theme-shimento .login-container button[type="submit"]:hover { box-shadow: 0 8px 20px rgba(19,17,15,.12); }
+body.theme-shimento .enterprise-skeleton-item { border-color: var(--border-color); border-radius: 18px; box-shadow: none; }
+body.theme-shimento .enterprise-skeleton-item span { background: linear-gradient(90deg, #e7e3dc, #faf9f7, #e7e3dc); background-size: 200% 100%; }
+body.theme-shimento :is(.profile-edu-meta, .profile-exp-item, .profile-exp-dates,
+  .profile-jd-date, .profile-jd-date-day, .profile-pref-desc, .profile-screening-summary,
+  .profile-screening-strengths, .profile-screening-gaps) { color: var(--text-secondary); }
+body.theme-shimento .profile-jd-date-time { color: var(--accent-dark); }
+body.theme-shimento :is(.profile-jd-score, .profile-skill-badge, .profile-screening-status-selected,
+  .client-status.status-active, .vendor-status.status-active) { color: #187554; }
+body.theme-shimento :is(.profile-screening-status-rejected, .vendor-status.status-inactive) { color: #a42c24; }
+body.theme-shimento .required-card.priority-high { border-color: #d38e85; }
+body.theme-shimento .required-card.priority-high .client-role-card-head span { color: #a42c24; background: #fceceb; border-color: #e8b5ae; }
+body.theme-shimento .client-project-card.active { background: var(--ui-soft); border-color: #c06327; }
+body.theme-shimento .analyze-result-selected { border-color: #9bcab6; }
+body.theme-shimento .analyze-result-rejected { border-color: #dba29c; }
+body.theme-shimento .interview-card-highlight { border-color: #187554; box-shadow: 0 0 0 3px rgba(31,143,101,.15); }
+body.theme-shimento .interview-card-time { color: var(--accent-dark); border-color: var(--accent-color); }
+body.theme-shimento .card.success > span { color: #187554; }
+body.theme-shimento .card.warning > span { color: #805019; }
+body.theme-shimento .card.danger > span { color: #a42c24; }
+body.theme-shimento .jd-field-value { background: var(--ui-inset); border-color: var(--accent-color); }
+
+/* Fixed overlays must stay relative to the viewport after page entry effects. */
+@keyframes reference-page-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+body.theme-shimento :is(.dashboard-container, .jd-list-container, .jd-create-container,
+  .jd-details-container, .comparison-container, .candidates-container, .profile-container,
+  .reports-container), body.theme-shimento.frontend-polish .main-container {
+  animation-name: reference-page-enter;
+  animation-fill-mode: backwards;
+}
+
+/* Responsive layout accounts for the new sidebar's share of viewport width. */
+.app-shell .grid-container { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.app-shell .grid > * { min-width: 0; }
+.app-shell .grid-4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.app-shell .metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 175px), 1fr)); gap: 14px; }
+.app-shell :is(.clients-page, .vendors-page, .interviews-container) { padding: 0; }
+.app-shell :is(.table-container, .table-responsive, .vendor-table-wrap, .dbBoxBody) { min-width: 0; max-width: 100%; overflow-x: auto; }
+.workspace-content { scrollbar-gutter: stable; }
+body .workspace-links {
+  scrollbar-width: thin;
+  scrollbar-color: #414147 transparent;
+  scrollbar-gutter: stable;
+}
+body .workspace-links::-webkit-scrollbar { width: 6px; }
+body .workspace-links::-webkit-scrollbar-track { background: transparent; }
+body .workspace-links::-webkit-scrollbar-thumb { background: #414147; border: 0; border-radius: 999px; }
+body .workspace-links::-webkit-scrollbar-thumb:hover { background: #65656d; }
+body .workspace-links::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+@media (max-width: 1050px) {
+  body.theme-shimento .welcome-hero { grid-template-columns: 1fr; }
+  .app-shell :is(.clients-layout, .workflow-admin-grid, .profile-grid, .welcome-activity-grid, .grid-2, .grid-3) { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .clients-sidebar { position: static; }
+  .app-shell .welcome-pipeline-track { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-shell :is(.welcome-briefing-grid, .welcome-actions-grid, .kpi-container) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-shell :is(.workflow-admin-vendor-item, .workflow-admin-head, .dbBoxHeadView) { display: flex; flex-wrap: wrap; }
+  .app-shell :is(.profile-dual-section, .profile-resume-grid) { grid-template-columns: minmax(0, 1fr); }
+  .app-shell :is(.interviews-header, .interviews-toolbar, .interviews-filter-controls) { flex-wrap: wrap; min-width: 0; }
+  .app-shell .interview-card { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .interview-card-actions { justify-content: flex-start; }
+}
+@media (max-width: 820px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 66px auto minmax(0, 1fr); }
+
+  .workspace-menu-toggle { display: inline-flex; grid-column: 1; grid-row: 1; align-self: center; margin-left: 15px; color: var(--text-primary); }
+  .workspace-sidebar { display: none; grid-column: 1; grid-row: 2; position: relative; height: min(55dvh, 450px); padding: 12px 15px; }
+  .workspace-sidebar-open { display: flex; }
+  .workspace-account { margin-top: 0; }
+  .workspace-content { grid-column: 1; grid-row: 3; }
+  .workspace-content > .main-container { padding: 20px 14px 36px; }
+  .workspace-content > .app-footer { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+  .app-footer-brand { flex-wrap: wrap; white-space: normal; }
+  .app-shell .app-footer-brand span { display: inline; }
+  body.theme-shimento .welcome-hero { padding: 24px 20px; }
+  body.theme-shimento .login-page { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 16px; }
+  body.theme-shimento .login-visual-panel { min-height: 200px; }
+  body.theme-shimento .login-auth-panel { min-height: 0; }
+  .app-shell :is(.jd-filter-bar input, .candidates-filter-bar input[type="text"], .candidates-filter-bar select) { min-width: 0; width: 100%; }
+  .app-shell :is(.client-project-grid, .client-role-grid, .required-role-grid, .workflow-admin-action, .workflow-admin-item) { grid-template-columns: minmax(0, 1fr); }
+  .app-shell :is(.clients-header, .vendors-header, .project-detail-header) { flex-wrap: wrap; }
+  .app-shell :is(.profile-info, .profile-activity-grid) { grid-template-columns: minmax(0, 1fr); }
+  body.theme-shimento .ca-layout { grid-template-columns: minmax(0, 1fr); padding: 16px 14px 100px; }
+  body.theme-shimento .ca-nav { position: static; }
+  body.theme-shimento .ca-nav-list { flex-direction: row; flex-wrap: wrap; max-height: none; }
+  body.theme-shimento .ca-header { position: relative; }
+}
+@media (max-width: 480px) {
+  .app-shell :is(.welcome-briefing-grid, .welcome-actions-grid, .welcome-pipeline-track, .kpi-container) { grid-template-columns: minmax(0, 1fr); }
+  body.theme-shimento :is(.welcome-section, .welcome-pipeline, .form-container, .login-container) { padding: 18px; }
+  body.theme-shimento .welcome-module-panel { padding: 8px; }
+  body.theme-shimento .welcome-module-row { gap: 8px; }
+  body.theme-shimento .welcome-module-row em { font-size: 11px; }
+  body.theme-shimento .ca-card { margin: 24px 14px; }
+}
+
+/* Display the supplied PNG intact. Object-fit crops only its blank margins;
+   the lettering and X are neither recolored nor regenerated. */
+body img[src="/ShimentoX-Logo.png"] {
+  aspect-ratio: 5.65;
+  object-fit: cover;
+  object-position: 50% 49.3%;
+  height: auto;
+  background: #fff;
+  filter: none;
+  animation: none;
+}
+.workspace-brand { padding: 12px; margin-bottom: 24px; background: transparent; border-radius: 12px; }
+.workspace-brand img { margin: 0 auto; width: 180px; }
+body .welcome-hero-logo { padding: 0; border: 0; border-radius: 2px; box-shadow: none; filter: none; animation: none; }
+body .app-footer-logo { padding: 0; width: 118px; filter: none; }
+.app-shell > .floating-chat { bottom: 80px; }
+.app-shell .floating-chat-panel { max-height: calc(100dvh - 170px); }
+.floating-chat-logo-frame { display: block; position: relative; width: 40px; height: 29px; overflow: hidden; }
+.floating-chat-logo-frame img[src="/ShimentoX-Logo.png"] {
+  position: absolute;
+  width: 406.4%;
+  max-width: none;
+  height: auto;
+  aspect-ratio: auto;
+  right: -3.2%;
+  top: 50%;
+  transform: translateY(-49.3%);
+  object-fit: initial;
+  filter: none;
+}
+.floating-chat-toggle:hover .floating-chat-logo-frame img { transform: translateY(-49.3%); }
+body .floating-chat-toggle, body.theme-shimento .floating-chat-toggle { background: #fff; }
+
+/* The shell itself never scrolls. Its central grid row owns page scrolling,
+   leaving navigation and the footer anchored at every viewport size. */
+html:has(.app-shell), body:has(.app-shell) { overflow: hidden; }
+@keyframes workspace-content-enter { from { opacity: 0; } to { opacity: 1; } }
+body .workspace-content > .main-container,
+body.frontend-polish .workspace-content > .main-container,
+body.theme-shimento.frontend-polish .workspace-content > .main-container {
+  animation-name: workspace-content-enter;
+  animation-fill-mode: backwards;
+  transform: none;
+  filter: none;
+}
+
+/* Login sizing works at ordinary and zoomed/short viewport heights. The form
+   sets the minimum page height, so scrolling never clips inputs or errors. */
+body:has(.login-page) { display: block; overflow: auto; background: #0b0b0d; }
+body .login-page {
+  position: relative;
+  inset: auto;
+  height: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 32px);
+  gap: clamp(24px, 4vw, 56px);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+}
+body .login-page.login-full {
+  max-width: none;
+  padding: 0;
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  background: #0b0b0d;
+}
+body .login-full .login-visual-panel {
+  background: transparent;
+  border-radius: 0;
+  padding: clamp(24px, 5vw, 80px);
+}
+body .login-full .login-visual-brand {
+  width: 100%;
+  margin: 0;
+  gap: 28px;
+  text-align: center;
+  text-shadow: none;
+  animation: none;
+}
+body .login-full .login-visual-logo {
+  width: min(540px, 100%);
+  height: auto;
+  opacity: 1;
+  filter: none;
+  animation: none;
+}
+body .login-full .login-auth-panel { padding: 32px 16px; }
+body .login-full .login-container {
+  background: transparent;
+  color: #fff;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+body .login-full .login-header img { background: transparent; }
+body .login-full .login-header p { color: #bbb9b5; text-shadow: none; }
+body .login-full .login-container label { color: #f5f4f1; }
+body .login-full .login-container input {
+  background: #fff;
+  color: #141416;
+  border: 1px solid #e7e3dc;
+}
+body .login-full .login-container input:focus {
+  background: #fff;
+  color: #141416;
+  border-color: #ef7a2d;
+  box-shadow: 0 0 0 3px rgba(239,122,45,.25);
+}
+body .login-full .login-container input::placeholder { color: #6a6865; }
+body .login-full .login-container button[type="submit"] {
+  background: linear-gradient(110deg, #f5a32d, #ef482d);
+  color: #141416;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: none;
+}
+body .login-full .login-startup { background: #0b0b0d; }
+body .login-page .login-auth-panel { min-height: 0; overflow: visible; }
+body .login-page .login-container { width: 100%; max-width: 440px; margin: 0; padding: 32px; }
+body .login-page .login-header { margin-bottom: 28px; }
+body .login-page .login-header img { width: min(260px, 100%); height: auto; padding: 0; margin: 0 auto 18px; border-radius: 0; animation: none; filter: none; }
+body .login-page .login-header p { font-size: 14px; letter-spacing: .02em; }
+body .login-page .login-container .form-group { margin-bottom: 20px; }
+body .login-page .login-container label { font-size: 12px; margin-bottom: 8px; letter-spacing: .06em; }
+body .login-page .login-container input { min-height: 46px; padding: 12px 14px; font-size: 16px; }
+body .login-page .login-container button[type="submit"] { padding: 13px 18px; min-height: 46px; font-size: 14px; letter-spacing: .06em; }
+body.theme-shimento .login-container input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #141416;
+  caret-color: #141416;
+}
+body .login-page .login-startup { min-height: 420px; }
+body .login-page .login-startup-logo { width: min(220px, calc(100% - 16px)); border: 0; border-radius: 2px; box-shadow: none; }
+@media (max-width: 920px) {
+  body .login-page.login-full { grid-template-columns: minmax(0, 1fr); align-items: center; }
+  body .login-full .login-visual-panel { display: flex; min-height: 0; padding: 32px 24px 0; }
+  body .login-full .login-visual-logo { width: min(320px, 100%); }
+  body .login-page .login-auth-panel { min-height: min(540px, calc(100dvh - 32px)); }
+}
+@media (max-width: 820px) {
+  .workspace-brand { width: 190px; margin-bottom: 12px; padding: 9px 12px; }
+  .workspace-account { display: flex; padding-top: 8px; }
+  .workspace-links { padding-bottom: 8px; }
+  .workspace-content > .app-footer { min-height: 90px; }
+  .app-shell .app-footer-brand { gap: 10px; font-size: 11px; }
+  .app-shell .app-footer-social { gap: 6px; }
+  .app-shell > .floating-chat { bottom: 112px; }
+  .app-shell .floating-chat-panel { max-height: calc(100dvh - 200px); }
+}
+@media (max-width: 480px) {
+  body .login-page .login-container { padding: 24px; }
+  .app-shell .app-footer-brand { width: 100%; justify-content: center; }
+  .app-shell .app-footer-social { width: 100%; justify-content: center; }
+}

@@ -1,0 +1,127 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 2381 >>
+stream
+BT /F2 19 Tf 44.0 550.0 Td (RecruitmentAssist Project Fix Report) Tj ET
+BT /F1 9 Tf 44.0 530.0 Td (Generated 2026-06-04 13:38) Tj ET
+q 0.8 w 44.0 515.0 m 798.0 515.0 l S Q
+BT /F2 13 Tf 44.0 485.0 Td (Summary) Tj ET
+BT /F1 9 Tf 56.0 465.0 Td (- Completed a backend/frontend health sweep after the LangGraph migration.) Tj ET
+BT /F1 9 Tf 56.0 449.0 Td (- Fixed verified data-count, response-shape, profile update, and Jobs refresh issues.) Tj ET
+BT /F1 9 Tf 56.0 433.0 Td (- Validated backend compilation, frontend production build, and key LangGraph route response shapes.) Tj ET
+BT /F2 13 Tf 44.0 409.0 Td (Issues Fixed) Tj ET
+BT /F1 9 Tf 56.0 389.0 Td (- Jobs page counts for candidates screened against multiple JDs: JD counts now use comparison rows instead of) Tj ET
+BT /F1 9 Tf 56.0 376.0 Td (the candidate table's single jd_id field.) Tj ET
+BT /F1 9 Tf 56.0 360.0 Td (- ServiceNow Developer card: verified it now reports total_resumes=2, selected_count=0, rejected_count=2 from) Tj ET
+BT /F1 9 Tf 56.0 347.0 Td (comparison data.) Tj ET
+BT /F1 9 Tf 56.0 331.0 Td (- Candidate queries for a specific JD: candidates_payload\({jd_id}\) now uses get_candidates_for_jd\(\), so JD) Tj ET
+BT /F1 9 Tf 56.0 318.0 Td (details and interview eligibility see comparison-backed candidates.) Tj ET
+BT /F1 9 Tf 56.0 302.0 Td (- Dashboard team data crash: preserved empty list responses and guarded the frontend before calling filter\(\).) Tj ET
+BT /F1 9 Tf 56.0 286.0 Td (- Jobs stale values: cleared the JD session cache after create, delete, and screening actions; Jobs page also) Tj ET
+BT /F1 9 Tf 56.0 273.0 Td (refreshes on focus/pageshow.) Tj ET
+BT /F1 9 Tf 56.0 257.0 Td (- List response robustness: guarded JD, candidate, comparison, and dashboard list consumers against malformed) Tj ET
+BT /F1 9 Tf 56.0 244.0 Td (non-array responses.) Tj ET
+BT /F1 9 Tf 56.0 228.0 Td (- Profile password form: added current-password verification and password update support instead of silently) Tj ET
+BT /F1 9 Tf 56.0 215.0 Td (ignoring password fields.) Tj ET
+BT /F1 9 Tf 56.0 199.0 Td (- Profile error display: frontend now respects failed profile update responses instead of always showing a) Tj ET
+BT /F1 9 Tf 56.0 186.0 Td (success-style message.) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist Fix Report) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 1995 >>
+stream
+BT /F2 19 Tf 44.0 550.0 Td (Verification Results) Tj ET
+BT /F1 9 Tf 44.0 530.0 Td (Commands and smoke checks run after fixes) Tj ET
+q 0.8 w 44.0 515.0 m 798.0 515.0 l S Q
+BT /F2 13 Tf 44.0 485.0 Td (Passed Checks) Tj ET
+BT /F1 9 Tf 56.0 465.0 Td (- Backend compile: python -m compileall -q RecruitmentAssist/backend passed.) Tj ET
+BT /F1 9 Tf 56.0 449.0 Td (- Frontend production build: npm --prefix RecruitmentAssist/frontend run build passed.) Tj ET
+BT /F1 9 Tf 56.0 433.0 Td (- LangGraph route shapes: dashboard=dict, dashboard_team=list, jd_list=list, candidate_list=list, reports=dict,) Tj ET
+BT /F1 9 Tf 56.0 420.0 Td (jd_performance=list.) Tj ET
+BT /F1 9 Tf 56.0 404.0 Td (- Candidate profile via graph: candidate 52 returned name=NISHIT MITTAL, jd_history=4, screening_summaries=4.) Tj ET
+BT /F1 9 Tf 56.0 388.0 Td (- ServiceNow JD list via graph: JD id 10 returned total_resumes=2, selected_count=0, rejected_count=2.) Tj ET
+BT /F1 9 Tf 56.0 372.0 Td (- Router safety: explicit known task_type values bypass LLM routing and use deterministic route mapping.) Tj ET
+BT /F2 13 Tf 44.0 348.0 Td (Files Touched) Tj ET
+BT /F1 9 Tf 56.0 328.0 Td (- backend/services/jd_service.py) Tj ET
+BT /F1 9 Tf 56.0 312.0 Td (- backend/services/candidate_service.py) Tj ET
+BT /F1 9 Tf 56.0 296.0 Td (- backend/database.py) Tj ET
+BT /F1 9 Tf 56.0 280.0 Td (- backend/routes/profile_routes.py) Tj ET
+BT /F1 9 Tf 56.0 264.0 Td (- backend/workflows/app_workflow.py) Tj ET
+BT /F1 9 Tf 56.0 248.0 Td (- frontend/src/api.js) Tj ET
+BT /F1 9 Tf 56.0 232.0 Td (- frontend/src/pages/JdList.jsx) Tj ET
+BT /F1 9 Tf 56.0 216.0 Td (- frontend/src/pages/Dashboard.jsx) Tj ET
+BT /F1 9 Tf 56.0 200.0 Td (- frontend/src/pages/Comparison.jsx) Tj ET
+BT /F1 9 Tf 56.0 184.0 Td (- frontend/src/pages/Candidates.jsx) Tj ET
+BT /F1 9 Tf 56.0 168.0 Td (- frontend/src/pages/Profile.jsx) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist Fix Report) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 1659 >>
+stream
+BT /F2 19 Tf 44.0 550.0 Td (Remaining Notes) Tj ET
+BT /F1 9 Tf 44.0 530.0 Td (Items to watch during manual testing) Tj ET
+q 0.8 w 44.0 515.0 m 798.0 515.0 l S Q
+BT /F2 13 Tf 44.0 485.0 Td (Recommended Manual Tests) Tj ET
+BT /F1 9 Tf 56.0 465.0 Td (- Restart backend and frontend, then hard-refresh the browser.) Tj ET
+BT /F1 9 Tf 56.0 449.0 Td (- Open Jobs and confirm ServiceNow Developer shows Total Resumes 2, Selected 0, Rejected 2.) Tj ET
+BT /F1 9 Tf 56.0 433.0 Td (- Run a new screening against any JD and confirm the Jobs card updates after returning to /jobs.) Tj ET
+BT /F1 9 Tf 56.0 417.0 Td (- Open a candidate profile and confirm Applied Roles and Screening Summaries render.) Tj ET
+BT /F1 9 Tf 56.0 401.0 Td (- Try profile email-only update and password update with both wrong and correct current password.) Tj ET
+BT /F1 9 Tf 56.0 385.0 Td (- Create and delete a JD, then confirm the Jobs list cache updates correctly.) Tj ET
+BT /F2 13 Tf 44.0 361.0 Td (Known Constraints) Tj ET
+BT /F1 9 Tf 56.0 341.0 Td (- This was a practical health sweep, not a formal exhaustive QA certification of every workflow.) Tj ET
+BT /F1 9 Tf 56.0 325.0 Td (- No destructive database migrations were run.) Tj ET
+BT /F1 9 Tf 56.0 309.0 Td (- Frontend build output changed because the production build was regenerated.) Tj ET
+BT /F1 9 Tf 56.0 293.0 Td (- LLM routing remains safely bypassed for explicit task_type values; ambiguous natural-language routing still) Tj ET
+BT /F1 9 Tf 56.0 280.0 Td (depends on OPENAI_API_KEY.) Tj ET
+q 0.8 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 8 Tf 44.0 19.0 Td (RecruitmentAssist Fix Report) Tj ET
+BT /F1 8 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+7 0 obj
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+8 0 obj
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+9 0 obj
+<< /Type /Pages /Kids [6 0 R 7 0 R 8 0 R] /Count 3 >>
+endobj
+10 0 obj
+<< /Type /Catalog /Pages 9 0 R >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000002593 00000 n 
+0000004640 00000 n 
+0000006351 00000 n 
+0000006487 00000 n 
+0000006623 00000 n 
+0000006759 00000 n 
+0000006828 00000 n 
+trailer
+<< /Size 11 /Root 10 0 R >>
+startxref
+6878
+%%EOF

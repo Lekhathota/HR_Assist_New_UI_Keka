@@ -1,0 +1,277 @@
+﻿diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/components/Layout.jsx b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/components/Layout.jsx
+index 117c658..10254d0 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/components/Layout.jsx
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/components/Layout.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import Navbar from './Navbar.jsx';
++import FloatingRecruiterChat from './FloatingRecruiterChat.jsx';
+ 
+ function Layout({ children }) {
+   return (
+@@ -15,6 +16,7 @@ function Layout({ children }) {
+       <main className="main-container">
+         {children}
+       </main>
++      <FloatingRecruiterChat />
+       <footer className="app-footer">
+         <div className="app-footer-brand">
+           <img
+diff --git a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css
+index f4f2ff5..c187bf5 100644
+--- a/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css
++++ b/HR_ASSIST_MONGODB-main/RecruitmentAssist_Complete/RecruitmentAssist/frontend/src/styles/style.css
+@@ -459,7 +459,8 @@ html {
+     .app-footer::before,
+     .app-footer-social a,
+     .ambient-sweep::before,
+-    .enterprise-skeleton-item span {
++    .enterprise-skeleton-item span,
++    .floating-chat-thinking span {
+         animation: none !important;
+     }
+ }
+@@ -1378,6 +1379,228 @@ table tbody tr:hover td {
+     letter-spacing: 0;
+ }
+ 
++/* ========== FLOATING RECRUITER CHAT ========== */
++.floating-chat {
++    position: fixed;
++    right: 1.6rem;
++    bottom: 1.6rem;
++    z-index: 1250;
++    display: flex;
++    flex-direction: column;
++    align-items: flex-end;
++    gap: 0.9rem;
++    pointer-events: none;
++}
++
++.floating-chat-panel,
++.floating-chat-toggle {
++    pointer-events: auto;
++}
++
++.floating-chat-toggle {
++    width: 58px;
++    height: 58px;
++    border: 1px solid rgba(0, 212, 255, 0.45);
++    border-radius: 50%;
++    color: #fff;
++    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
++    box-shadow: 0 0 24px rgba(0, 212, 255, 0.28), 0 12px 28px rgba(0, 0, 0, 0.25);
++    cursor: pointer;
++    font-size: 1.25rem;
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    transition: transform 0.22s ease, box-shadow 0.22s ease;
++}
++
++.floating-chat-toggle:hover {
++    transform: translateY(-3px) scale(1.04);
++    box-shadow: 0 0 34px rgba(0, 212, 255, 0.42), 0 16px 34px rgba(0, 0, 0, 0.28);
++}
++
++.floating-chat-panel {
++    width: min(420px, calc(100vw - 2rem));
++    height: min(640px, calc(100vh - 8.5rem));
++    min-height: 460px;
++    display: flex;
++    flex-direction: column;
++    overflow: hidden;
++    border: 1px solid rgba(0, 212, 255, 0.28);
++    border-radius: 14px;
++    background: linear-gradient(135deg, rgba(15, 20, 40, 0.96), rgba(45, 53, 97, 0.96));
++    box-shadow: 0 26px 72px rgba(0, 0, 0, 0.38), 0 0 30px rgba(0, 212, 255, 0.16);
++    backdrop-filter: blur(14px);
++    animation: card-rise-in 0.22s ease both;
++}
++
++.floating-chat-header {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    gap: 1rem;
++    padding: 1rem 1.1rem;
++    border-bottom: 1px solid rgba(0, 212, 255, 0.22);
++    background: rgba(0, 212, 255, 0.08);
++}
++
++.floating-chat-header strong {
++    display: flex;
++    align-items: center;
++    gap: 0.45rem;
++    color: #fff;
++    font-size: 0.98rem;
++}
++
++.floating-chat-header span {
++    display: block;
++    margin-top: 0.2rem;
++    color: rgba(255, 255, 255, 0.68);
++    font-size: 0.76rem;
++}
++
++.floating-chat-header button {
++    width: 34px;
++    height: 34px;
++    border: 0;
++    border-radius: 8px;
++    color: #fff;
++    background: rgba(255, 255, 255, 0.08);
++    cursor: pointer;
++}
++
++.floating-chat-messages {
++    flex: 1;
++    padding: 1rem;
++    overflow-y: auto;
++}
++
++.floating-chat-empty {
++    display: grid;
++    gap: 0.75rem;
++    place-items: center;
++    min-height: 210px;
++    text-align: center;
++    color: rgba(255, 255, 255, 0.78);
++}
++
++.floating-chat-empty i {
++    color: var(--accent-color);
++    font-size: 2rem;
++}
++
++.floating-chat-message {
++    margin-bottom: 0.95rem;
++}
++
++.floating-chat-message-user {
++    display: flex;
++    justify-content: flex-end;
++}
++
++.floating-chat-message-user .floating-chat-bubble {
++    color: #fff;
++    background: rgba(0, 212, 255, 0.22);
++    border-color: rgba(0, 212, 255, 0.3);
++}
++
++.floating-chat-bubble {
++    max-width: 100%;
++    white-space: pre-wrap;
++    color: var(--text-primary);
++    background: rgba(255, 255, 255, 0.95);
++    border: 1px solid rgba(0, 212, 255, 0.18);
++    border-radius: 10px;
++    padding: 0.75rem 0.85rem;
++    font-size: 0.88rem;
++    line-height: 1.45;
++}
++
++.floating-chat-actions,
++.floating-chat-suggestions,
++.floating-chat-starters {
++    display: flex;
++    flex-wrap: wrap;
++    gap: 0.45rem;
++    margin-top: 0.55rem;
++}
++
++.floating-chat-actions button,
++.floating-chat-suggestions button,
++.floating-chat-starters button {
++    border: 1px solid rgba(0, 212, 255, 0.3);
++    border-radius: 999px;
++    padding: 0.45rem 0.7rem;
++    color: #fff;
++    background: rgba(0, 212, 255, 0.12);
++    cursor: pointer;
++    font-size: 0.76rem;
++    font-weight: 700;
++}
++
++.floating-chat-actions button {
++    background: rgba(0, 212, 255, 0.22);
++}
++
++.floating-chat-starters {
++    padding: 0 1rem 0.75rem;
++    margin-top: 0;
++}
++
++.floating-chat-input {
++    display: flex;
++    gap: 0.6rem;
++    padding: 0.9rem 1rem 1rem;
++    border-top: 1px solid rgba(0, 212, 255, 0.18);
++}
++
++.floating-chat-input input {
++    flex: 1;
++    min-width: 0;
++    min-height: 42px;
++    border: 1px solid rgba(0, 212, 255, 0.28);
++    border-radius: 10px;
++    padding: 0.75rem;
++    color: #fff;
++    background: rgba(15, 20, 40, 0.62);
++    font: inherit;
++}
++
++.floating-chat-input input::placeholder {
++    color: rgba(255, 255, 255, 0.52);
++}
++
++.floating-chat-input button {
++    width: 42px;
++    height: 42px;
++    border: 0;
++    border-radius: 10px;
++    color: #fff;
++    background: linear-gradient(135deg, var(--accent-color), var(--accent-dark));
++    cursor: pointer;
++}
++
++.floating-chat-thinking {
++    display: inline-flex;
++    gap: 0.32rem;
++    align-items: center;
++}
++
++.floating-chat-thinking span {
++    width: 7px;
++    height: 7px;
++    border-radius: 50%;
++    background: var(--accent-color);
++    animation: chat-dot 0.9s ease-in-out infinite;
++}
++
++.floating-chat-thinking span:nth-child(2) { animation-delay: 0.12s; }
++.floating-chat-thinking span:nth-child(3) { animation-delay: 0.24s; }
++
++@keyframes chat-dot {
++    0%, 100% { opacity: 0.35; transform: translateY(0); }
++    50% { opacity: 1; transform: translateY(-3px); }
++}
++
+ /* ========== RESPONSIVE ========== */
+ @media (max-width: 1024px) {
+     .main-container { padding: 1.5rem; }
+@@ -1416,6 +1639,14 @@ table tbody tr:hover td {
+         justify-content: flex-start;
+         width: 100%;
+     }
++    .floating-chat {
++        right: 1rem;
++        bottom: 1rem;
++    }
++    .floating-chat-panel {
++        width: calc(100vw - 2rem);
++        height: min(620px, calc(100vh - 7rem));
++    }
+ }
+ 
+ @media (max-width: 480px) {

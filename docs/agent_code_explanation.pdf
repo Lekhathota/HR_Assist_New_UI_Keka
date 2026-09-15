@@ -1,0 +1,364 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 2590 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Agent Code Explanation) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (How to explain every major agent and orchestrator file) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (High level idea) Tj ET
+BT /F1 10 Tf 44.0 478.0 Td (The project uses one Main HR Orchestrator and one LangGraph StateGraph. The graph starts at a Router Agent, then sends) Tj ET
+BT /F1 10 Tf 44.0 464.0 Td (the request to a role-specific path such as screening, chat, JD, candidate, interview, dashboard, reports, or) Tj ET
+BT /F1 10 Tf 44.0 450.0 Td (unsupported.) Tj ET
+BT /F2 13 Tf 44.0 432.0 Td (Code layers to explain) Tj ET
+BT /F1 9 Tf 56.0 410.0 Td (- Flask route layer: receives requests, files, and authenticated user context.) Tj ET
+BT /F1 9 Tf 56.0 397.0 Td (- Main orchestrator: creates run_id, stores agent_runs status, invokes the graph.) Tj ET
+BT /F1 9 Tf 56.0 384.0 Td (- LangGraph graph: defines nodes, conditional routing, and final response normalization.) Tj ET
+BT /F1 9 Tf 56.0 371.0 Td (- Agents: role-specific code for routing, JD loading, resume extraction, matching, ranking, summary, chat, and) Tj ET
+BT /F1 9 Tf 56.0 358.0 Td (interview questions.) Tj ET
+BT /F1 9 Tf 56.0 345.0 Td (- Tools and workflows: reusable helpers for database, matching persistence, recruiter context, and application) Tj ET
+BT /F1 9 Tf 56.0 332.0 Td (tasks.) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 68.0 125.0 190.0 60.0 re B Q
+BT /F2 10 Tf 77.0 168.0 Td (Key message) Tj ET
+BT /F1 7 Tf 77.0 154.0 Td (Agents are specialized) Tj ET
+BT /F1 7 Tf 77.0 144.0 Td (Router decides route) Tj ET
+BT /F1 7 Tf 77.0 134.0 Td (Graph coordinates work) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 318.0 125.0 190.0 60.0 re B Q
+BT /F2 10 Tf 327.0 168.0 Td (Screening) Tj ET
+BT /F1 7 Tf 327.0 154.0 Td (JD -> Resume) Tj ET
+BT /F1 7 Tf 327.0 144.0 Td (Matching -> Ranking) Tj ET
+BT /F1 7 Tf 327.0 134.0 Td (Summary) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 568.0 125.0 190.0 60.0 re B Q
+BT /F2 10 Tf 577.0 168.0 Td (Traceability) Tj ET
+BT /F1 7 Tf 577.0 154.0 Td (run_id) Tj ET
+BT /F1 7 Tf 577.0 144.0 Td (agent_runs) Tj ET
+BT /F1 7 Tf 577.0 134.0 Td (trace_start/end) Tj ET
+q 1.0 w 258.0 155.0 m 318.0 155.0 l S Q
+q 0.8 w 318.0 155.0 m 310.0 160.0 l S Q
+q 0.8 w 318.0 155.0 m 310.0 150.0 l S Q
+q 1.0 w 508.0 155.0 m 568.0 155.0 l S Q
+q 0.8 w 568.0 155.0 m 560.0 160.0 l S Q
+q 0.8 w 568.0 155.0 m 560.0 150.0 l S Q
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Agent Code Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 4083 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Architecture Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Code modules and runtime flow) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 42.0 450.0 120.0 54.0 re B Q
+BT /F2 10 Tf 51.0 487.0 Td (Frontend) Tj ET
+BT /F1 7 Tf 51.0 473.0 Td (api.js) Tj ET
+BT /F1 7 Tf 51.0 463.0 Td (floating chat) Tj ET
+BT /F1 7 Tf 51.0 453.0 Td (screening form) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 205.0 450.0 132.0 54.0 re B Q
+BT /F2 10 Tf 214.0 487.0 Td (Flask API) Tj ET
+BT /F1 7 Tf 214.0 473.0 Td (agentic_routes.py) Tj ET
+BT /F1 7 Tf 214.0 463.0 Td (auth user) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 380.0 450.0 150.0 54.0 re B Q
+BT /F2 10 Tf 389.0 487.0 Td (Main Orchestrator) Tj ET
+BT /F1 7 Tf 389.0 473.0 Td (main_orchestrator.py) Tj ET
+BT /F1 7 Tf 389.0 463.0 Td (agent_runs) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 572.0 450.0 155.0 54.0 re B Q
+BT /F2 10 Tf 581.0 487.0 Td (LangGraph) Tj ET
+BT /F1 7 Tf 581.0 473.0 Td (hr_graph.py) Tj ET
+BT /F1 7 Tf 581.0 463.0 Td (StateGraph) Tj ET
+q 1.0 w 162.0 477.0 m 205.0 477.0 l S Q
+q 0.8 w 205.0 477.0 m 197.0 482.0 l S Q
+q 0.8 w 205.0 477.0 m 197.0 472.0 l S Q
+q 1.0 w 337.0 477.0 m 380.0 477.0 l S Q
+q 0.8 w 380.0 477.0 m 372.0 482.0 l S Q
+q 0.8 w 380.0 477.0 m 372.0 472.0 l S Q
+q 1.0 w 530.0 477.0 m 572.0 477.0 l S Q
+q 0.8 w 572.0 477.0 m 564.0 482.0 l S Q
+q 0.8 w 572.0 477.0 m 564.0 472.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 78.0 335.0 135.0 55.0 re B Q
+BT /F2 10 Tf 87.0 373.0 Td (Router Agent) Tj ET
+BT /F1 7 Tf 87.0 359.0 Td (router_agent.py) Tj ET
+BT /F1 7 Tf 87.0 349.0 Td (route decision) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 262.0 335.0 135.0 55.0 re B Q
+BT /F2 10 Tf 271.0 373.0 Td (Screening Agents) Tj ET
+BT /F1 7 Tf 271.0 359.0 Td (jd/resume) Tj ET
+BT /F1 7 Tf 271.0 349.0 Td (match/rank/summary) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 446.0 335.0 135.0 55.0 re B Q
+BT /F2 10 Tf 455.0 373.0 Td (Chat Agent) Tj ET
+BT /F1 7 Tf 455.0 359.0 Td (recruiter_agent.py) Tj ET
+BT /F1 7 Tf 455.0 349.0 Td (chat actions) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 630.0 335.0 135.0 55.0 re B Q
+BT /F2 10 Tf 639.0 373.0 Td (App Workflow) Tj ET
+BT /F1 7 Tf 639.0 359.0 Td (JD/candidate) Tj ET
+BT /F1 7 Tf 639.0 349.0 Td (interview/report) Tj ET
+q 1.0 w 650.0 450.0 m 145.0 390.0 l S Q
+q 0.8 w 145.0 390.0 m 153.0 395.0 l S Q
+q 0.8 w 145.0 390.0 m 153.0 385.0 l S Q
+q 1.0 w 145.0 335.0 m 330.0 390.0 l S Q
+q 0.8 w 330.0 390.0 m 322.0 395.0 l S Q
+q 0.8 w 330.0 390.0 m 322.0 385.0 l S Q
+q 1.0 w 145.0 335.0 m 514.0 390.0 l S Q
+q 0.8 w 514.0 390.0 m 506.0 395.0 l S Q
+q 0.8 w 514.0 390.0 m 506.0 385.0 l S Q
+q 1.0 w 145.0 335.0 m 698.0 390.0 l S Q
+q 0.8 w 698.0 390.0 m 690.0 395.0 l S Q
+q 0.8 w 698.0 390.0 m 690.0 385.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 118.0 205.0 170.0 62.0 re B Q
+BT /F2 10 Tf 127.0 250.0 Td (Tools) Tj ET
+BT /F1 7 Tf 127.0 236.0 Td (jd_tools.py) Tj ET
+BT /F1 7 Tf 127.0 226.0 Td (resume_tools.py) Tj ET
+BT /F1 7 Tf 127.0 216.0 Td (matching_tools.py) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 342.0 205.0 170.0 62.0 re B Q
+BT /F2 10 Tf 351.0 250.0 Td (Services) Tj ET
+BT /F1 7 Tf 351.0 236.0 Td (candidate_service.py) Tj ET
+BT /F1 7 Tf 351.0 226.0 Td (jd_service.py) Tj ET
+BT /F1 7 Tf 351.0 216.0 Td (interview_service.py) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 566.0 205.0 170.0 62.0 re B Q
+BT /F2 10 Tf 575.0 250.0 Td (Database) Tj ET
+BT /F1 7 Tf 575.0 236.0 Td (MongoDB helpers) Tj ET
+BT /F1 7 Tf 575.0 226.0 Td (agent_runs) Tj ET
+q 1.0 w 330.0 335.0 m 203.0 267.0 l S Q
+q 0.8 w 203.0 267.0 m 211.0 272.0 l S Q
+q 0.8 w 203.0 267.0 m 211.0 262.0 l S Q
+q 1.0 w 514.0 335.0 m 427.0 267.0 l S Q
+q 0.8 w 427.0 267.0 m 435.0 272.0 l S Q
+q 0.8 w 427.0 267.0 m 435.0 262.0 l S Q
+q 1.0 w 698.0 335.0 m 651.0 267.0 l S Q
+q 0.8 w 651.0 267.0 m 646.0 275.0 l S Q
+q 0.8 w 651.0 267.0 m 656.0 275.0 l S Q
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Agent Code Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 1746 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Orchestrator Code) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (What to say about main_orchestrator.py and hr_graph.py) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 10 Tf 44.0 500.0 Td (_task_type) Tj ET
+BT /F1 9 Tf 176.0 500.0 Td (Infers the task label used for run tracking from task_type, type, message, or jd_id.) Tj ET
+BT /F2 10 Tf 44.0 481.0 Td (_safe_input) Tj ET
+BT /F1 9 Tf 176.0 481.0 Td (Removes private fields and uploaded file objects before saving run input metadata.) Tj ET
+BT /F2 10 Tf 44.0 462.0 Td (run_main_orchestrator) Tj ET
+BT /F1 9 Tf 176.0 462.0 Td (Creates run_id, writes running status, invokes run_hr_graph, then writes completed or) Tj ET
+BT /F1 9 Tf 176.0 449.0 Td (failed output.) Tj ET
+BT /F2 10 Tf 44.0 430.0 Td (HRGraphState) Tj ET
+BT /F1 9 Tf 176.0 430.0 Td (Typed dictionary that carries payload, route, contexts, errors, path result, and final) Tj ET
+BT /F1 9 Tf 176.0 417.0 Td (response between nodes.) Tj ET
+BT /F2 10 Tf 44.0 398.0 Td (router_node) Tj ET
+BT /F1 9 Tf 176.0 398.0 Td (Runs route_request and stores route_decision plus route in graph state.) Tj ET
+BT /F2 10 Tf 44.0 379.0 Td (route_after_router) Tj ET
+BT /F1 9 Tf 176.0 379.0 Td (Conditional edge function that decides which branch runs after the router.) Tj ET
+BT /F2 10 Tf 44.0 360.0 Td (final_response_node) Tj ET
+BT /F1 9 Tf 176.0 360.0 Td (Converts each branch result into the stable API response shape.) Tj ET
+BT /F2 10 Tf 44.0 341.0 Td (build_hr_graph) Tj ET
+BT /F1 9 Tf 176.0 341.0 Td (Registers LangGraph nodes and edges, then compiles the graph once.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Agent Code Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 2658 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Screening Agents) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (What each screening function does) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 44.0 464.0 150.0 38.0 re B Q
+BT /F2 10 Tf 53.0 485.0 Td (JD Agent) Tj ET
+BT /F1 9 Tf 219.0 495.0 Td (run_jd_agent loads the JD row and normalized JD JSON. build_jd_agent_prompt documents) Tj ET
+BT /F1 9 Tf 219.0 482.0 Td (what the JD Agent would extract.) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 44.0 392.0 150.0 38.0 re B Q
+BT /F2 10 Tf 53.0 413.0 Td (Resume Agent) Tj ET
+BT /F1 9 Tf 219.0 423.0 Td (run_resume_agent builds profiles from existing candidates and uploaded resumes. It) Tj ET
+BT /F1 9 Tf 219.0 410.0 Td (records non-fatal extraction errors.) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 44.0 320.0 150.0 38.0 re B Q
+BT /F2 10 Tf 53.0 341.0 Td (Matching Agent) Tj ET
+BT /F1 9 Tf 219.0 351.0 Td (run_matching_agent compares each profile with the JD and persists comparison rows) Tj ET
+BT /F1 9 Tf 219.0 338.0 Td (through matching_tools.persist_match.) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 44.0 248.0 150.0 38.0 re B Q
+BT /F2 10 Tf 53.0 269.0 Td (Ranking Agent) Tj ET
+BT /F1 9 Tf 219.0 279.0 Td (run_ranking_agent sorts results by match_score and splits selected_results from) Tj ET
+BT /F1 9 Tf 219.0 266.0 Td (rejected_results.) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 44.0 176.0 150.0 38.0 re B Q
+BT /F2 10 Tf 53.0 197.0 Td (Summary Agent) Tj ET
+BT /F1 9 Tf 219.0 207.0 Td (run_summary_agent produces the recruiter-facing summary, selected/rejected counts, top) Tj ET
+BT /F1 9 Tf 219.0 194.0 Td (candidate, and errors.) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 92.0 95.0 130.0 45.0 re B Q
+BT /F2 10 Tf 101.0 123.0 Td (JD) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 272.0 95.0 130.0 45.0 re B Q
+BT /F2 10 Tf 281.0 123.0 Td (Resume) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 452.0 95.0 130.0 45.0 re B Q
+BT /F2 10 Tf 461.0 123.0 Td (Match) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 632.0 95.0 130.0 45.0 re B Q
+BT /F2 10 Tf 641.0 123.0 Td (Rank/Summary) Tj ET
+q 1.0 w 222.0 118.0 m 272.0 118.0 l S Q
+q 0.8 w 272.0 118.0 m 264.0 123.0 l S Q
+q 0.8 w 272.0 118.0 m 264.0 113.0 l S Q
+q 1.0 w 402.0 118.0 m 452.0 118.0 l S Q
+q 0.8 w 452.0 118.0 m 444.0 123.0 l S Q
+q 0.8 w 452.0 118.0 m 444.0 113.0 l S Q
+q 1.0 w 582.0 118.0 m 632.0 118.0 l S Q
+q 0.8 w 632.0 118.0 m 624.0 123.0 l S Q
+q 0.8 w 632.0 118.0 m 624.0 113.0 l S Q
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Agent Code Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 1543 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Chat, Interview, and App Workflow Agents) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (How to explain non-screening branches) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 10 Tf 44.0 500.0 Td (Router Agent) Tj ET
+BT /F1 9 Tf 176.0 500.0 Td (deterministic_route handles known task types. route_request uses deterministic routing) Tj ET
+BT /F1 9 Tf 176.0 487.0 Td (first and LLM routing only when needed.) Tj ET
+BT /F2 10 Tf 44.0 460.0 Td (Recruiter Agent) Tj ET
+BT /F1 9 Tf 176.0 460.0 Td (run_recruiter_agent answers grounded recruiter questions. execute_recruiter_action runs) Tj ET
+BT /F1 9 Tf 176.0 447.0 Td (supported chat actions with confirmation for side effects.) Tj ET
+BT /F2 10 Tf 44.0 420.0 Td (Interview Agent) Tj ET
+BT /F1 9 Tf 176.0 420.0 Td (run_interview_question_agent generates role-specific interview questions from candidate) Tj ET
+BT /F1 9 Tf 176.0 407.0 Td (and JD context.) Tj ET
+BT /F2 10 Tf 44.0 380.0 Td (App Workflow) Tj ET
+BT /F1 9 Tf 176.0 380.0 Td (run_app_workflow dispatches JD, candidate, profile, dashboard, report, and interview tasks) Tj ET
+BT /F1 9 Tf 176.0 367.0 Td (to existing services.) Tj ET
+BT /F2 10 Tf 44.0 340.0 Td (Agentic Routes) Tj ET
+BT /F1 9 Tf 176.0 340.0 Td (api_agentic_run normalizes request payloads, adds authenticated user context, and calls) Tj ET
+BT /F1 9 Tf 176.0 327.0 Td (the Main HR Orchestrator.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Agent Code Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 3122 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (UML Sequence Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (How one request moves through the code) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.0 w 54.0 500.0 94.0 30.0 re B Q
+BT /F2 10 Tf 63.0 513.0 Td (Frontend) Tj ET
+q 0.6 w 101.0 500.0 m 101.0 86.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.0 w 178.0 500.0 94.0 30.0 re B Q
+BT /F2 10 Tf 187.0 513.0 Td (API Route) Tj ET
+q 0.6 w 225.0 500.0 m 225.0 86.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.0 w 302.0 500.0 94.0 30.0 re B Q
+BT /F2 10 Tf 311.0 513.0 Td (Orchestrator) Tj ET
+q 0.6 w 349.0 500.0 m 349.0 86.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.0 w 426.0 500.0 94.0 30.0 re B Q
+BT /F2 10 Tf 435.0 513.0 Td (LangGraph) Tj ET
+q 0.6 w 473.0 500.0 m 473.0 86.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.0 w 550.0 500.0 94.0 30.0 re B Q
+BT /F2 10 Tf 559.0 513.0 Td (Agent) Tj ET
+q 0.6 w 597.0 500.0 m 597.0 86.0 l S Q
+q 0.94 0.96 0.99 rg 0.18 0.24 0.32 RG 1.0 w 674.0 500.0 94.0 30.0 re B Q
+BT /F2 10 Tf 683.0 513.0 Td (DB/Service) Tj ET
+q 0.6 w 721.0 500.0 m 721.0 86.0 l S Q
+q 1.0 w 101.0 462.0 m 225.0 462.0 l S Q
+q 0.8 w 225.0 462.0 m 217.0 467.0 l S Q
+q 0.8 w 225.0 462.0 m 217.0 457.0 l S Q
+BT /F1 7 Tf 108.0 470.0 Td (POST request) Tj ET
+q 1.0 w 225.0 422.0 m 349.0 422.0 l S Q
+q 0.8 w 349.0 422.0 m 341.0 427.0 l S Q
+q 0.8 w 349.0 422.0 m 341.0 417.0 l S Q
+BT /F1 7 Tf 232.0 430.0 Td (run_main_orchestrator) Tj ET
+q 1.0 w 349.0 382.0 m 721.0 382.0 l S Q
+q 0.8 w 721.0 382.0 m 713.0 387.0 l S Q
+q 0.8 w 721.0 382.0 m 713.0 377.0 l S Q
+BT /F1 7 Tf 356.0 390.0 Td (create_agent_run) Tj ET
+q 1.0 w 349.0 342.0 m 473.0 342.0 l S Q
+q 0.8 w 473.0 342.0 m 465.0 347.0 l S Q
+q 0.8 w 473.0 342.0 m 465.0 337.0 l S Q
+BT /F1 7 Tf 356.0 350.0 Td (invoke graph) Tj ET
+q 1.0 w 473.0 302.0 m 597.0 302.0 l S Q
+q 0.8 w 597.0 302.0 m 589.0 307.0 l S Q
+q 0.8 w 597.0 302.0 m 589.0 297.0 l S Q
+BT /F1 7 Tf 480.0 310.0 Td (router/role node) Tj ET
+q 1.0 w 597.0 262.0 m 721.0 262.0 l S Q
+q 0.8 w 721.0 262.0 m 713.0 267.0 l S Q
+q 0.8 w 721.0 262.0 m 713.0 257.0 l S Q
+BT /F1 7 Tf 604.0 270.0 Td (load or persist data) Tj ET
+q 1.0 w 597.0 222.0 m 473.0 222.0 l S Q
+q 0.8 w 473.0 222.0 m 481.0 227.0 l S Q
+q 0.8 w 473.0 222.0 m 481.0 217.0 l S Q
+BT /F1 7 Tf 480.0 230.0 Td (path_result) Tj ET
+q 1.0 w 473.0 182.0 m 349.0 182.0 l S Q
+q 0.8 w 349.0 182.0 m 357.0 187.0 l S Q
+q 0.8 w 349.0 182.0 m 357.0 177.0 l S Q
+BT /F1 7 Tf 356.0 190.0 Td (final_response) Tj ET
+q 1.0 w 349.0 142.0 m 721.0 142.0 l S Q
+q 0.8 w 721.0 142.0 m 713.0 147.0 l S Q
+q 0.8 w 721.0 142.0 m 713.0 137.0 l S Q
+BT /F1 7 Tf 356.0 150.0 Td (update_agent_run) Tj ET
+q 1.0 w 349.0 102.0 m 225.0 102.0 l S Q
+q 0.8 w 225.0 102.0 m 233.0 107.0 l S Q
+q 0.8 w 225.0 102.0 m 233.0 97.0 l S Q
+BT /F1 7 Tf 232.0 110.0 Td (result) Tj ET
+q 1.0 w 225.0 78.0 m 101.0 78.0 l S Q
+q 0.8 w 101.0 78.0 m 109.0 83.0 l S Q
+q 0.8 w 101.0 78.0 m 109.0 73.0 l S Q
+BT /F1 7 Tf 108.0 86.0 Td (JSON) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Agent Code Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+15 0 obj
+<< /Type /Pages /Kids [9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R] /Count 6 >>
+endobj
+16 0 obj
+<< /Type /Catalog /Pages 15 0 R >>
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000002802 00000 n 
+0000006937 00000 n 
+0000008735 00000 n 
+0000011445 00000 n 
+0000013040 00000 n 
+0000016214 00000 n 
+0000016351 00000 n 
+0000016489 00000 n 
+0000016627 00000 n 
+0000016765 00000 n 
+0000016903 00000 n 
+0000017041 00000 n 
+0000017134 00000 n 
+trailer
+<< /Size 17 /Root 16 0 R >>
+startxref
+17185
+%%EOF

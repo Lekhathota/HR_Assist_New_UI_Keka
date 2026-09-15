@@ -1,0 +1,152 @@
+/* ========== JD LIST EXTRA STYLES ========== */
+
+.jd-list-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: nowrap;
+    gap: 1rem;
+    min-height: 56px;
+}
+
+.jd-list-topbar h1 {
+    margin-bottom: 0;
+    margin-top: 0;
+    line-height: 1;
+}
+
+.jd-cards-grid {
+    margin-bottom: 2rem;
+    align-items: stretch;
+}
+
+/* Job cards need enough room for both actions; the shared theme otherwise
+   compresses this grid into overly narrow five-column layouts. */
+.app-shell .jd-cards-grid.grid-4 {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.jd-card-title {
+    color: #2c3e50;
+    margin-bottom: 0.8rem;
+}
+
+.jd-card-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.jd-table-remove-compact {
+    font-size: 0.7rem !important;
+    padding: 0.25rem 0.45rem !important;
+    line-height: 1.2 !important;
+    border-radius: 6px !important;
+}
+
+.jd-card-meta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.jd-card-stats {
+    margin: 1.2rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.jd-card-stats-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    text-align: center;
+}
+
+.jd-stat-label {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.jd-stat-value-blue  { font-size: 1.5rem; font-weight: 700; color: #3498db; }
+.jd-stat-value-green { font-size: 1.5rem; font-weight: 700; color: #27ae60; }
+.jd-stat-value-red   { font-size: 1.5rem; font-weight: 700; color: #e74c3c; }
+
+.jd-card-progress-wrap {
+    margin-top: 0.8rem;
+}
+
+.jd-card-progress-label {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    margin-bottom: 0.4rem;
+}
+
+.jd-card-actions-bottom {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+    width: 100%;
+}
+
+/* Keep actions on the same baseline when card content has different heights. */
+.jd-cards-grid .jd-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.jd-card-actions-bottom .jd-card-btn {
+    display: inline-flex;
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.jd-table-actions {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.jd-section-title {
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+}
+
+.jd-table-btn {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Empty state */
+.jd-empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.jd-empty-icon {
+    font-size: 3rem;
+    color: #bdc3c7;
+    margin-bottom: 1rem;
+}
+
+.jd-empty-title  { color: #7f8c8d; }
+.jd-empty-text   { color: #95a5a6; margin-bottom: 1.5rem; }

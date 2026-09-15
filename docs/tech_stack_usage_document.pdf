@@ -1,0 +1,374 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 2315 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Technology Stack and Usage Document) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Recruitment Assist full-stack AI recruitment application) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (Project Overview) Tj ET
+BT /F1 10 Tf 44.0 478.0 Td (Recruitment Assist is a full-stack AI-powered recruitment platform. It manages job descriptions, resumes, candidate) Tj ET
+BT /F1 10 Tf 44.0 464.0 Td (comparison, interview scheduling, communication drafts, dashboards, reports, and recruiter assistance.) Tj ET
+BT /F2 13 Tf 44.0 440.0 Td (Core Stack) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 44.0 370.0 108.0 48.0 re B Q
+BT /F2 11 Tf 54.0 398.0 Td (React) Tj ET
+BT /F1 8 Tf 54.0 383.0 Td (Frontend UI) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 168.0 370.0 108.0 48.0 re B Q
+BT /F2 11 Tf 178.0 398.0 Td (Flask) Tj ET
+BT /F1 8 Tf 178.0 383.0 Td (Backend API) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 292.0 370.0 108.0 48.0 re B Q
+BT /F2 11 Tf 302.0 398.0 Td (MongoDB) Tj ET
+BT /F1 8 Tf 302.0 383.0 Td (Database) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 416.0 370.0 108.0 48.0 re B Q
+BT /F2 11 Tf 426.0 398.0 Td (OpenAI) Tj ET
+BT /F1 8 Tf 426.0 383.0 Td (AI extraction) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 540.0 370.0 108.0 48.0 re B Q
+BT /F2 11 Tf 550.0 398.0 Td (LangGraph) Tj ET
+BT /F1 8 Tf 550.0 383.0 Td (Agent workflow) Tj ET
+q 0.95 0.97 1.00 rg 0.20 0.24 0.32 RG 0.8 w 664.0 370.0 108.0 48.0 re B Q
+BT /F2 11 Tf 674.0 398.0 Td (PDF/DOCX) Tj ET
+BT /F1 8 Tf 674.0 383.0 Td (Parsing) Tj ET
+BT /F2 13 Tf 44.0 334.0 Td (Application Flow) Tj ET
+BT /F1 9 Tf 54.0 312.0 Td (1. User works in the React frontend.) Tj ET
+BT /F1 9 Tf 54.0 299.0 Td (2. frontend/src/api.js sends requests to Flask and attaches the session token.) Tj ET
+BT /F1 9 Tf 54.0 286.0 Td (3. Flask routes call services, workflows, or agents.) Tj ET
+BT /F1 9 Tf 54.0 273.0 Td (4. MongoDB stores users, jobs, candidates, comparisons, interviews, audit logs, and agent runs.) Tj ET
+BT /F1 9 Tf 54.0 260.0 Td (5. OpenAI and LangGraph power extraction, screening, matching, summaries, and recruiter assistance.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 2471 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Frontend Technologies) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Where each technology is used and why) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (React 18) Tj ET
+BT /F1 8 Tf 186.0 500.0 Td (Where: frontend/src/App.jsx, frontend/src/pages/*, frontend/src/components/*) Tj ET
+BT /F1 8 Tf 186.0 490.0 Td (Why: Builds the single-page application UI with reusable components.) Tj ET
+BT /F2 9 Tf 44.0 473.0 Td (React DOM) Tj ET
+BT /F1 8 Tf 186.0 473.0 Td (Where: frontend/src/index.js) Tj ET
+BT /F1 8 Tf 186.0 463.0 Td (Why: Mounts the React app into the browser DOM.) Tj ET
+BT /F2 9 Tf 44.0 446.0 Td (React Router DOM) Tj ET
+BT /F1 8 Tf 186.0 446.0 Td (Where: frontend/src/App.jsx and files using Link/useNavigate/useParams) Tj ET
+BT /F1 8 Tf 186.0 436.0 Td (Why: Handles routes like /dashboard, /jobs, /analyze, /talent, /interviews, and) Tj ET
+BT /F1 8 Tf 186.0 426.0 Td (/profile.) Tj ET
+BT /F2 9 Tf 44.0 409.0 Td (Create React App / react-scripts) Tj ET
+BT /F1 8 Tf 186.0 409.0 Td (Where: frontend/package.json) Tj ET
+BT /F1 8 Tf 186.0 399.0 Td (Why: Provides the dev server, build command, test runner, and standard React tooling.) Tj ET
+BT /F2 9 Tf 44.0 382.0 Td (CSS) Tj ET
+BT /F1 8 Tf 186.0 382.0 Td (Where: frontend/src/styles/*.css and frontend/src/index.css) Tj ET
+BT /F1 8 Tf 186.0 372.0 Td (Why: Controls layout, branding, dashboard styling, forms, reports, and responsive UI.) Tj ET
+BT /F2 9 Tf 44.0 355.0 Td (Flatpickr) Tj ET
+BT /F1 8 Tf 186.0 355.0 Td (Where: frontend/src/pages/Dashboard.jsx and frontend/src/styles/dashboard.css) Tj ET
+BT /F1 8 Tf 186.0 345.0 Td (Why: Provides dashboard date picker controls.) Tj ET
+BT /F2 9 Tf 44.0 328.0 Td (Fetch API) Tj ET
+BT /F1 8 Tf 186.0 328.0 Td (Where: frontend/src/api.js) Tj ET
+BT /F1 8 Tf 186.0 318.0 Td (Why: Sends HTTP requests from React to Flask APIs.) Tj ET
+BT /F2 9 Tf 44.0 301.0 Td (localStorage / sessionStorage) Tj ET
+BT /F1 8 Tf 186.0 301.0 Td (Where: frontend/src/api.js) Tj ET
+BT /F1 8 Tf 186.0 291.0 Td (Why: Stores session tokens and small frontend caches.) Tj ET
+BT /F2 9 Tf 44.0 274.0 Td (Tailwind config) Tj ET
+BT /F1 8 Tf 186.0 274.0 Td (Where: frontend/tailwind.config.js) Tj ET
+BT /F1 8 Tf 186.0 264.0 Td (Why: Defines design tokens; the current UI mainly uses custom CSS files.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 2269 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Backend Technologies) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Where each technology is used and why) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (Python) Tj ET
+BT /F1 8 Tf 186.0 500.0 Td (Where: backend/**/*.py) Tj ET
+BT /F1 8 Tf 186.0 490.0 Td (Why: Main backend programming language.) Tj ET
+BT /F2 9 Tf 44.0 473.0 Td (Flask) Tj ET
+BT /F1 8 Tf 186.0 473.0 Td (Where: backend/app.py and backend/routes/*.py) Tj ET
+BT /F1 8 Tf 186.0 463.0 Td (Why: Provides API routing, request handling, sessions, redirects, and JSON responses.) Tj ET
+BT /F2 9 Tf 44.0 446.0 Td (Flask Blueprints) Tj ET
+BT /F1 8 Tf 186.0 446.0 Td (Where: backend/app.py and backend/routes/*.py) Tj ET
+BT /F1 8 Tf 186.0 436.0 Td (Why: Organizes APIs by feature: auth, dashboard, jobs, candidates, matching,) Tj ET
+BT /F1 8 Tf 186.0 426.0 Td (interviews, reports, audit, and agentic routes.) Tj ET
+BT /F2 9 Tf 44.0 409.0 Td (Flask-CORS) Tj ET
+BT /F1 8 Tf 186.0 409.0 Td (Where: backend/app.py) Tj ET
+BT /F1 8 Tf 186.0 399.0 Td (Why: Allows React localhost frontend requests to Flask /api/* endpoints during) Tj ET
+BT /F1 8 Tf 186.0 389.0 Td (development.) Tj ET
+BT /F2 9 Tf 44.0 372.0 Td (Werkzeug) Tj ET
+BT /F1 8 Tf 186.0 372.0 Td (Where: backend/database.py and backend/services/*.py) Tj ET
+BT /F1 8 Tf 186.0 362.0 Td (Why: Handles password hashing and secure uploaded filenames.) Tj ET
+BT /F2 9 Tf 44.0 345.0 Td (python-dotenv) Tj ET
+BT /F1 8 Tf 186.0 345.0 Td (Where: backend/app.py and backend/agents/openai_config.py) Tj ET
+BT /F1 8 Tf 186.0 335.0 Td (Why: Loads .env settings such as MongoDB URI, OpenAI key, Flask config, SMTP, and) Tj ET
+BT /F1 8 Tf 186.0 325.0 Td (Twilio values.) Tj ET
+BT /F2 9 Tf 44.0 308.0 Td (Pydantic) Tj ET
+BT /F1 8 Tf 186.0 308.0 Td (Where: backend/schemas/agentic.py) Tj ET
+BT /F1 8 Tf 186.0 298.0 Td (Why: Validates structured agentic API payloads.) Tj ET
+BT /F2 9 Tf 44.0 281.0 Td (pytest) Tj ET
+BT /F1 8 Tf 186.0 281.0 Td (Where: backend/tests/test_security_hardening.py) Tj ET
+BT /F1 8 Tf 186.0 271.0 Td (Why: Runs backend security and regression tests.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 1444 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Database and Persistence) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Where each technology is used and why) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (MongoDB / MongoDB Atlas) Tj ET
+BT /F1 8 Tf 186.0 500.0 Td (Where: backend/database.py) Tj ET
+BT /F1 8 Tf 186.0 490.0 Td (Why: Stores users, job descriptions, candidates, comparisons, interviews, audit logs,) Tj ET
+BT /F1 8 Tf 186.0 480.0 Td (agent runs, tokens, and counters.) Tj ET
+BT /F2 9 Tf 44.0 463.0 Td (PyMongo) Tj ET
+BT /F1 8 Tf 186.0 463.0 Td (Where: backend/database.py) Tj ET
+BT /F1 8 Tf 186.0 453.0 Td (Why: Connects to MongoDB, creates indexes, queries collections, and updates documents.) Tj ET
+BT /F2 9 Tf 44.0 436.0 Td (MongoDB indexes) Tj ET
+BT /F1 8 Tf 186.0 436.0 Td (Where: backend/database.py) Tj ET
+BT /F1 8 Tf 186.0 426.0 Td (Why: Improves lookups and enforces uniqueness for usernames, job IDs, candidate IDs,) Tj ET
+BT /F1 8 Tf 186.0 416.0 Td (comparisons, interviews, and tokens.) Tj ET
+BT /F2 9 Tf 44.0 399.0 Td (Integer counters) Tj ET
+BT /F1 8 Tf 186.0 399.0 Td (Where: backend/database.py) Tj ET
+BT /F1 8 Tf 186.0 389.0 Td (Why: Keeps simple numeric IDs in URLs and payloads while using MongoDB documents) Tj ET
+BT /F1 8 Tf 186.0 379.0 Td (internally.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 2195 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (AI and Agentic Technologies) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Where each technology is used and why) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (OpenAI Python SDK) Tj ET
+BT /F1 8 Tf 186.0 500.0 Td (Where: backend/app/llm_extraction.py and backend/agents/*.py) Tj ET
+BT /F1 8 Tf 186.0 490.0 Td (Why: Performs extraction, resume/JD parsing, matching, ranking, summaries, interview) Tj ET
+BT /F1 8 Tf 186.0 480.0 Td (content generation, and recruiter chat.) Tj ET
+BT /F2 9 Tf 44.0 463.0 Td (LangGraph) Tj ET
+BT /F1 8 Tf 186.0 463.0 Td (Where: backend/orchestration/hr_graph.py) Tj ET
+BT /F1 8 Tf 186.0 453.0 Td (Why: Coordinates multi-step HR workflows using graph-based routing and state) Tj ET
+BT /F1 8 Tf 186.0 443.0 Td (transitions.) Tj ET
+BT /F2 9 Tf 44.0 426.0 Td (LangChain dependency) Tj ET
+BT /F1 8 Tf 186.0 426.0 Td (Where: backend/requirements.txt) Tj ET
+BT /F1 8 Tf 186.0 416.0 Td (Why: Included as part of the AI/agent workflow stack.) Tj ET
+BT /F2 9 Tf 44.0 399.0 Td (Agent modules) Tj ET
+BT /F1 8 Tf 186.0 399.0 Td (Where: backend/agents/*.py) Tj ET
+BT /F1 8 Tf 186.0 389.0 Td (Why: Separate AI responsibilities into JD, resume, matching, ranking, summary,) Tj ET
+BT /F1 8 Tf 186.0 379.0 Td (interview, recruiter, and router agents.) Tj ET
+BT /F2 9 Tf 44.0 362.0 Td (Workflow modules) Tj ET
+BT /F1 8 Tf 186.0 362.0 Td (Where: backend/workflows/*.py) Tj ET
+BT /F1 8 Tf 186.0 352.0 Td (Why: Encapsulate screening, recruiter chat, and application workflows.) Tj ET
+BT /F2 9 Tf 44.0 335.0 Td (Tool gateway) Tj ET
+BT /F1 8 Tf 186.0 335.0 Td (Where: backend/tools/tool_gateway.py) Tj ET
+BT /F1 8 Tf 186.0 325.0 Td (Why: Controls agent access to tools and applies policy checks before actions.) Tj ET
+BT /F2 9 Tf 44.0 308.0 Td (Security policy) Tj ET
+BT /F1 8 Tf 186.0 308.0 Td (Where: backend/security/policy.py and backend/security/context_safety.py) Tj ET
+BT /F1 8 Tf 186.0 298.0 Td (Why: Adds tool-use guardrails, prompt-injection checks, and safer agent execution.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 1618 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (File Upload and Parsing) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Where each technology is used and why) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (PyPDF2) Tj ET
+BT /F1 8 Tf 186.0 500.0 Td (Where: backend/app/text_extractor.py) Tj ET
+BT /F1 8 Tf 186.0 490.0 Td (Why: Extracts PDF text as one parser fallback.) Tj ET
+BT /F2 9 Tf 44.0 473.0 Td (PyMuPDF) Tj ET
+BT /F1 8 Tf 186.0 473.0 Td (Where: backend/app/text_extractor.py) Tj ET
+BT /F1 8 Tf 186.0 463.0 Td (Why: Extracts PDF text through fitz, useful for complex PDFs.) Tj ET
+BT /F2 9 Tf 44.0 446.0 Td (pdfplumber) Tj ET
+BT /F1 8 Tf 186.0 446.0 Td (Where: backend/app/text_extractor.py) Tj ET
+BT /F1 8 Tf 186.0 436.0 Td (Why: Extracts layout-sensitive PDF text as another fallback.) Tj ET
+BT /F2 9 Tf 44.0 419.0 Td (python-docx) Tj ET
+BT /F1 8 Tf 186.0 419.0 Td (Where: backend/app/text_extractor.py) Tj ET
+BT /F1 8 Tf 186.0 409.0 Td (Why: Extracts text from .docx resumes and job descriptions.) Tj ET
+BT /F2 9 Tf 44.0 392.0 Td (secure_filename) Tj ET
+BT /F1 8 Tf 186.0 392.0 Td (Where: backend/services/jd_service.py and backend/services/matching_service.py) Tj ET
+BT /F1 8 Tf 186.0 382.0 Td (Why: Sanitizes uploaded filenames before saving files.) Tj ET
+BT /F2 9 Tf 44.0 365.0 Td (Static uploads) Tj ET
+BT /F1 8 Tf 186.0 365.0 Td (Where: backend/static/uploads) Tj ET
+BT /F1 8 Tf 186.0 355.0 Td (Why: Stores uploaded resumes and job description files.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Length 2011 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Communication, Auth, and Tooling) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Where each technology is used and why) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (smtplib / EmailMessage) Tj ET
+BT /F1 8 Tf 186.0 500.0 Td (Where: backend/services/interview_service.py) Tj ET
+BT /F1 8 Tf 186.0 490.0 Td (Why: Sends interview emails, follow-ups, and cancellations through SMTP.) Tj ET
+BT /F2 9 Tf 44.0 473.0 Td (Twilio) Tj ET
+BT /F1 8 Tf 186.0 473.0 Td (Where: backend/services/interview_service.py and backend/requirements.txt) Tj ET
+BT /F1 8 Tf 186.0 463.0 Td (Why: Supports SMS/text notifications when configured.) Tj ET
+BT /F2 9 Tf 44.0 446.0 Td (Custom session token) Tj ET
+BT /F1 8 Tf 186.0 446.0 Td (Where: frontend/src/api.js, backend/services/auth_service.py, backend/database.py) Tj ET
+BT /F1 8 Tf 186.0 436.0 Td (Why: Stores a frontend token and validates it against MongoDB.) Tj ET
+BT /F2 9 Tf 44.0 419.0 Td (Protected React routes) Tj ET
+BT /F1 8 Tf 186.0 419.0 Td (Where: frontend/src/App.jsx) Tj ET
+BT /F1 8 Tf 186.0 409.0 Td (Why: Redirects unauthenticated users to /login.) Tj ET
+BT /F2 9 Tf 44.0 392.0 Td (Audit logs) Tj ET
+BT /F1 8 Tf 186.0 392.0 Td (Where: backend/database.py and backend/routes/audit_routes.py) Tj ET
+BT /F1 8 Tf 186.0 382.0 Td (Why: Records important actions with hash-chain integrity checks.) Tj ET
+BT /F2 9 Tf 44.0 365.0 Td (npm/concurrently/cross-env) Tj ET
+BT /F1 8 Tf 186.0 365.0 Td (Where: RecruitmentAssist/package.json) Tj ET
+BT /F1 8 Tf 186.0 355.0 Td (Why: Runs Flask and React together during development.) Tj ET
+BT /F2 9 Tf 44.0 338.0 Td (requirements.txt / package-lock.json) Tj ET
+BT /F1 8 Tf 186.0 338.0 Td (Where: backend/requirements.txt and package-lock files) Tj ET
+BT /F1 8 Tf 186.0 328.0 Td (Why: Locks and documents backend/frontend dependencies.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 7) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Length 2587 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Feature-Wise Stack Mapping) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Main features and the technologies behind them) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (Login and authentication) Tj ET
+BT /F1 8 Tf 200.0 500.0 Td (Files: Login.jsx, auth_routes.py, auth_service.py, database.py) Tj ET
+BT /F1 8 Tf 200.0 490.0 Td (Tech: React, Flask, MongoDB, Werkzeug hashing, session tokens) Tj ET
+BT /F2 9 Tf 44.0 473.0 Td (Dashboard) Tj ET
+BT /F1 8 Tf 200.0 473.0 Td (Files: Dashboard.jsx, dashboard_routes.py, report_service.py) Tj ET
+BT /F1 8 Tf 200.0 463.0 Td (Tech: React, Flatpickr, Flask, MongoDB queries) Tj ET
+BT /F2 9 Tf 44.0 446.0 Td (Job descriptions) Tj ET
+BT /F1 8 Tf 200.0 446.0 Td (Files: JdList.jsx, JdCreate.jsx, JdDetails.jsx, jd_routes.py, jd_service.py) Tj ET
+BT /F1 8 Tf 200.0 436.0 Td (Tech: React, Flask, file upload, PDF/DOCX parsing, OpenAI, MongoDB) Tj ET
+BT /F2 9 Tf 44.0 419.0 Td (Candidate management) Tj ET
+BT /F1 8 Tf 200.0 419.0 Td (Files: Candidates.jsx, CandidateProfile.jsx, candidate_routes.py,) Tj ET
+BT /F1 8 Tf 200.0 409.0 Td (candidate_service.py) Tj ET
+BT /F1 8 Tf 200.0 399.0 Td (Tech: React, Flask, MongoDB, resume parsing) Tj ET
+BT /F2 9 Tf 44.0 382.0 Td (Resume/JD comparison) Tj ET
+BT /F1 8 Tf 200.0 382.0 Td (Files: Comparison.jsx, matching_service.py, screening_workflow.py) Tj ET
+BT /F1 8 Tf 200.0 372.0 Td (Tech: React multipart upload, Flask, OpenAI, agent workflow, MongoDB) Tj ET
+BT /F2 9 Tf 44.0 355.0 Td (Interviews) Tj ET
+BT /F1 8 Tf 200.0 355.0 Td (Files: Interviews.jsx, interview_routes.py, interview_service.py) Tj ET
+BT /F1 8 Tf 200.0 345.0 Td (Tech: React, Flask, MongoDB, SMTP, Twilio, OpenAI drafts) Tj ET
+BT /F2 9 Tf 44.0 328.0 Td (Reports and insights) Tj ET
+BT /F1 8 Tf 200.0 328.0 Td (Files: Reports.jsx, report_routes.py, report_service.py) Tj ET
+BT /F1 8 Tf 200.0 318.0 Td (Tech: React, Flask, MongoDB reporting queries) Tj ET
+BT /F2 9 Tf 44.0 301.0 Td (Recruiter chat) Tj ET
+BT /F1 8 Tf 200.0 301.0 Td (Files: FloatingRecruiterChat.jsx, recruiter_chat_workflow.py, recruiter_agent.py) Tj ET
+BT /F1 8 Tf 200.0 291.0 Td (Tech: React, Flask, OpenAI, tool gateway, MongoDB) Tj ET
+BT /F2 9 Tf 44.0 274.0 Td (Agent orchestration) Tj ET
+BT /F1 8 Tf 200.0 274.0 Td (Files: hr_graph.py, main_orchestrator.py, backend/agents/*.py) Tj ET
+BT /F1 8 Tf 200.0 264.0 Td (Tech: LangGraph, OpenAI, Flask, MongoDB, security policy) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 8) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Length 2012 >>
+stream
+BT /F2 18 Tf 44.0 553.0 Td (Why This Stack Fits) Tj ET
+BT /F1 9 Tf 44.0 533.0 Td (Summary) Tj ET
+q 0.7 w 44.0 519.0 m 798.0 519.0 l S Q
+BT /F1 9 Tf 44.0 500.0 Td (React fits because the application has many interactive screens, protected routes, upload flows, forms, modals,) Tj ET
+BT /F1 9 Tf 44.0 487.0 Td (dashboards, and recruiter workflows.) Tj ET
+BT /F1 9 Tf 44.0 466.0 Td (Flask fits because the backend needs lightweight API routing, file upload handling, session handling, and direct) Tj ET
+BT /F1 9 Tf 44.0 453.0 Td (integration with Python AI and document-processing libraries.) Tj ET
+BT /F1 9 Tf 44.0 432.0 Td (MongoDB fits because recruitment data is flexible: resumes, parsed profiles, job descriptions, comparisons,) Tj ET
+BT /F1 9 Tf 44.0 419.0 Td (interviews, audit logs, and agent outputs can vary in shape.) Tj ET
+BT /F1 9 Tf 44.0 398.0 Td (OpenAI fits because the core product depends on natural language understanding: extracting resume/JD details,) Tj ET
+BT /F1 9 Tf 44.0 385.0 Td (comparing profiles, creating summaries, generating interview messages, and powering recruiter chat.) Tj ET
+BT /F1 9 Tf 44.0 364.0 Td (LangGraph fits because screening and recruiter assistance are multi-step workflows that need routing, state) Tj ET
+BT /F1 9 Tf 44.0 351.0 Td (management, and controlled agent coordination.) Tj ET
+BT /F1 9 Tf 44.0 330.0 Td (PDF/DOCX parsing, SMTP, and Twilio support real recruiter workflows: uploaded documents, email communication, and) Tj ET
+BT /F1 9 Tf 44.0 317.0 Td (optional text notifications.) Tj ET
+BT /F2 12 Tf 44.0 292.0 Td (Final Stack) Tj ET
+BT /F1 10 Tf 54.0 270.0 Td (React frontend + Flask backend + MongoDB database + OpenAI AI layer + LangGraph workflow orchestration +) Tj ET
+BT /F1 10 Tf 54.0 256.0 Td (PDF/DOCX parsing + SMTP/Twilio communication + custom authentication and audit logging.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (Recruitment Assist - Tech Stack Usage Document) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 9) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+15 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+16 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+17 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+18 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 9 0 R >>
+endobj
+19 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 10 0 R >>
+endobj
+20 0 obj
+<< /Type /Page /Parent 21 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 11 0 R >>
+endobj
+21 0 obj
+<< /Type /Pages /Kids [12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R 18 0 R 19 0 R 20 0 R] /Count 9 >>
+endobj
+22 0 obj
+<< /Type /Catalog /Pages 21 0 R >>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000002527 00000 n 
+0000005050 00000 n 
+0000007371 00000 n 
+0000008867 00000 n 
+0000011114 00000 n 
+0000012784 00000 n 
+0000014847 00000 n 
+0000017487 00000 n 
+0000019552 00000 n 
+0000019690 00000 n 
+0000019828 00000 n 
+0000019966 00000 n 
+0000020104 00000 n 
+0000020242 00000 n 
+0000020380 00000 n 
+0000020518 00000 n 
+0000020657 00000 n 
+0000020796 00000 n 
+0000020911 00000 n 
+trailer
+<< /Size 23 /Root 22 0 R >>
+startxref
+20962
+%%EOF

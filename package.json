@@ -1,0 +1,19 @@
+{
+  "name": "recruitment-assist",
+  "private": true,
+  "description": "Run Flask API + React UI together (dev)",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "node scripts/run-backend.js",
+    "dev:web": "cd frontend && cross-env PORT=3001 BROWSER=none npm start",
+    "setup:backend": "node scripts/setup-backend.js",
+    "seed:backend": "node scripts/run-python.js backend/database/seed_mongo_data.py",
+    "import:uploads": "node scripts/run-python.js backend/database/import_uploads_to_mongo.py",
+    "import:json": "node scripts/run-python.js backend/database/import_json_to_mongo.py",
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3"
+  }
+}

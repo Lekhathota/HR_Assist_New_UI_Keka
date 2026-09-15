@@ -1,0 +1,15 @@
+backend/
+ ├── agents/
+ │    ├── jd_agent.py
+ │    ├── resume_agent.py
+ │    ├── matching_agent.py
+ │    ├── screening_agent.py
+ │    ├── interview_agent.py
+ │    ├── report_agent.py
+ │    └── analytics_agent.py
+ │
+ ├── orchestrator/
+ │    ├── orchestrator.py
+ │    ├── workflow_manager.py
+ │    ├── context_manager.py
+ │    └── memory_manager.py

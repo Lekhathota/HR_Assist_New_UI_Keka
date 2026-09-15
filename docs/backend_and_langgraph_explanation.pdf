@@ -1,0 +1,336 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 1638 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (RecruitmentAssist Backend and LangGraph) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Simple explanation of the backend folder and agent architecture) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (Tiny Meaning) Tj ET
+BT /F1 10 Tf 44.0 480.0 Td (The backend is the hidden kitchen of the HR app. The frontend is what users see. The backend stores data, reads) Tj ET
+BT /F1 10 Tf 44.0 466.0 Td (resumes, checks job descriptions, matches candidates, schedules interviews, and talks to AI.) Tj ET
+BT /F2 13 Tf 44.0 442.0 Td (Main Idea) Tj ET
+BT /F1 9 Tf 54.0 422.0 Td (- routes are the doors where frontend requests enter.) Tj ET
+BT /F1 9 Tf 54.0 407.0 Td (- services are the workers that do business logic.) Tj ET
+BT /F1 9 Tf 54.0 392.0 Td (- database.py is the big notebook that remembers jobs, candidates, interviews, users, and audit logs.) Tj ET
+BT /F1 9 Tf 54.0 377.0 Td (- agents are AI helpers for reading, matching, ranking, summarizing, and chatting.) Tj ET
+BT /F1 9 Tf 54.0 362.0 Td (- LangGraph is the traffic controller that decides which agent runs first and next.) Tj ET
+BT /F2 13 Tf 44.0 339.0 Td (Like You Are 5) Tj ET
+BT /F1 10 Tf 44.0 319.0 Td (Imagine an office helper. One helper opens the door, one writes in the notebook, one reads papers, one compares) Tj ET
+BT /F1 10 Tf 44.0 305.0 Td (papers, one makes a list of best people, and one explains the answer. LangGraph tells these helpers whose turn it is.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 2790 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Backend Folder Structure) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (What each major folder/file does) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 10 Tf 44.0 500.0 Td (app.py) Tj ET
+BT /F1 9 Tf 189.0 500.0 Td (Starts the Flask backend, connects routes, prepares database and frontend preference.) Tj ET
+BT /F2 10 Tf 44.0 484.0 Td (database.py) Tj ET
+BT /F1 9 Tf 189.0 484.0 Td (MongoDB helper. Creates, reads, updates, and deletes jobs, candidates, comparisons,) Tj ET
+BT /F1 9 Tf 189.0 472.0 Td (interviews, users, runs, and audit logs.) Tj ET
+BT /F2 10 Tf 44.0 456.0 Td (routes/) Tj ET
+BT /F1 9 Tf 189.0 456.0 Td (API doors. Files like jd_routes.py, candidate_routes.py, interview_routes.py, and) Tj ET
+BT /F1 9 Tf 189.0 444.0 Td (agentic_routes.py receive frontend requests.) Tj ET
+BT /F2 10 Tf 44.0 428.0 Td (services/) Tj ET
+BT /F1 9 Tf 189.0 428.0 Td (Business workers. They prepare JD data, candidate profiles, matching results, interview) Tj ET
+BT /F1 9 Tf 189.0 416.0 Td (emails, dashboard data, and auth state.) Tj ET
+BT /F2 10 Tf 44.0 400.0 Td (agents/) Tj ET
+BT /F1 9 Tf 189.0 400.0 Td (AI helpers. JD agent, resume agent, matching agent, ranking agent, summary agent,) Tj ET
+BT /F1 9 Tf 189.0 388.0 Td (recruiter chat agent, and router agent.) Tj ET
+BT /F2 10 Tf 44.0 372.0 Td (tools/) Tj ET
+BT /F1 9 Tf 189.0 372.0 Td (Small controlled tools used by agents, with a gateway and policy checks before important) Tj ET
+BT /F1 9 Tf 189.0 360.0 Td (actions.) Tj ET
+BT /F2 10 Tf 44.0 344.0 Td (workflows/) Tj ET
+BT /F1 9 Tf 189.0 344.0 Td (Recipes for bigger tasks such as screening, recruiter chat, and app actions.) Tj ET
+BT /F2 10 Tf 44.0 328.0 Td (orchestration/) Tj ET
+BT /F1 9 Tf 189.0 328.0 Td (LangGraph and orchestrator layer. This is where the graph is built and executed.) Tj ET
+BT /F2 10 Tf 44.0 312.0 Td (app/) Tj ET
+BT /F1 9 Tf 189.0 312.0 Td (Text extraction, regex extraction, LLM extraction, matching rules, summaries, and) Tj ET
+BT /F1 9 Tf 189.0 300.0 Td (utility functions.) Tj ET
+BT /F2 10 Tf 44.0 284.0 Td (security/) Tj ET
+BT /F1 9 Tf 189.0 284.0 Td (Safety guard. Checks prompt injection and controls what tools/actions are allowed.) Tj ET
+BT /F2 10 Tf 44.0 268.0 Td (schemas/) Tj ET
+BT /F1 9 Tf 189.0 268.0 Td (Request validation forms, especially for agentic payloads.) Tj ET
+BT /F2 10 Tf 44.0 252.0 Td (static/uploads/) Tj ET
+BT /F1 9 Tf 189.0 252.0 Td (Uploaded resumes and job description files.) Tj ET
+BT /F2 10 Tf 44.0 236.0 Td (tests/) Tj ET
+BT /F1 9 Tf 189.0 236.0 Td (Security tests that check validation, policy, prompt injection, and audit behavior.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 2084 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Important Files and Functions) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Simple jobs of the main Python parts) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (database.py) Tj ET
+BT /F1 9 Tf 54.0 480.0 Td (- create_jd adds a job.) Tj ET
+BT /F1 9 Tf 54.0 465.0 Td (- create_candidate adds a candidate.) Tj ET
+BT /F1 9 Tf 54.0 450.0 Td (- upsert_comparison saves matching results.) Tj ET
+BT /F1 9 Tf 54.0 435.0 Td (- create_interview stores interview details.) Tj ET
+BT /F1 9 Tf 54.0 420.0 Td (- authenticate_user checks login.) Tj ET
+BT /F2 13 Tf 44.0 401.0 Td (jd_service.py) Tj ET
+BT /F1 9 Tf 54.0 381.0 Td (- allowed_file checks uploaded file types.) Tj ET
+BT /F1 9 Tf 54.0 366.0 Td (- create_jd_from_upload reads and saves a JD.) Tj ET
+BT /F1 9 Tf 54.0 351.0 Td (- jd_details_payload prepares JD details for frontend.) Tj ET
+BT /F2 13 Tf 44.0 332.0 Td (candidate_service.py) Tj ET
+BT /F1 9 Tf 54.0 312.0 Td (- normalize_candidate_record cleans candidate data.) Tj ET
+BT /F1 9 Tf 54.0 297.0 Td (- candidates_payload builds candidate list.) Tj ET
+BT /F1 9 Tf 54.0 282.0 Td (- candidate_profile_payload builds one full candidate profile.) Tj ET
+BT /F2 13 Tf 44.0 263.0 Td (matching_service.py) Tj ET
+BT /F1 9 Tf 54.0 243.0 Td (- run_matching compares resumes with a JD.) Tj ET
+BT /F1 9 Tf 54.0 228.0 Td (- run_matching_from_paths compares already saved resume files.) Tj ET
+BT /F2 13 Tf 44.0 209.0 Td (interview_service.py) Tj ET
+BT /F1 9 Tf 54.0 189.0 Td (- generate_interview_email writes invite email.) Tj ET
+BT /F1 9 Tf 54.0 174.0 Td (- assert_slot_available checks interview time.) Tj ET
+BT /F1 9 Tf 54.0 159.0 Td (- send_email sends the message.) Tj ET
+BT /F2 13 Tf 44.0 140.0 Td (security files) Tj ET
+BT /F1 9 Tf 54.0 120.0 Td (- context_safety.py detects unsafe prompt text.) Tj ET
+BT /F1 9 Tf 54.0 105.0 Td (- policy.py decides which tool actions are allowed.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 1520 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (How LangGraph Works Here) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (The traffic controller for agents) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (Where It Lives) Tj ET
+BT /F1 10 Tf 44.0 480.0 Td (LangGraph is mainly used in RecruitmentAssist/backend/orchestration/hr_graph.py.) Tj ET
+BT /F2 13 Tf 44.0 458.0 Td (What It Does) Tj ET
+BT /F1 9 Tf 54.0 438.0 Td (- It creates a StateGraph named HRGraphState.) Tj ET
+BT /F1 9 Tf 54.0 423.0 Td (- It adds nodes such as router, jd_agent, resume_agent, matching_agent, ranking_agent, summary_agent,) Tj ET
+BT /F1 9 Tf 54.0 410.0 Td (recruiter_chat_agent, and final_response.) Tj ET
+BT /F1 9 Tf 54.0 395.0 Td (- It connects nodes with edges, which means after this step, go to that step.) Tj ET
+BT /F1 9 Tf 54.0 380.0 Td (- It uses conditional edges after the router so only the correct path runs.) Tj ET
+BT /F1 9 Tf 54.0 365.0 Td (- It returns one final response shape back to Flask and then the frontend.) Tj ET
+BT /F2 13 Tf 44.0 342.0 Td (The Shared Backpack) Tj ET
+BT /F1 10 Tf 44.0 322.0 Td (HRGraphState is like a backpack passed from node to node. It can carry payload, username, run_id, task_type, route) Tj ET
+BT /F1 10 Tf 44.0 308.0 Td (decision, jd_id, JD context, resume context, match result, ranking result, summary, errors, and final_response.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 4092 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (LangGraph Flow Diagram) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (How a request travels through the graph) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 70.0 455.0 125.0 46.0 re B Q
+BT /F2 10 Tf 79.0 484.0 Td (Frontend) Tj ET
+BT /F1 7 Tf 79.0 469.0 Td (User clicks) Tj ET
+BT /F1 7 Tf 79.0 459.0 Td (or uploads files) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 235.0 455.0 125.0 46.0 re B Q
+BT /F2 10 Tf 244.0 484.0 Td (Flask Route) Tj ET
+BT /F1 7 Tf 244.0 469.0 Td (agentic_routes.py) Tj ET
+BT /F1 7 Tf 244.0 459.0 Td (/api/agentic/run) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 400.0 455.0 145.0 46.0 re B Q
+BT /F2 10 Tf 409.0 484.0 Td (Main Orchestrator) Tj ET
+BT /F1 7 Tf 409.0 469.0 Td (creates run_id) Tj ET
+BT /F1 7 Tf 409.0 459.0 Td (stores running) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 585.0 455.0 145.0 46.0 re B Q
+BT /F2 10 Tf 594.0 484.0 Td (LangGraph) Tj ET
+BT /F1 7 Tf 594.0 469.0 Td (StateGraph) Tj ET
+BT /F1 7 Tf 594.0 459.0 Td (router first) Tj ET
+q 1.0 w 195.0 478.0 m 235.0 478.0 l S Q
+q 0.8 w 235.0 478.0 m 227.0 483.0 l S Q
+q 0.8 w 235.0 478.0 m 227.0 473.0 l S Q
+q 1.0 w 360.0 478.0 m 400.0 478.0 l S Q
+q 0.8 w 400.0 478.0 m 392.0 483.0 l S Q
+q 0.8 w 400.0 478.0 m 392.0 473.0 l S Q
+q 1.0 w 545.0 478.0 m 585.0 478.0 l S Q
+q 0.8 w 585.0 478.0 m 577.0 483.0 l S Q
+q 0.8 w 585.0 478.0 m 577.0 473.0 l S Q
+q 0.98 0.98 0.92 rg 0.18 0.24 0.32 RG 1.0 w 335.0 365.0 170.0 48.0 re B Q
+BT /F2 10 Tf 344.0 396.0 Td (Router Node) Tj ET
+BT /F1 7 Tf 344.0 381.0 Td (route_request\(payload\)) Tj ET
+BT /F1 7 Tf 344.0 371.0 Td (choose path) Tj ET
+q 1.0 w 657.0 455.0 m 420.0 413.0 l S Q
+q 0.8 w 420.0 413.0 m 428.0 418.0 l S Q
+q 0.8 w 420.0 413.0 m 428.0 408.0 l S Q
+q 0.95 0.99 0.95 rg 0.18 0.24 0.32 RG 1.0 w 65.0 255.0 180.0 72.0 re B Q
+BT /F2 10 Tf 74.0 310.0 Td (Screening Path) Tj ET
+BT /F1 7 Tf 74.0 295.0 Td (screening_entry) Tj ET
+BT /F1 7 Tf 74.0 285.0 Td (jd_agent) Tj ET
+BT /F1 7 Tf 74.0 275.0 Td (resume_agent) Tj ET
+BT /F1 7 Tf 74.0 265.0 Td (matching_agent) Tj ET
+BT /F1 7 Tf 74.0 255.0 Td (ranking_agent) Tj ET
+BT /F1 7 Tf 74.0 245.0 Td (summary_agent) Tj ET
+q 0.95 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 330.0 255.0 180.0 72.0 re B Q
+BT /F2 10 Tf 339.0 310.0 Td (Chat Path) Tj ET
+BT /F1 7 Tf 339.0 295.0 Td (recruiter_context) Tj ET
+BT /F1 7 Tf 339.0 285.0 Td (recruiter_chat_agent) Tj ET
+q 0.98 0.96 1.00 rg 0.18 0.24 0.32 RG 1.0 w 595.0 255.0 180.0 72.0 re B Q
+BT /F2 10 Tf 604.0 310.0 Td (App Role Path) Tj ET
+BT /F1 7 Tf 604.0 295.0 Td (jd/candidate/interview) Tj ET
+BT /F1 7 Tf 604.0 285.0 Td (dashboard/reports) Tj ET
+BT /F1 7 Tf 604.0 275.0 Td (run_app_workflow) Tj ET
+q 1.0 w 420.0 365.0 m 155.0 327.0 l S Q
+q 0.8 w 155.0 327.0 m 163.0 332.0 l S Q
+q 0.8 w 155.0 327.0 m 163.0 322.0 l S Q
+q 1.0 w 420.0 365.0 m 420.0 327.0 l S Q
+q 0.8 w 420.0 327.0 m 415.0 335.0 l S Q
+q 0.8 w 420.0 327.0 m 425.0 335.0 l S Q
+q 1.0 w 420.0 365.0 m 685.0 327.0 l S Q
+q 0.8 w 685.0 327.0 m 677.0 332.0 l S Q
+q 0.8 w 685.0 327.0 m 677.0 322.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 335.0 145.0 170.0 48.0 re B Q
+BT /F2 10 Tf 344.0 176.0 Td (Final Response Node) Tj ET
+BT /F1 7 Tf 344.0 161.0 Td (normalize output) Tj ET
+BT /F1 7 Tf 344.0 151.0 Td (send to API) Tj ET
+q 1.0 w 155.0 255.0 m 420.0 193.0 l S Q
+q 0.8 w 420.0 193.0 m 412.0 198.0 l S Q
+q 0.8 w 420.0 193.0 m 412.0 188.0 l S Q
+q 1.0 w 420.0 255.0 m 420.0 193.0 l S Q
+q 0.8 w 420.0 193.0 m 415.0 201.0 l S Q
+q 0.8 w 420.0 193.0 m 425.0 201.0 l S Q
+q 1.0 w 685.0 255.0 m 420.0 193.0 l S Q
+q 0.8 w 420.0 193.0 m 428.0 198.0 l S Q
+q 0.8 w 420.0 193.0 m 428.0 188.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 1.0 w 335.0 75.0 170.0 38.0 re B Q
+BT /F2 10 Tf 344.0 96.0 Td (Frontend Result) Tj ET
+BT /F1 7 Tf 344.0 81.0 Td (JSON response) Tj ET
+q 1.0 w 420.0 145.0 m 420.0 113.0 l S Q
+q 0.8 w 420.0 113.0 m 415.0 121.0 l S Q
+q 0.8 w 420.0 113.0 m 425.0 121.0 l S Q
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 1728 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (LangGraph Paths) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (What happens for each kind of request) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 500.0 Td (Screening Request) Tj ET
+BT /F1 10 Tf 44.0 480.0 Td (Used when the app needs to screen candidates for a job description.) Tj ET
+BT /F1 9 Tf 54.0 466.0 Td (- screening_entry_node checks that jd_id exists.) Tj ET
+BT /F1 9 Tf 54.0 451.0 Td (- jd_agent_node loads and understands the selected job description.) Tj ET
+BT /F1 9 Tf 54.0 436.0 Td (- resume_agent_node turns candidate ids or uploaded resumes into clean profiles.) Tj ET
+BT /F1 9 Tf 54.0 421.0 Td (- matching_agent_node compares each profile with the JD and saves comparison records.) Tj ET
+BT /F1 9 Tf 54.0 406.0 Td (- ranking_agent_node sorts candidates into ranked/selected/rejected style output.) Tj ET
+BT /F1 9 Tf 54.0 391.0 Td (- summary_agent_node creates the final explanation.) Tj ET
+BT /F2 13 Tf 44.0 368.0 Td (Chat Request) Tj ET
+BT /F1 9 Tf 54.0 348.0 Td (- recruiter_context_node checks the message/action is valid.) Tj ET
+BT /F1 9 Tf 54.0 333.0 Td (- recruiter_chat_agent_node runs recruiter_chat_workflow.) Tj ET
+BT /F1 9 Tf 54.0 318.0 Td (- It can answer recruiter questions or prepare confirmed actions.) Tj ET
+BT /F2 13 Tf 44.0 295.0 Td (App Requests) Tj ET
+BT /F1 9 Tf 54.0 275.0 Td (- JD, candidate, interview, dashboard, and reports routes go through app_role_node.) Tj ET
+BT /F1 9 Tf 54.0 260.0 Td (- app_role_node calls run_app_workflow, which dispatches the right backend service/tool.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Length 2058 >>
+stream
+BT /F2 18 Tf 44.0 551.0 Td (Request Lifecycle) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (From frontend request to final answer) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 9 Tf 44.0 500.0 Td (1.) Tj ET
+BT /F1 9 Tf 72.0 500.0 Td (Frontend sends JSON or uploaded files to /api/agentic/run.) Tj ET
+BT /F2 9 Tf 44.0 484.0 Td (2.) Tj ET
+BT /F1 9 Tf 72.0 484.0 Td (agentic_routes.py normalizes the request into one payload.) Tj ET
+BT /F2 9 Tf 44.0 468.0 Td (3.) Tj ET
+BT /F1 9 Tf 72.0 468.0 Td (validate_agentic_payload checks that the request is allowed and shaped correctly.) Tj ET
+BT /F2 9 Tf 44.0 452.0 Td (4.) Tj ET
+BT /F1 9 Tf 72.0 452.0 Td (run_main_orchestrator creates a run_id and saves an agent run as running.) Tj ET
+BT /F2 9 Tf 44.0 436.0 Td (5.) Tj ET
+BT /F1 9 Tf 72.0 436.0 Td (run_hr_graph invokes the compiled LangGraph graph.) Tj ET
+BT /F2 9 Tf 44.0 420.0 Td (6.) Tj ET
+BT /F1 9 Tf 72.0 420.0 Td (router_node chooses the path.) Tj ET
+BT /F2 9 Tf 44.0 404.0 Td (7.) Tj ET
+BT /F1 9 Tf 72.0 404.0 Td (The selected nodes run and update HRGraphState.) Tj ET
+BT /F2 9 Tf 44.0 388.0 Td (8.) Tj ET
+BT /F1 9 Tf 72.0 388.0 Td (final_response_node creates the final API response.) Tj ET
+BT /F2 9 Tf 44.0 372.0 Td (9.) Tj ET
+BT /F1 9 Tf 72.0 372.0 Td (main_orchestrator saves completed output, or failed error if something breaks.) Tj ET
+BT /F2 9 Tf 44.0 356.0 Td (10.) Tj ET
+BT /F1 9 Tf 72.0 356.0 Td (Flask sends JSON back to the frontend.) Tj ET
+BT /F2 13 Tf 44.0 334.0 Td (Why This Is Useful) Tj ET
+BT /F1 9 Tf 54.0 314.0 Td (- The app does not need one huge messy function.) Tj ET
+BT /F1 9 Tf 54.0 299.0 Td (- Each agent has one clear job.) Tj ET
+BT /F1 9 Tf 54.0 284.0 Td (- The graph makes the order easy to see.) Tj ET
+BT /F1 9 Tf 54.0 269.0 Td (- Failed runs can be saved and inspected.) Tj ET
+BT /F1 9 Tf 54.0 254.0 Td (- New paths can be added later by adding nodes and edges.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Backend and LangGraph Explanation) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 7) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+15 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+16 0 obj
+<< /Type /Page /Parent 17 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 9 0 R >>
+endobj
+17 0 obj
+<< /Type /Pages /Kids [10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R] /Count 7 >>
+endobj
+18 0 obj
+<< /Type /Catalog /Pages 17 0 R >>
+endobj
+xref
+0 19
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000001850 00000 n 
+0000004692 00000 n 
+0000006828 00000 n 
+0000008400 00000 n 
+0000012544 00000 n 
+0000014324 00000 n 
+0000016434 00000 n 
+0000016572 00000 n 
+0000016710 00000 n 
+0000016848 00000 n 
+0000016986 00000 n 
+0000017124 00000 n 
+0000017262 00000 n 
+0000017400 00000 n 
+0000017501 00000 n 
+trailer
+<< /Size 19 /Root 18 0 R >>
+startxref
+17552
+%%EOF

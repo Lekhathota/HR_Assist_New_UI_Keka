@@ -1,0 +1,303 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 1590 >>
+stream
+BT /F2 18 Tf 44.0 550.0 Td (Production Hardening Report) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Generated 2026-06-09 15:04) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 487.0 Td (Executive Summary) Tj ET
+BT /F1 9 Tf 56.0 467.0 Td (- The existing Flask, LangGraph, and MongoDB HR agent system was hardened without replacing the product) Tj ET
+BT /F1 9 Tf 56.0 454.0 Td (workflow.) Tj ET
+BT /F1 9 Tf 56.0 439.0 Td (- The implementation adds typed validation, a policy-enforced tool gateway, tamper-evident audit logging, and) Tj ET
+BT /F1 9 Tf 56.0 426.0 Td (prompt/context safety checks.) Tj ET
+BT /F1 9 Tf 56.0 411.0 Td (- The core recruitment graph remains intact: router, screening path, recruiter chat path, and app workflow path) Tj ET
+BT /F1 9 Tf 56.0 398.0 Td (still use the same API surface.) Tj ET
+BT /F1 9 Tf 56.0 383.0 Td (- Controlled mutations now have a security boundary instead of being called directly from agents or workflows.) Tj ET
+BT /F2 13 Tf 44.0 360.0 Td (Design Intent) Tj ET
+BT /F1 9 Tf 56.0 340.0 Td (- Preserve working HR behavior while adding production safeguards around the riskiest operations.) Tj ET
+BT /F1 9 Tf 56.0 325.0 Td (- Prefer incremental hardening over a disruptive migration to FastAPI, MCP servers, or a new database stack.) Tj ET
+BT /F1 9 Tf 56.0 310.0 Td (- Make unsafe or ambiguous actions fail closed with clear approval-required or authorization-denied responses.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Production Hardening Report) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 1) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 4097 >>
+stream
+BT /F2 18 Tf 44.0 550.0 Td (Updated Architecture) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (How the new controls fit around the existing LangGraph system) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 45.0 455.0 128.0 54.0 re B Q
+BT /F2 9 Tf 53.0 493.0 Td (Client / Frontend) Tj ET
+BT /F1 7 Tf 53.0 479.0 Td (Sends agentic task) Tj ET
+BT /F1 7 Tf 53.0 469.0 Td (JSON or multipart) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 215.0 455.0 128.0 54.0 re B Q
+BT /F2 9 Tf 223.0 493.0 Td (Flask Route) Tj ET
+BT /F1 7 Tf 223.0 479.0 Td (Validates payload) Tj ET
+BT /F1 7 Tf 223.0 469.0 Td (Pydantic schemas) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 385.0 455.0 128.0 54.0 re B Q
+BT /F2 9 Tf 393.0 493.0 Td (Main Orchestrator) Tj ET
+BT /F1 7 Tf 393.0 479.0 Td (Creates run_id) Tj ET
+BT /F1 7 Tf 393.0 469.0 Td (Invokes graph) Tj ET
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 555.0 455.0 170.0 54.0 re B Q
+BT /F2 9 Tf 563.0 493.0 Td (LangGraph) Tj ET
+BT /F1 7 Tf 563.0 479.0 Td (Router) Tj ET
+BT /F1 7 Tf 563.0 469.0 Td (Screening/chat/app paths) Tj ET
+q 0.8 w 173.0 482.0 m 215.0 482.0 l S Q
+q 0.7 w 215.0 482.0 m 208.0 486.0 l S Q
+q 0.7 w 215.0 482.0 m 208.0 478.0 l S Q
+q 0.8 w 343.0 482.0 m 385.0 482.0 l S Q
+q 0.7 w 385.0 482.0 m 378.0 486.0 l S Q
+q 0.7 w 385.0 482.0 m 378.0 478.0 l S Q
+q 0.8 w 513.0 482.0 m 555.0 482.0 l S Q
+q 0.7 w 555.0 482.0 m 548.0 486.0 l S Q
+q 0.7 w 555.0 482.0 m 548.0 478.0 l S Q
+q 0.96 0.99 0.96 rg 0.18 0.24 0.32 RG 0.9 w 115.0 330.0 145.0 60.0 re B Q
+BT /F2 9 Tf 123.0 374.0 Td (Read-Only Services) Tj ET
+BT /F1 7 Tf 123.0 360.0 Td (Dashboard) Tj ET
+BT /F1 7 Tf 123.0 350.0 Td (JD/candidate lists) Tj ET
+BT /F1 7 Tf 123.0 340.0 Td (Reports) Tj ET
+q 0.98 0.98 0.92 rg 0.18 0.24 0.32 RG 0.9 w 348.0 330.0 145.0 60.0 re B Q
+BT /F2 9 Tf 356.0 374.0 Td (Tool Gateway) Tj ET
+BT /F1 7 Tf 356.0 360.0 Td (Validate params) Tj ET
+BT /F1 7 Tf 356.0 350.0 Td (Policy check) Tj ET
+BT /F1 7 Tf 356.0 340.0 Td (Audit attempt) Tj ET
+q 0.99 0.96 0.96 rg 0.18 0.24 0.32 RG 0.9 w 585.0 330.0 145.0 60.0 re B Q
+BT /F2 9 Tf 593.0 374.0 Td (Controlled Tools) Tj ET
+BT /F1 7 Tf 593.0 360.0 Td (Deletes) Tj ET
+BT /F1 7 Tf 593.0 350.0 Td (Repair) Tj ET
+BT /F1 7 Tf 593.0 340.0 Td (Schedule/send) Tj ET
+q 0.8 w 640.0 455.0 m 420.0 390.0 l S Q
+q 0.7 w 420.0 390.0 m 427.0 394.0 l S Q
+q 0.7 w 420.0 390.0 m 427.0 386.0 l S Q
+q 0.8 w 260.0 360.0 m 348.0 360.0 l S Q
+q 0.7 w 348.0 360.0 m 341.0 364.0 l S Q
+q 0.7 w 348.0 360.0 m 341.0 356.0 l S Q
+q 0.8 w 493.0 360.0 m 585.0 360.0 l S Q
+q 0.7 w 585.0 360.0 m 578.0 364.0 l S Q
+q 0.7 w 585.0 360.0 m 578.0 356.0 l S Q
+q 0.95 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 155.0 195.0 150.0 60.0 re B Q
+BT /F2 9 Tf 163.0 239.0 Td (Policy Engine) Tj ET
+BT /F1 7 Tf 163.0 225.0 Td (Auth required) Tj ET
+BT /F1 7 Tf 163.0 215.0 Td (Role checks) Tj ET
+BT /F1 7 Tf 163.0 205.0 Td (Approval gates) Tj ET
+q 0.95 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 345.0 195.0 150.0 60.0 re B Q
+BT /F2 9 Tf 353.0 239.0 Td (Audit Chain) Tj ET
+BT /F1 7 Tf 353.0 225.0 Td (previous_hash) Tj ET
+BT /F1 7 Tf 353.0 215.0 Td (current_hash) Tj ET
+BT /F1 7 Tf 353.0 205.0 Td (sanitized params) Tj ET
+q 0.95 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 535.0 195.0 150.0 60.0 re B Q
+BT /F2 9 Tf 543.0 239.0 Td (Prompt Safety) Tj ET
+BT /F1 7 Tf 543.0 225.0 Td (Injection markers) Tj ET
+BT /F1 7 Tf 543.0 215.0 Td (Context budget) Tj ET
+BT /F1 7 Tf 543.0 205.0 Td (Blocked logs) Tj ET
+q 0.8 w 420.0 330.0 m 230.0 255.0 l S Q
+q 0.7 w 230.0 255.0 m 237.0 259.0 l S Q
+q 0.7 w 230.0 255.0 m 237.0 251.0 l S Q
+q 0.8 w 420.0 330.0 m 420.0 255.0 l S Q
+q 0.7 w 420.0 255.0 m 416.0 262.0 l S Q
+q 0.7 w 420.0 255.0 m 424.0 262.0 l S Q
+q 0.8 w 640.0 455.0 m 610.0 255.0 l S Q
+q 0.7 w 610.0 255.0 m 606.0 262.0 l S Q
+q 0.7 w 610.0 255.0 m 614.0 262.0 l S Q
+BT /F2 10 Tf 80.0 120.0 Td (Key boundary: role agents can still decide what to do, but controlled side effects are executed only by the gateway.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Production Hardening Report) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 2) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 1787 >>
+stream
+BT /F2 18 Tf 44.0 550.0 Td (Implementation Changes) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Files and behavior added by the hardening pass) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 487.0 Td (Validation Layer) Tj ET
+BT /F1 9 Tf 56.0 467.0 Td (- Added schemas/agentic.py with Pydantic v2 models for agentic payloads and recruiter action params.) Tj ET
+BT /F1 9 Tf 56.0 452.0 Td (- Routes now validate /api/agentic/run and /api/agentic/screening before graph invocation.) Tj ET
+BT /F1 9 Tf 56.0 437.0 Td (- Invalid task types, missing IDs, malformed params, and missing files now return request validation errors) Tj ET
+BT /F1 9 Tf 56.0 424.0 Td (earlier.) Tj ET
+BT /F2 13 Tf 44.0 403.0 Td (Gateway and Policy) Tj ET
+BT /F1 9 Tf 56.0 383.0 Td (- Added tools/tool_gateway.py with ToolRequest, ToolResult, and registered controlled tool handlers.) Tj ET
+BT /F1 9 Tf 56.0 368.0 Td (- Added security/policy.py with role checks, approval gates, auth requirements, and bulk-write protection.) Tj ET
+BT /F1 9 Tf 56.0 353.0 Td (- App workflow now routes JD create/delete, candidate delete/repair, interview schedule, and profile update) Tj ET
+BT /F1 9 Tf 56.0 340.0 Td (through the gateway.) Tj ET
+BT /F2 13 Tf 44.0 319.0 Td (Audit and Prompt Safety) Tj ET
+BT /F1 9 Tf 56.0 299.0 Td (- database.log_audit now supports run_id, tool, outcome, sanitized params, previous_hash, and current_hash.) Tj ET
+BT /F1 9 Tf 56.0 284.0 Td (- Added verify_audit_chain\(\) for tamper-evident audit validation.) Tj ET
+BT /F1 9 Tf 56.0 269.0 Td (- Router and recruiter chat now run lightweight prompt-injection checks before LLM calls.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Production Hardening Report) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 3) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 1755 >>
+stream
+BT /F2 18 Tf 44.0 550.0 Td (Behavioral Understanding) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (What changed at runtime) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 487.0 Td (Controlled Action Rules) Tj ET
+BT /F1 9 Tf 56.0 467.0 Td (- Deletes require a manager/admin-style role and explicit confirmation.) Tj ET
+BT /F1 9 Tf 56.0 452.0 Td (- Candidate repair, interview scheduling, email sending, password changes, and bulk writes over 50 rows require) Tj ET
+BT /F1 9 Tf 56.0 439.0 Td (explicit confirmation.) Tj ET
+BT /F1 9 Tf 56.0 424.0 Td (- If approval is missing, the tool is not executed and the response says approval is required.) Tj ET
+BT /F1 9 Tf 56.0 409.0 Td (- If authorization fails, the tool is not executed and the response says the action is not allowed.) Tj ET
+BT /F1 9 Tf 56.0 394.0 Td (- Every gateway attempt is audited as allowed, denied, approval_required, or failed.) Tj ET
+BT /F2 13 Tf 44.0 371.0 Td (Prompt and Context Safety) Tj ET
+BT /F1 9 Tf 56.0 351.0 Td (- Recruiter chat still uses compact grounded context, but the context is now trimmed before it enters the) Tj ET
+BT /F1 9 Tf 56.0 338.0 Td (prompt.) Tj ET
+BT /F1 9 Tf 56.0 323.0 Td (- Messages that try to ignore system instructions, reveal secrets, or bypass approvals are blocked before LLM) Tj ET
+BT /F1 9 Tf 56.0 310.0 Td (execution.) Tj ET
+BT /F1 9 Tf 56.0 295.0 Td (- Blocked prompt attempts are written to the audit log with sanitized metadata.) Tj ET
+BT /F1 9 Tf 56.0 280.0 Td (- Semantic vector memory was intentionally deferred; the immediate priority was safety around tool execution.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Production Hardening Report) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 4) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Length 2855 >>
+stream
+BT /F2 18 Tf 44.0 550.0 Td (Security Sequence) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Lifecycle of a controlled agent action) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 52.0 500.0 96.0 30.0 re B Q
+BT /F2 9 Tf 60.0 514.0 Td (Frontend) Tj ET
+q 0.5 w 100.0 500.0 m 100.0 95.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 178.0 500.0 96.0 30.0 re B Q
+BT /F2 9 Tf 186.0 514.0 Td (Route) Tj ET
+q 0.5 w 226.0 500.0 m 226.0 95.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 304.0 500.0 96.0 30.0 re B Q
+BT /F2 9 Tf 312.0 514.0 Td (Graph) Tj ET
+q 0.5 w 352.0 500.0 m 352.0 95.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 430.0 500.0 96.0 30.0 re B Q
+BT /F2 9 Tf 438.0 514.0 Td (Workflow/Agent) Tj ET
+q 0.5 w 478.0 500.0 m 478.0 95.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 556.0 500.0 96.0 30.0 re B Q
+BT /F2 9 Tf 564.0 514.0 Td (Gateway) Tj ET
+q 0.5 w 604.0 500.0 m 604.0 95.0 l S Q
+q 0.96 0.98 1.00 rg 0.18 0.24 0.32 RG 0.9 w 682.0 500.0 96.0 30.0 re B Q
+BT /F2 9 Tf 690.0 514.0 Td (DB/Service) Tj ET
+q 0.5 w 730.0 500.0 m 730.0 95.0 l S Q
+q 0.8 w 100.0 465.0 m 226.0 465.0 l S Q
+q 0.7 w 226.0 465.0 m 219.0 469.0 l S Q
+q 0.7 w 226.0 465.0 m 219.0 461.0 l S Q
+BT /F1 7 Tf 106.0 472.0 Td (POST task payload) Tj ET
+q 0.98 0.98 0.92 rg 0.18 0.24 0.32 RG 0.9 w 186.0 416.0 82.0 18.0 re B Q
+BT /F2 9 Tf 194.0 418.0 Td (Pydantic validate) Tj ET
+q 0.8 w 226.0 385.0 m 352.0 385.0 l S Q
+q 0.7 w 352.0 385.0 m 345.0 389.0 l S Q
+q 0.7 w 352.0 385.0 m 345.0 381.0 l S Q
+BT /F1 7 Tf 232.0 392.0 Td (run graph) Tj ET
+q 0.8 w 352.0 345.0 m 478.0 345.0 l S Q
+q 0.7 w 478.0 345.0 m 471.0 349.0 l S Q
+q 0.7 w 478.0 345.0 m 471.0 341.0 l S Q
+BT /F1 7 Tf 358.0 352.0 Td (selected path) Tj ET
+q 0.8 w 478.0 305.0 m 604.0 305.0 l S Q
+q 0.7 w 604.0 305.0 m 597.0 309.0 l S Q
+q 0.7 w 604.0 305.0 m 597.0 301.0 l S Q
+BT /F1 7 Tf 484.0 312.0 Td (ToolRequest) Tj ET
+q 0.98 0.98 0.92 rg 0.18 0.24 0.32 RG 0.9 w 564.0 256.0 82.0 18.0 re B Q
+BT /F2 9 Tf 572.0 258.0 Td (policy check) Tj ET
+q 0.8 w 604.0 225.0 m 730.0 225.0 l S Q
+q 0.7 w 730.0 225.0 m 723.0 229.0 l S Q
+q 0.7 w 730.0 225.0 m 723.0 221.0 l S Q
+BT /F1 7 Tf 610.0 232.0 Td (execute if allowed) Tj ET
+q 0.8 w 604.0 185.0 m 730.0 185.0 l S Q
+q 0.7 w 730.0 185.0 m 723.0 189.0 l S Q
+q 0.7 w 730.0 185.0 m 723.0 181.0 l S Q
+BT /F1 7 Tf 610.0 192.0 Td (write audit hash) Tj ET
+q 0.8 w 604.0 145.0 m 478.0 145.0 l S Q
+q 0.7 w 478.0 145.0 m 485.0 149.0 l S Q
+q 0.7 w 478.0 145.0 m 485.0 141.0 l S Q
+BT /F1 7 Tf 484.0 152.0 Td (ToolResult) Tj ET
+q 0.8 w 478.0 110.0 m 100.0 110.0 l S Q
+q 0.7 w 100.0 110.0 m 107.0 114.0 l S Q
+q 0.7 w 100.0 110.0 m 107.0 106.0 l S Q
+BT /F1 7 Tf 106.0 117.0 Td (response) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Production Hardening Report) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 5) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Length 1696 >>
+stream
+BT /F2 18 Tf 44.0 550.0 Td (Verification and Test Report) Tj ET
+BT /F1 9 Tf 44.0 531.0 Td (Checks completed after implementation) Tj ET
+q 0.8 w 44.0 517.0 m 798.0 517.0 l S Q
+BT /F2 13 Tf 44.0 487.0 Td (Automated Verification) Tj ET
+BT /F1 9 Tf 56.0 467.0 Td (- Focused test file added: backend/tests/test_security_hardening.py.) Tj ET
+BT /F1 9 Tf 56.0 452.0 Td (- Tests cover payload validation, policy approval rules, destructive action role denial, prompt-injection) Tj ET
+BT /F1 9 Tf 56.0 439.0 Td (detection, and audit hash tamper detection.) Tj ET
+BT /F1 9 Tf 56.0 424.0 Td (- Command passed: .venv/Scripts/python.exe -m pytest RecruitmentAssist/backend/tests/test_security_hardening.py.) Tj ET
+BT /F1 9 Tf 56.0 409.0 Td (- Result: 8 tests passed.) Tj ET
+BT /F1 9 Tf 56.0 394.0 Td (- Compile check passed for all touched backend modules and the new test file.) Tj ET
+BT /F2 13 Tf 44.0 371.0 Td (Manual Checks Recommended) Tj ET
+BT /F1 9 Tf 56.0 351.0 Td (- Try candidate_delete as a recruiter and confirm it is denied.) Tj ET
+BT /F1 9 Tf 56.0 336.0 Td (- Try candidate_delete as manager/admin without confirmed=True and confirm approval is required.) Tj ET
+BT /F1 9 Tf 56.0 321.0 Td (- Try interview_schedule without confirmed=True and confirm no email is sent.) Tj ET
+BT /F1 9 Tf 56.0 306.0 Td (- Ask recruiter chat to ignore previous instructions and confirm the message is blocked and audited.) Tj ET
+BT /F1 9 Tf 56.0 291.0 Td (- Run verify_audit_chain\(\) after several controlled actions and confirm the chain is valid.) Tj ET
+q 0.7 w 44.0 34.0 m 798.0 34.0 l S Q
+BT /F1 7 Tf 44.0 19.0 Td (RecruitmentAssist - Production Hardening Report) Tj ET
+BT /F1 7 Tf 756.0 19.0 Td (Page 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 4 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 6 0 R >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 15 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 8 0 R >>
+endobj
+15 0 obj
+<< /Type /Pages /Kids [9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R] /Count 6 >>
+endobj
+16 0 obj
+<< /Type /Catalog /Pages 15 0 R >>
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000001802 00000 n 
+0000005951 00000 n 
+0000007790 00000 n 
+0000009597 00000 n 
+0000012504 00000 n 
+0000014252 00000 n 
+0000014389 00000 n 
+0000014527 00000 n 
+0000014665 00000 n 
+0000014803 00000 n 
+0000014941 00000 n 
+0000015079 00000 n 
+0000015172 00000 n 
+trailer
+<< /Size 17 /Root 16 0 R >>
+startxref
+15223
+%%EOF
