@@ -41,6 +41,15 @@ function Candidates() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
+  const [expandedRoles, setExpandedRoles] = useState({});
+
+  const toggleRoles = (candidateId) => {
+    setExpandedRoles(prev => ({
+      ...prev,
+      [candidateId]: !prev[candidateId]
+  }))};
+
+
   // --- REPORT MODAL STATE ---
   const [showModal, setShowModal] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState('pdf');
@@ -1190,50 +1199,132 @@ function Candidates() {
             </div>
 
             <div className="grid grid-4 candidates-cards-grid">
-              {filtered.map(c => (
-                <div key={c.id} className="candidate-card">
-                  <div className="candidate-card-header">
-                    <div className="candidate-name">{c.name}</div>
-                    <span className={`candidate-status status-${(c.status || '').toLowerCase().replace(' ', '-')}`}>{c.status}</span>
-                  </div>
-                  <div className="candidate-roles-section">
-                    <div className="candidate-client-line">
-                      <i className="fas fa-building"></i> {c.client_name || 'ShimentoX'}
-                    </div>
-                    <div className="candidate-category-line">
-                      <span className="candidate-category-pill">{c.primary_category || 'Others'}</span>
-                    </div>
-                    <div className="candidate-roles-label">Applied Roles</div>
-                    <div className="candidate-roles-badges">
-                      {(c.applied_roles || []).map(role => <span key={role} className="badge badge-primary">{role}</span>)}
-                    </div>
-                  </div>
-                  <div className="candidate-score-section">
-                    <div className="candidate-score-row">
-                      <span className="candidate-score-label">Latest Match Score</span>
-                      <span className="candidate-score-value">{c.match_score}%</span>
-                    </div>
-                    <div className="progress"><div className="progress-bar" style={{ width: `${c.match_score}%` }}></div></div>
-                  </div>
-                  <div className="candidate-stage-box">
-                    <div className="candidate-stage-label"><i className="fas fa-briefcase"></i> Current Hiring Stage</div>
-                    <div className="candidate-stage-value">{c.hiring_stage || 'Not Started'}</div>
-                  </div>
-                  <div className="candidate-quick-preview">
-                    <div className="candidate-skills-heading">Main Skills</div>
-                    {(((c.structured_data || {}).skills || c.skills || []).slice(0, 6)).map(skill => (
-                      <span key={skill} className="badge badge-primary">{skill}</span>
-                    ))}
-                    {(((c.structured_data || {}).skills || c.skills || []).length === 0) && (
-                      <span className="badge badge-primary">Skills pending</span>
-                    )}
-                  </div>
-                  <Link to={`/talent/${c.id}`} className="btn btn-primary candidate-view-btn">
-                    <i className="fas fa-eye"></i> View Full Profile
-                  </Link>
-                </div>
-              ))}
-            </div>
+  {filtered.map(c => (
+    <div key={c.id} className="candidate-card">
+      <div className="candidate-card-header">
+        <div className="candidate-name">{c.name}</div>
+        <span
+          className={`candidate-status status-${(c.status || '')
+            .toLowerCase()
+            .replace(' ', '-')}`}
+        >
+          {c.status}
+        </span>
+      </div>
+
+      <div className="candidate-roles-section">
+        <div className="candidate-client-line">
+          <i className="fas fa-building"></i> {c.client_name || 'ShimentoX'}
+        </div>
+
+        <div className="candidate-category-line">
+          <span className="candidate-category-pill">
+            {c.primary_category || 'Others'}
+          </span>
+        </div>
+
+        <div className="candidate-roles-label">
+          Applied Roles
+        </div>
+
+        <div
+          className={`candidate-roles-badges ${
+            expandedRoles[c.id] ? 'roles-expanded' : ''
+          }`}
+        >
+          {(c.applied_roles || [])
+            .slice(
+              0,
+              expandedRoles[c.id]
+                ? (c.applied_roles || []).length
+                : 3
+            )
+            .map(role => (
+              <span key={role} className="badge badge-primary">
+                {role}
+              </span>
+            ))}
+
+          {(c.applied_roles || []).length > 3 && (
+            <button
+              type="button"
+              className="candidate-more-roles"
+              onClick={() => toggleRoles(c.id)}
+              title={
+                expandedRoles[c.id]
+                  ? 'Show fewer roles'
+                  : `Show ${(c.applied_roles || []).length - 3} more applied role(s)`
+              }
+            >
+              {expandedRoles[c.id]
+                ? '−'
+                : `+${(c.applied_roles || []).length - 3}`}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="candidate-score-section">
+        <div className="candidate-score-row">
+          <span className="candidate-score-label">
+            Latest Match Score
+          </span>
+          <span className="candidate-score-value">
+            {c.match_score}%
+          </span>
+        </div>
+
+        <div className="progress">
+          <div
+            className="progress-bar"
+            style={{ width: `${c.match_score}%` }}
+          ></div>
+        </div>
+      </div>
+
+      <div className="candidate-stage-box">
+        <div className="candidate-stage-label">
+          <i className="fas fa-briefcase"></i> Current Hiring Stage
+        </div>
+
+        <div className="candidate-stage-value">
+          {c.hiring_stage || 'Not Started'}
+        </div>
+      </div>
+
+      <div className="candidate-quick-preview">
+        <div className="candidate-skills-heading">
+          Main Skills
+        </div>
+
+        {(((c.structured_data || {}).skills || c.skills || [])
+          .slice(0, 6))
+          .map(skill => (
+            <span
+              key={skill}
+              className="badge badge-primary"
+            >
+              {skill}
+            </span>
+          ))}
+
+        {(((c.structured_data || {}).skills || c.skills || [])
+          .length === 0) && (
+          <span className="badge badge-primary">
+            Skills pending
+          </span>
+        )}
+      </div>
+
+      <Link
+        to={`/talent/${c.id}`}
+        className="btn btn-primary candidate-view-btn"
+      >
+        <i className="fas fa-eye"></i> View Full Profile
+      </Link>
+    </div>
+  ))}
+</div>
 
             <h2 className="candidates-section-title"><i className="fas fa-list"></i> Detailed List</h2>
             <div className="table-container candidates-table-container">

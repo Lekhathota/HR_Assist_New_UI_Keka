@@ -3,6 +3,7 @@ import { useAppearance } from './AppearanceProvider.jsx';
 import Navbar from './Navbar.jsx';
 import FloatingRecruiterChat from './FloatingRecruiterChat.jsx';
 
+
 function Layout({ children }) {
   const { colorTheme } = useAppearance();
   return (
@@ -21,14 +22,13 @@ function Layout({ children }) {
       </main>
       <footer className="app-footer">
         <div className="app-footer-brand">
-          <img
-            src="/ShimentoX-Light-Logo.webp"
-            alt="ShimentoX"
-            className="app-footer-logo"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-          <span>ShimentoX Talent Intelligence</span>
-        </div>
+  <img
+    src="/ShimentoX-Logo.png"
+    alt="ShimentoX"
+    className="app-footer-logo"
+    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+  />
+</div>
         <nav className="app-footer-social" aria-label="Company social profiles">
           <a href="https://shimentox.ai/" target="_blank" rel="noreferrer" aria-label="ShimentoX website">
             <i className="fas fa-globe"></i>

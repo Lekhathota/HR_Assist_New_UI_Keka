@@ -133,3 +133,11 @@
     }
 }
 
+.workflow-admin-item a,
+.workflow-admin-item a:visited,
+.workflow-admin-item a:hover,
+.workflow-admin-item a:active {
+    color: #0f172a;
+    text-decoration: none;
+    font-weight: 500;
+}

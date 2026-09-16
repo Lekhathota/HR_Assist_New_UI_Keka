@@ -29,6 +29,13 @@
     align-items: start;
 }
 
+.clients-sidebar {
+    position: sticky;
+    top: 90px;
+    height: fit-content;
+    align-self: start;
+}
+
 .clients-sidebar,
 .client-overview-card,
 .client-metric-card,
@@ -38,11 +45,13 @@
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(239, 122, 45, 0.08);
 }
-
 .clients-sidebar {
     padding: 1rem;
     position: sticky;
-    top: 90px;
+    top: 20px;
+    height: fit-content;
+    align-self: start;
+    z-index: 10;
 }
 
 .clients-sidebar input {

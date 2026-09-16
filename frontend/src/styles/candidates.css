@@ -114,7 +114,77 @@
 .candidate-roles-badges {
     display: flex;
     flex-wrap: wrap;
+    align-content: flex-start;
     gap: 0.5rem;
+    min-height: 58px;
+    max-height: 58px;
+    overflow: hidden;
+}
+
+.candidate-more-roles {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid #ef7a2d;
+    border-radius: 999px;
+    background: #fff1e8;
+    color: #a64716;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.candidate-more-roles:hover {
+    background: #ef7a2d;
+    color: #fff;
+}
+
+.candidate-roles-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0.5rem;
+
+    /* Keep collapsed cards aligned */
+    min-height: 58px;
+    max-height: 58px;
+    overflow: hidden;
+}
+
+.candidate-roles-badges.roles-expanded {
+    max-height: none;
+    overflow: visible;
+}
+
+.candidate-more-roles {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 32px;
+    height: 28px;
+    padding: 0 8px;
+
+    border: 1px solid #ef7a2d;
+    border-radius: 999px;
+
+    background: #fff1e8;
+    color: #a64716;
+
+    font-size: 0.78rem;
+    font-weight: 700;
+
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.candidate-more-roles:hover {
+    background: #ef7a2d;
+    color: #fff;
 }
 
 .candidate-score-section {
