@@ -39,6 +39,8 @@ from routes.report_routes import report_bp
 from database import init_db, seed_data
 from routes.vendor_routes import vendor_bp
 from routes.workflow_admin_routes import workflow_admin_bp
+from services.auth_service import current_user
+from security.rbac import enforce_api_role
 
 
 BUILD_DIR = os.path.join(BASE_DIR, "build")
@@ -59,6 +61,15 @@ _cors_raw = (
 )
 _cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 CORS(app, resources={r"/api/*": {"origins": _cors_origins}}, supports_credentials=True)
+
+
+@app.before_request
+def _enforce_role_permissions():
+    # Authentication decorators remain responsible for 401 responses. This
+    # central layer applies role permissions consistently to API endpoints.
+    if request.path.startswith("/api/") and request.path not in {"/api/login", "/api/logout"}:
+        return enforce_api_role(current_user)
+    return None
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)

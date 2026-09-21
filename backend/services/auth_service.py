@@ -8,6 +8,7 @@ from typing import Optional
 from flask import jsonify, redirect, request, session, url_for
 
 import database as db
+from security.rbac import normalize_role
 
 
 # Purpose: Implements the login required backend behavior.
@@ -52,7 +53,29 @@ def current_user() -> Optional[dict]:
     uid = effective_user_id()
     if uid is None:
         return None
-    return db.get_user_by_id(uid)
+    user = db.get_user_by_id(uid)
+    if not user:
+        return None
+    user["role"] = normalize_role(user.get("role"))
+    return user
+
+
+def role_required(*allowed_roles):
+    """Protect a view by role; admin is always permitted."""
+    allowed = {normalize_role(role) for role in allowed_roles}
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = current_user()
+            if not user:
+                return jsonify({"error": "Unauthorized"}), 401
+            role = normalize_role(user.get("role"))
+            if role != "admin" and role not in allowed:
+                return jsonify({"error": "Forbidden: insufficient role permissions."}), 403
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 # Purpose: Implements the authenticate backend behavior.

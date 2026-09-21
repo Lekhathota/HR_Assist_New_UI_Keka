@@ -957,3 +957,81 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* ===== Table alignment fix: Talent/Candidates ===== */
+.candidates-table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.candidates-table {
+    width: 100%;
+    min-width: 1240px;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Column widths total 100%; give Status and Actions enough room. */
+.candidates-table .candidate-name-col { width: 12%; }
+.candidates-table .candidate-category-col { width: 10%; }
+.candidates-table .candidate-roles-col { width: 25%; }
+.candidates-table .candidate-client-col { width: 9%; }
+.candidates-table .candidate-score-col { width: 11%; }
+.candidates-table .candidate-stage-col { width: 11%; }
+.candidates-table .candidate-status-col { width: 10%; }
+.candidates-table .candidate-actions-col { width: 12%; }
+
+.candidates-table th,
+.candidates-table td {
+    box-sizing: border-box;
+    vertical-align: middle;
+    overflow-wrap: normal;
+}
+
+.candidates-table th:nth-child(7),
+.candidates-table td:nth-child(7) {
+    white-space: nowrap;
+}
+
+.candidates-table td:nth-child(7) .badge,
+.candidates-table td:nth-child(7) [class*="badge"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-width: 76px;
+    max-width: 100%;
+    padding: 0.55rem 0.75rem;
+    line-height: 1.2;
+    overflow-wrap: normal;
+    word-break: keep-all;
+}
+
+.candidates-table td:nth-child(8) {
+    white-space: nowrap;
+}
+
+.candidates-table .candidate-table-actions {
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
+    white-space: nowrap;
+}
+
+.candidates-table .btn-table-action {
+    width: 100%;
+    min-width: 112px;
+    white-space: nowrap;
+    word-break: keep-all;
+    line-height: 1.2;
+    padding: 0.65rem 0.75rem;
+}
+
+@media (max-width: 1200px) {
+    .candidates-table {
+        min-width: 1180px;
+    }
+}

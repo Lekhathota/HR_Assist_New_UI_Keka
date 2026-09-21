@@ -150,3 +150,105 @@
 
 .jd-empty-title  { color: #7f8c8d; }
 .jd-empty-text   { color: #95a5a6; margin-bottom: 1.5rem; }
+
+
+/* ===== Table alignment fix: Jobs detailed view ===== */
+.table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-container > table {
+    width: 100%;
+    min-width: 1320px;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Ten columns: widths total 100%, with usable Status and Actions columns. */
+.table-container > table th:nth-child(1),
+.table-container > table td:nth-child(1) { width: 18%; }
+
+.table-container > table th:nth-child(2),
+.table-container > table td:nth-child(2) { width: 10%; }
+
+.table-container > table th:nth-child(3),
+.table-container > table td:nth-child(3) { width: 9%; }
+
+.table-container > table th:nth-child(4),
+.table-container > table td:nth-child(4) { width: 12%; }
+
+.table-container > table th:nth-child(5),
+.table-container > table td:nth-child(5) { width: 8%; }
+
+.table-container > table th:nth-child(6),
+.table-container > table td:nth-child(6) { width: 8%; }
+
+.table-container > table th:nth-child(7),
+.table-container > table td:nth-child(7) { width: 7%; }
+
+.table-container > table th:nth-child(8),
+.table-container > table td:nth-child(8) { width: 7%; }
+
+.table-container > table th:nth-child(9),
+.table-container > table td:nth-child(9) { width: 9%; }
+
+.table-container > table th:nth-child(10),
+.table-container > table td:nth-child(10) { width: 12%; }
+
+.table-container > table th,
+.table-container > table td {
+    box-sizing: border-box;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+}
+
+.table-container > table th:nth-child(9),
+.table-container > table td:nth-child(9),
+.table-container > table th:nth-child(10),
+.table-container > table td:nth-child(10) {
+    text-align: center;
+}
+
+.table-container > table td:nth-child(9) {
+    white-space: nowrap;
+}
+
+.table-container > table td:nth-child(9) .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    max-width: 100%;
+    padding: 0.55rem 0.7rem;
+    white-space: nowrap;
+    word-break: keep-all;
+    line-height: 1.2;
+}
+
+.jd-table-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.jd-table-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 76px;
+    max-width: 100%;
+    white-space: nowrap;
+    word-break: keep-all;
+    line-height: 1.2;
+}
+
+@media (max-width: 1200px) {
+    .table-container > table {
+        min-width: 1240px;
+    }
+}

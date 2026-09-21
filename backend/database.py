@@ -2276,7 +2276,7 @@ def user_id_for_session_token(token: str) -> Optional[int]:
 # Purpose: Implements the authenticate user backend behavior.
 def authenticate_user(username: str, password: str) -> Optional[dict]:
     row = _database().users.find_one({"username": username})
-    if not row or not check_password_hash(row.get("password", ""), password):
+    if not row or row.get("is_active", True) is False or not check_password_hash(row.get("password", ""), password):
         return None
     user = _serialize_doc(row) or {}
     user.pop("password", None)
@@ -2284,6 +2284,28 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
 
 
 # Purpose: Fetches user by id from storage or service context.
+
+
+def list_users() -> list[dict]:
+    """Return safe user fields for the admin user-management screen."""
+    rows = _database().users.find({}, {"password": 0}).sort("id", ASCENDING)
+    return [_serialize_doc(row) or {} for row in rows]
+
+
+def create_managed_user(username: str, password: str, email: str, role: str) -> dict:
+    username = username.strip().lower()
+    doc = {"id": _next_id("users"), "username": username, "password": generate_password_hash(password),
+           "email": email.strip().lower(), "role": role, "is_active": True, "created_at": _now()}
+    _database().users.insert_one(doc)
+    doc.pop("password", None)
+    return _serialize_doc(doc) or doc
+
+
+def update_managed_user(user_id: int, updates: dict) -> bool:
+    result = _database().users.update_one({"id": int(user_id)}, {"$set": updates})
+    return result.matched_count > 0
+
+
 def get_user_by_id(user_id: int) -> Optional[dict]:
     row = _database().users.find_one({"id": int(user_id)})
     user = _serialize_doc(row)
