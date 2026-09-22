@@ -137,29 +137,78 @@ def api_compare():
     jd_id = request.form.get("jd_id")
     if not jd_id:
         return jsonify({"error": "Please select a Job Description"}), 400
+    resume_files = _collect_resume_files()
     try:
         user = current_user()
-        result = run_automated_bench_workflow(int(jd_id), username=user["username"] if user else "")
+        username = user["username"] if user else ""
+
+        if resume_files:
+            # Uploaded resumes: run them through the JD/Resume/Matching agent pipeline directly.
+            result = _run_agentic_compare(jd_id, username=username)
+            ranked = result.get("ranked_candidates") or []
+            selected_results = result.get("selected_results") or []
+            rejected_results = result.get("rejected_results") or []
+            summary = result.get("summary") or {}
+            db.log_audit(
+                "Resume Match Run",
+                username,
+                f"User '{username or 'unknown'}' matched uploaded resumes against JD id={jd_id}. "
+                f"File parts received: {result.get('resume_parts_received', 0)}, "
+                f"queued: {result.get('uploaded_count', 0)}, "
+                f"skipped (bad ext): {result.get('resume_parts_skipped_bad_ext', 0)}, "
+                f"processed: {result.get('processed_count', 0)}, "
+                f"selected: {len(selected_results)}, rejected: {len(rejected_results)}.",
+                int(jd_id),
+            )
+            return jsonify(
+                {
+                    "mode": "resume_upload",
+                    "run_id": result.get("run_id"),
+                    "results": ranked,
+                    "selected_results": selected_results,
+                    "waitlisted_results": [],
+                    "rejected_results": rejected_results,
+                    "fulfilment_summary": None,
+                    "summary": summary,
+                    "stats": [
+                        {"label": "Resumes Processed", "value": summary.get("total_candidates", len(ranked))},
+                        {"label": "Selected", "value": summary.get("selected_count", len(selected_results))},
+                        {"label": "Rejected", "value": summary.get("rejected_count", len(rejected_results))},
+                    ],
+                }
+            )
+
+        result = run_automated_bench_workflow(int(jd_id), username=username)
         summary = result.get("summary") or {}
         db.log_audit(
             "Bench Workflow Completed",
-            user["username"] if user else "",
+            username,
             f"Automated bench workflow completed for JD id={jd_id}; "
             f"selected={len((result.get('bench_results') or {}).get('selected') or [])}, "
             f"remaining={int((result.get('fulfilment_summary') or {}).get('remaining_vendor_requirement') or 0)}.",
             int(jd_id),
         )
         bench = result.get("bench_results") or {}
+        fulfilment_summary = result.get("fulfilment_summary") or {}
+        waitlisted = bench.get("waitlisted") or []
         return jsonify(
             {
+                "mode": "bench",
                 "run_id": result.get("run_id"),
-                "results": (bench.get("selected") or []) + (bench.get("waitlisted") or []) + (bench.get("rejected") or []),
+                "results": (bench.get("selected") or []) + waitlisted + (bench.get("rejected") or []),
                 "selected_results": bench.get("selected") or [],
-                "waitlisted_results": bench.get("waitlisted") or [],
+                "waitlisted_results": waitlisted,
                 "rejected_results": bench.get("rejected") or [],
-                "fulfilment_summary": result.get("fulfilment_summary") or {},
+                "fulfilment_summary": fulfilment_summary,
                 "vendor_assignments": result.get("vendor_assignments") or [],
                 "summary": summary,
+                "stats": [
+                    {"label": "Required", "value": fulfilment_summary.get("total_required", 0)},
+                    {"label": "Analyzed", "value": fulfilment_summary.get("bench_analyzed_count", 0)},
+                    {"label": "Selected Bench", "value": fulfilment_summary.get("selected_bench_count", 0)},
+                    {"label": "Waitlisted", "value": len(waitlisted)},
+                    {"label": "Vendor Shortage", "value": fulfilment_summary.get("remaining_vendor_requirement", 0)},
+                ],
             }
         )
     except Exception as exc:
