@@ -88,13 +88,15 @@ def api_me():
     return jsonify({"user": {"id": user.get("id"), "username": user.get("username"), "email": user.get("email"), "role": user.get("role")}})
 
 
-# Admin-only user administration API. Authorization is enforced on the server.
+# User administration API. Per-role restrictions have not been configured yet,
+# so any authenticated, recognized-role user may manage accounts for now.
+# "admin" keeps unrestricted superuser access regardless of other role rules.
 def _admin_user():
     user = current_user()
     if not user:
         return None, (jsonify({"error": "Unauthorized"}), 401)
-    if str(user.get("role", "")).strip().lower().replace(" ", "_") not in {"admin", "administrator"}:
-        return None, (jsonify({"error": "Forbidden: administrator access required."}), 403)
+    if str(user.get("role", "")).strip().lower().replace(" ", "_") not in {"finance", "recruiter", "hr", "managers_consultant", "it", "admin"}:
+        return None, (jsonify({"error": "Forbidden: unrecognized role."}), 403)
     return user, None
 
 
@@ -127,8 +129,8 @@ def admin_create_user():
         return jsonify({"error": "Password must be at least 12 characters."}), 400
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         return jsonify({"error": "Enter a valid email address."}), 400
-    if role not in {"admin", "recruiter", "hiring_manager"}:
-        return jsonify({"error": "Role must be admin, recruiter, or hiring_manager."}), 400
+    if role not in {"finance", "recruiter", "hr", "managers_consultant", "it", "admin"}:
+        return jsonify({"error": "Role must be finance, recruiter, hr, managers_consultant, it, or admin."}), 400
     try:
         user = db.create_managed_user(username, password, email, role)
     except DuplicateKeyError:
@@ -146,9 +148,9 @@ def admin_update_user(user_id):
     updates = {}
     if "role" in data:
         role = str(data.get("role") or "").strip().lower().replace(" ", "_")
-        if role not in {"admin", "recruiter", "hiring_manager"}:
-            return jsonify({"error": "Role must be admin, recruiter, or hiring_manager."}), 400
-        if int(admin["id"]) == user_id and role != "admin":
+        if role not in {"finance", "recruiter", "hr", "managers_consultant", "it", "admin"}:
+            return jsonify({"error": "Role must be finance, recruiter, hr, managers_consultant, it, or admin."}), 400
+        if admin.get("role") == "admin" and int(admin["id"]) == user_id and role != "admin":
             return jsonify({"error": "You cannot remove your own administrator role."}), 400
         updates["role"] = role
     if "is_active" in data:

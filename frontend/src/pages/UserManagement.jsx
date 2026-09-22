@@ -4,8 +4,11 @@ import '../styles/user-management.css';
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
+  { value: 'finance', label: 'Finance' },
   { value: 'recruiter', label: 'Recruiter' },
-  { value: 'hiring_manager', label: 'Hiring Manager' },
+  { value: 'hr', label: 'HR' },
+  { value: 'managers_consultant', label: 'Managers/Consultant' },
+  { value: 'it', label: 'IT' },
 ];
 
 export default function UserManagement() {
@@ -15,7 +18,8 @@ export default function UserManagement() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [reload, setReload] = useState(0);
-  const isAdmin = (() => { try { const u = JSON.parse(localStorage.getItem('recruitment_assist_user') || '{}'); return ['admin','administrator'].includes(String(u.role || '').toLowerCase()); } catch { return false; } })();
+  // Per-role page access hasn't been configured yet, so any signed-in user with a recognized role can manage accounts.
+  const canManageUsers = (() => { try { const u = JSON.parse(localStorage.getItem('recruitment_assist_user') || '{}'); return Boolean(u && u.role); } catch { return false; } })();
   const load = useCallback(async () => { try { const data = await apiGet('/api/admin/users'); setUsers(data.users || []); } catch (e) { setError(e.message || 'Unable to load users.'); } }, []);
   useEffect(() => { load(); }, [load, reload]);
   const submit = async (e) => {
@@ -37,7 +41,7 @@ export default function UserManagement() {
       setNotice('User updated.'); setReload(v => v + 1);
     } catch (e) { setError(e.message || 'Update failed.'); }
   };
-  if (!isAdmin) return <main className="um-page"><section className="um-card"><h1>Administrator access required</h1><p>This page is available only to Admin users.</p></section></main>;
+  if (!canManageUsers) return <main className="um-page"><section className="um-card"><h1>Sign-in required</h1><p>Please sign in to manage users.</p></section></main>;
   return <main className="um-page">
     <header className="um-header"><div><p className="um-eyebrow">ACCESS CONTROL</p><h1>User Management</h1><p>Create accounts, assign roles, and manage access to ShimentoX.</p></div><span className="um-count">{users.length} users</span></header>
     {error && <div className="um-alert error" role="alert">{error}</div>}{notice && <div className="um-alert success" role="status">{notice}</div>}

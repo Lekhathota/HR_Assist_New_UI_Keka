@@ -6,13 +6,13 @@ import database as db
 from services.fulfilment_service import recalculate_fulfilment
 
 
-PRIVILEGED_ROLES = {"admin", "manager", "hiring manager"}
+PRIVILEGED_ROLES = {"finance", "recruiter", "hr", "managers_consultant", "it", "admin"}
 
 
 def require_manager(user: dict | None) -> None:
     role = str((user or {}).get("role") or "").strip().lower()
     if role not in PRIVILEGED_ROLES:
-        raise PermissionError("This action requires a manager or admin role.")
+        raise PermissionError("This action requires a recognized workspace role.")
 
 
 def readiness_payload() -> dict[str, Any]:

@@ -361,9 +361,10 @@ def _seed_default_users() -> None:
         return
     db = _database()
     defaults = [
-        ("admin", os.environ.get("DEFAULT_ADMIN_PASSWORD"), "admin@localhost", "admin"),
-        ("recruiter", os.environ.get("DEFAULT_RECRUITER_PASSWORD"), "recruiter@localhost", "Recruiter"),
-        ("manager", os.environ.get("DEFAULT_MANAGER_PASSWORD"), "manager@localhost", "Hiring Manager"),
+        ("finance", os.environ.get("DEFAULT_ADMIN_PASSWORD"), "finance@localhost", "finance"),
+        ("recruiter", os.environ.get("DEFAULT_RECRUITER_PASSWORD"), "recruiter@localhost", "recruiter"),
+        ("hr", os.environ.get("DEFAULT_HR_PASSWORD"), "hr@localhost", "hr"),
+        ("manager", os.environ.get("DEFAULT_MANAGER_PASSWORD"), "manager@localhost", "managers_consultant"),
     ]
     for username, password, email, role in defaults:
         if not password:

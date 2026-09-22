@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiPost, clearToken } from '../api.js';
+import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
 
 const navigation = [
   ['/dashboard', 'Dashboard', 'fa-chart-line'],
@@ -14,34 +15,6 @@ const navigation = [
   ['/hiring-pipeline', 'Pipeline', 'fa-route'],
   ['/insights', 'Reports', 'fa-chart-bar'],
 ];
-
-const ROLE_ACCESS = {
-  admin: ['*'],
-  administrator: ['*'],
-  recruiter: ['/dashboard', '/jobs', '/jobs/create', '/jobs/:id', '/analyze', '/talent', '/talent/:id', '/hiring-pipeline', '/profile'],
-  hiring_manager: ['/dashboard', '/talent', '/talent/:id', '/hiring-pipeline', '/profile'],
-  manager: ['/dashboard', '/talent', '/talent/:id', '/hiring-pipeline', '/profile'],
-};
-
-function getCurrentRole() {
-  try {
-    const user = JSON.parse(localStorage.getItem('recruitment_assist_user') || '{}');
-    return String(user.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-  } catch {
-    return '';
-  }
-}
-
-function roleCanAccess(role, pathname) {
-  const allowed = ROLE_ACCESS[role] || [];
-  if (allowed.includes('*')) return true;
-  const actual = pathname.split('/').filter(Boolean);
-  return allowed.some((pattern) => {
-    const expected = pattern.split('/').filter(Boolean);
-    return expected.length === actual.length &&
-      expected.every((part, i) => part.startsWith(':') || part === actual[i]);
-  });
-}
 
 function Navbar() {
   const navigate = useNavigate();

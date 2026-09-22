@@ -28,7 +28,7 @@ APPROVAL_REQUIRED_TOOLS = {
     "vendor.email.retry",
     "bench.selection.override",
 }
-PRIVILEGED_ROLES = {"admin", "manager", "hiring manager"}
+PRIVILEGED_ROLES = {"finance", "recruiter", "hr", "managers_consultant", "it", "admin"}
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ class PolicyEngine:
 
         role = str(user.get("role") or "").strip().lower()
         if request.tool in PRIVILEGED_ACTION_TOOLS and role not in PRIVILEGED_ROLES:
-            return PolicyDecision(False, reason="This action requires a manager or admin role.")
+            return PolicyDecision(False, reason="This action requires a recognized workspace role.")
 
         row_count = int(request.params.get("row_count") or 0)
         if row_count > 50 and not request.confirmed:

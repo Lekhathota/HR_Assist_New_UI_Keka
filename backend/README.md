@@ -27,9 +27,10 @@ The app creates collections and indexes automatically on startup. It also seeds 
 
 | Username | Password | Role |
 |----------|----------|------|
-| admin | admin | admin |
-| recruiter | recruiter | Recruiter |
-| manager | manager | Hiring Manager |
+| finance | (DEFAULT_ADMIN_PASSWORD) | finance |
+| recruiter | (DEFAULT_RECRUITER_PASSWORD) | recruiter |
+| hr | (DEFAULT_HR_PASSWORD) | hr |
+| manager | (DEFAULT_MANAGER_PASSWORD) | managers_consultant |
 
 ## 2. Install
 
