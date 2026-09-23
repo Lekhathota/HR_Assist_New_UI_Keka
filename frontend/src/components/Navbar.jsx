@@ -10,7 +10,6 @@ const navigation = [
   ['/talent', 'Talent', 'fa-users'],
   ['/clients', 'Clients', 'fa-building'],
   ['/vendors', 'Vendors', 'fa-handshake'],
-  ['/admin/workflow', 'Workflow', 'fa-screwdriver-wrench'],
   ['/admin/users', 'User Management', 'fa-user-gear'],
   ['/hiring-pipeline', 'Pipeline', 'fa-route'],
   ['/insights', 'Reports', 'fa-chart-bar'],

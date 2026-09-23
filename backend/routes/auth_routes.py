@@ -88,15 +88,13 @@ def api_me():
     return jsonify({"user": {"id": user.get("id"), "username": user.get("username"), "email": user.get("email"), "role": user.get("role")}})
 
 
-# User administration API. Per-role restrictions have not been configured yet,
-# so any authenticated, recognized-role user may manage accounts for now.
-# "admin" keeps unrestricted superuser access regardless of other role rules.
+# Admin-only user administration API. Authorization is enforced on the server.
 def _admin_user():
     user = current_user()
     if not user:
         return None, (jsonify({"error": "Unauthorized"}), 401)
-    if str(user.get("role", "")).strip().lower().replace(" ", "_") not in {"finance", "recruiter", "hr", "managers_consultant", "it", "admin"}:
-        return None, (jsonify({"error": "Forbidden: unrecognized role."}), 403)
+    if str(user.get("role", "")).strip().lower().replace(" ", "_") not in {"admin", "administrator"}:
+        return None, (jsonify({"error": "Forbidden: administrator access required."}), 403)
     return user, None
 
 

@@ -30,6 +30,7 @@ const click = element => act(() => element.dispatchEvent(new MouseEvent('click',
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
+  localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'admin' }));
   document.body.className = '';
   jest.clearAllMocks();
   window.matchMedia = jest.fn(() => ({ matches: true }));
@@ -48,7 +49,7 @@ test('keeps all existing navigation labels, order, destinations, and the welcome
   expect(links.map(link => [link.textContent, link.getAttribute('href')])).toEqual([
     ['Dashboard', '/dashboard'], ['Jobs', '/jobs'], ['Analyze', '/analyze'],
     ['Talent', '/talent'], ['Clients', '/clients'], ['Vendors', '/vendors'],
-    ['Workflow', '/admin/workflow'], ['Pipeline', '/hiring-pipeline'], ['Reports', '/insights'],
+    ['User Management', '/admin/users'], ['Pipeline', '/hiring-pipeline'], ['Reports', '/insights'],
   ]);
   expect(container.querySelector('[aria-current="page"]').textContent).toBe('Jobs');
   expect(container.querySelector('.workspace-brand').getAttribute('href')).toBe('/welcome');

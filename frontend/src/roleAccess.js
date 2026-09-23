@@ -14,6 +14,8 @@ const RESTRICTED_ROUTES = [
   { prefix: '/vendors', roles: ['managers_consultant'] },
   { prefix: '/hiring-pipeline', roles: ['recruiter', 'managers_consultant', 'hr'] },
   { prefix: '/insights', roles: ['finance'] },
+  // Only admin (handled by the bypass above) may reach User Management.
+  { prefix: '/admin/users', roles: [] },
 ];
 
 export function getCurrentRole() {

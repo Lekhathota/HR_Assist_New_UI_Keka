@@ -13,7 +13,6 @@ import CandidateProfile from './pages/CandidateProfile.jsx';
 import Clients from './pages/Clients.jsx';
 import ClientProject from './pages/ClientProject.jsx';
 import Vendors from './pages/Vendors.jsx';
-import WorkflowAdmin from './pages/WorkflowAdmin.jsx';
 import UserManagement from './pages/UserManagement.jsx';
 import HiringPipeline from './pages/Interviews.jsx';
 import Reports from './pages/Reports.jsx';
@@ -67,7 +66,6 @@ function App() {
         <Route path="/clients/:clientId/projects/:projectId" element={<ProtectedRoute><ClientProject /></ProtectedRoute>} />
         <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-        <Route path="/admin/workflow" element={<ProtectedRoute><WorkflowAdmin /></ProtectedRoute>} />
         <Route path="/hiring-pipeline" element={<ProtectedRoute><HiringPipeline /></ProtectedRoute>} />
         <Route path="/interviews" element={<Navigate to="/hiring-pipeline" replace />} />
 
