@@ -35,8 +35,31 @@ const ROLE_CATEGORY_FILTER_LABELS = {
   Others: 'Others',
 };
 
+// Multiple resume submissions for the same person create separate candidate
+// records (one per JD match). Collapse those into one card per person, merging
+// their applied roles, so the Talent page shows one candidate with every role
+// they've applied for underneath their name instead of duplicate cards.
+function dedupeCandidates(rows) {
+  const order = [];
+  const groups = new Map();
+  for (const c of rows) {
+    const email = (c.email || '').trim().toLowerCase();
+    const name = (c.name || '').trim().toLowerCase();
+    const key = email || (name ? `name:${name}` : null);
+    if (!key) { order.push(c.id); groups.set(c.id, { ...c, applied_roles: [...(c.applied_roles || [])] }); continue; }
+    const existing = groups.get(key);
+    if (!existing) {
+      order.push(key);
+      groups.set(key, { ...c, applied_roles: [...(c.applied_roles || [])] });
+    } else {
+      existing.applied_roles = Array.from(new Set([...(existing.applied_roles || []), ...(c.applied_roles || [])]));
+    }
+  }
+  return order.map(key => groups.get(key));
+}
+
 function Candidates() {
-  const [candidates, setCandidates] = useState(() => readSessionCache(TALENT_CACHE_KEY) || []);
+  const [candidates, setCandidates] = useState(() => dedupeCandidates(readSessionCache(TALENT_CACHE_KEY) || []));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -60,13 +83,13 @@ function Candidates() {
   useEffect(() => {
     const cached = readSessionCache(TALENT_CACHE_KEY);
     if (cached) {
-      setCandidates(Array.isArray(cached) ? cached : []);
+      setCandidates(dedupeCandidates(Array.isArray(cached) ? cached : []));
     }
 
     apiGet('/api/candidates')
       .then(data => {
         const rows = Array.isArray(data) ? data : [];
-        setCandidates(rows);
+        setCandidates(dedupeCandidates(rows));
         writeSessionCache(TALENT_CACHE_KEY, rows);
       })
       .catch(() => {});
