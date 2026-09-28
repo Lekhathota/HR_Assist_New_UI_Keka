@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import database as db
 from app.regex_extractor import extract_resume_regex
 from app.text_extractor import extract_text
 from app.utils import clean_resume_text
+from services.hiring_process_service import compute_effective_stage
 from services.role_category_service import categorize_candidate
 
 
@@ -205,6 +207,32 @@ def _parse_datetime(value: Any) -> datetime | None:
         return None
 
 
+# Purpose: Converts a "YYYY-MM-DD" calendar date + IANA timezone into a UTC datetime bound.
+def parse_calendar_bound(date_str: Any, tz_name: str, *, end_of_day: bool) -> datetime | None:
+    raw = str(date_str or "").strip()
+    if not raw:
+        return None
+    try:
+        year, month, day = (int(part) for part in raw.split("-"))
+        local_date = date(year, month, day)
+    except (ValueError, TypeError):
+        return None
+    try:
+        tz = ZoneInfo(str(tz_name)) if tz_name else timezone.utc
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = timezone.utc
+    local_time = time(23, 59, 59, 999999) if end_of_day else time(0, 0, 0)
+    return datetime.combine(local_date, local_time, tzinfo=tz).astimezone(timezone.utc)
+
+
+# Purpose: Returns candidate ids with a non-cancelled interview overlapping a date range.
+def candidate_ids_with_interview_in_range(range_start: datetime | None, range_end: datetime | None) -> list[int] | None:
+    if range_start is None and range_end is None:
+        return None
+    interviews = db.get_interviews({"exclude_cancelled": True, "range_start": range_start, "range_end": range_end})
+    return list({int(row.get("candidate_id") or 0) for row in interviews if row.get("candidate_id")})
+
+
 def _interview_stage(candidate_id: int) -> str:
     interviews = db.get_interviews({"candidate_id": candidate_id})
     if not interviews:
@@ -362,6 +390,14 @@ def normalize_candidate_record(candidate: dict[str, Any], *, repair: bool = True
         db.update_candidate(int(candidate["id"]), category_payload)
     _sync_candidate_status(candidate)
     _apply_current_hiring_stage(candidate)
+    jd = db.get_jd_by_id(int(candidate["jd_id"])) if candidate.get("jd_id") else None
+    effective = compute_effective_stage(candidate, jd)
+    if effective["configured"]:
+        candidate["hiring_stage"] = effective["stage_name"]
+    candidate["stage_id"] = effective["stage_id"]
+    candidate["on_hold"] = effective["on_hold"]
+    candidate["automation_paused"] = effective["automation_paused"]
+    candidate["hiring_process_steps"] = effective["steps"]
     return candidate
 
 
@@ -383,7 +419,11 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
     db_filters = {k: v for k, v in filters.items() if k not in {"status"}}
     rows = [normalize_candidate_record(row) for row in db.get_all_candidates(db_filters if db_filters else None)]
     status_filter = str(filters.get("status") or "").strip().lower()
-    if status_filter:
+    if status_filter == "on hold":
+        # "On Hold" is a manual flag layered on top of the score-driven Selected/Rejected
+        # status, not a value that status itself ever holds — filter on the flag instead.
+        rows = [row for row in rows if bool(row.get("on_hold"))]
+    elif status_filter:
         rows = [row for row in rows if str(row.get("status") or "").lower() == status_filter]
     return rows
 

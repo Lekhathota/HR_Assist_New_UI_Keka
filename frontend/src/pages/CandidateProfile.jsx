@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPost } from '../api.js';
+import { getCurrentRole } from '../roleAccess.js';
 import '../styles/profile.css';
 import '../styles/candidates.css';
 import jsPDF from 'jspdf';
@@ -47,6 +48,25 @@ function CandidateProfile() {
   const [candidate, setCandidate] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const canEditStage = ['recruiter', 'admin'].includes(getCurrentRole());
+
+  const updateHiringState = async (body) => {
+    const { ok, data } = await apiPost(`/api/candidates/${candidateId}/hiring-state`, body);
+    if (ok) {
+      setCandidate(prev => (prev ? {
+        ...prev,
+        stage_id: data.stage_id,
+        hiring_stage: data.stage_name,
+        on_hold: data.on_hold,
+        automation_paused: data.automation_paused,
+      } : prev));
+    } else {
+      toast({ type: 'error', message: data.error || 'Could not update hiring state.' });
+    }
+  };
+  const setStage = (stageId) => updateHiringState({ stage_id: stageId || null });
+  const toggleHold = () => updateHiringState({ on_hold: !candidate?.on_hold });
+  const resumeAutomation = () => updateHiringState({ resume_automation: true });
 
   // --- REPORT MODAL STATE ---
   const [showModal, setShowModal] = useState(false);
@@ -1043,12 +1063,38 @@ function CandidateProfile() {
         </div>
 
         <div className="profile-info">
-          {[['fas fa-building', 'Client', candidate.client_name || 'ShimentoX'], ['fas fa-envelope', 'Email', candidate.email || 'N/A'], ['fas fa-phone', 'Phone', phoneNumber], ['fas fa-tag', 'Status', candidate.status], ['fas fa-tasks', 'Current Stage', candidate.hiring_stage || 'N/A']].map(([icon, label, val]) => (
+          {[['fas fa-building', 'Client', candidate.client_name || 'ShimentoX'], ['fas fa-envelope', 'Email', candidate.email || 'N/A'], ['fas fa-phone', 'Phone', phoneNumber], ['fas fa-tag', 'Status', candidate.status]].map(([icon, label, val]) => (
             <div key={label} className="profile-field">
               <strong><i className={icon}></i> {label}</strong>
               <span>{val}</span>
             </div>
           ))}
+          <div className="profile-field">
+            <strong><i className="fas fa-tasks"></i> Current Stage</strong>
+            {(candidate.hiring_process_steps || []).length ? (
+              <div className="profile-stage-control">
+                {canEditStage ? (
+                  <select value={candidate.stage_id || ''} onChange={(e) => setStage(e.target.value)}>
+                    <option value="">Not Started</option>
+                    {candidate.hiring_process_steps.map(step => <option key={step.id} value={step.id}>{step.name}</option>)}
+                  </select>
+                ) : <span>{candidate.hiring_stage || 'Not Started'}</span>}
+                {candidate.on_hold && <span className="badge badge-warning profile-hold-badge">On Hold</span>}
+                {canEditStage && (
+                  <div className="profile-stage-actions">
+                    <button type="button" className="btn btn-secondary jd-table-btn" onClick={toggleHold}>
+                      {candidate.on_hold ? 'Clear On Hold' : 'Set On Hold'}
+                    </button>
+                    {candidate.automation_paused && (
+                      <button type="button" className="btn btn-secondary jd-table-btn" onClick={resumeAutomation}>
+                        Resume automatic updates
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : <span>{candidate.hiring_stage || 'N/A'}</span>}
+          </div>
           <div className="profile-field">
             <strong><i className="fas fa-layer-group"></i> Role Category</strong>
             <span>{candidate.primary_category || 'Others'}</span>

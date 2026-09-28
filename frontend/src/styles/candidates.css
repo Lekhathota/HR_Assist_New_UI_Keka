@@ -1,19 +1,26 @@
 /* ========== CANDIDATES PAGE ========== */
 
+/* The shared app shell gives every page a generous side gutter; the Talent
+   list specifically wants to use the full width, so narrow it just here. */
+.main-container:has(.candidates-container) {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+}
+
 .candidates-subtitle {
     color: #7f8c8d;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     font-size: 1.05rem;
 }
 
 .candidates-filter-bar {
     background: #fff;
-    padding: 1.5rem;
+    padding: 1rem 1.25rem;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
 }
 
@@ -34,53 +41,263 @@
     min-width: 150px;
 }
 
-.candidates-cards-grid {
-    margin-bottom: 2rem;
-    align-items: stretch;
+.candidates-filters-anchor {
+    position: relative;
 }
 
-/* Preserve enough card width for readable content and a consistent action row. */
-.app-shell .candidates-cards-grid.grid-4 {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-}
-
-.candidates-cards-grid .candidate-card {
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.candidate-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-}
-
-.candidate-roles-section {
-    margin-bottom: 1rem;
-}
-
-.candidate-client-line {
+.candidates-filters-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    color: #ef7a2d;
-    font-size: 0.86rem;
-    font-weight: 800;
-    margin-bottom: 0.65rem;
+    gap: 0.5rem;
+    padding: 0.8rem 1.1rem;
+    border: 1px solid #bdc3c7;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #2c3e50;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-.candidate-category-line,
-.candidate-table-categories {
+.candidates-filters-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: #ef7a2d;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.candidates-filters-panel {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    right: 0;
+    z-index: 60;
+    width: min(640px, 90vw);
+    max-height: min(70vh, 640px);
+    overflow-y: auto;
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid #e1e5e9;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    display: grid;
+    gap: 1.25rem;
+}
+
+@media (max-width: 640px) {
+    .candidates-filters-panel {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 80vh;
+        border-radius: 16px 16px 0 0;
+    }
+}
+
+.candidates-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.candidates-filters-grid label,
+.candidates-filters-dates fieldset legend {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #2c3e50;
+    margin-bottom: 0.4rem;
+}
+
+.candidates-filters-grid select {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid #bdc3c7;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.candidates-filters-dates {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.65rem;
+    gap: 1.5rem;
 }
 
-.candidate-table-categories {
-    justify-content: center;
-    margin-bottom: 0;
+.candidates-filters-dates fieldset {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.candidates-filters-dates fieldset > legend {
+    width: 100%;
+    margin-bottom: 0.4rem;
+}
+
+.candidates-filters-dates input[type="date"] {
+    padding: 0.6rem;
+    border: 1px solid #bdc3c7;
+    border-radius: 6px;
+}
+
+.candidates-filters-error {
+    padding: 0.7rem 0.9rem;
+    border-radius: 6px;
+    background: #fdecea;
+    color: #c0392b;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.candidates-filters-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.candidates-result-count {
+    margin-bottom: 0.6rem;
+    color: #7f8c8d;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+/* TEMPORARY: bulk select + delete — remove alongside the JSX that uses these. */
+.candidates-select-col {
+    width: 42px;
+    text-align: center !important;
+}
+
+.candidates-bulk-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #2c3e50;
+}
+
+.candidates-bulk-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+/* ========== CANDIDATE LIST (replaces the old card grid) ========== */
+
+.candidates-list-container {
+    width: 100%;
+}
+
+.candidates-simple-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.candidates-simple-table thead th {
+    text-align: left;
+    padding: 0.65rem 1rem;
+    background: #f8f9fa;
+    color: #7f8c8d;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.candidates-simple-table thead th:last-child {
+    text-align: right;
+}
+
+.candidates-simple-table tbody tr {
+    border-bottom: 1px solid #edf0f2;
+}
+
+.candidates-simple-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.candidates-simple-table tbody tr:hover {
+    background: #fafbfc;
+}
+
+.candidates-simple-table td {
+    padding: 0.65rem 1rem;
+    vertical-align: middle;
+}
+
+.candidates-simple-name {
+    font-weight: 700;
+    color: #1f2430;
+    font-size: 1rem;
+}
+
+.candidates-simple-client {
+    color: #ef7a2d;
+    font-weight: 600;
+}
+
+.candidates-simple-actions {
+    text-align: right;
+}
+
+.candidates-simple-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .candidates-simple-table thead {
+        display: none;
+    }
+
+    .candidates-simple-table,
+    .candidates-simple-table tbody,
+    .candidates-simple-table tr,
+    .candidates-simple-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .candidates-simple-table tr {
+        padding: 0.75rem 1rem;
+    }
+
+    .candidates-simple-table td {
+        padding: 0.2rem 0;
+    }
+
+    .candidates-simple-name {
+        font-size: 1.05rem;
+    }
+
+    .candidates-simple-actions {
+        text-align: left;
+        margin-top: 0.6rem;
+    }
+
+    .candidates-simple-btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 .candidate-category-pill {
@@ -103,146 +320,11 @@
     color: #d9f7ff;
 }
 
-.candidate-roles-label {
-    font-size: 0.85rem;
-    color: #7f8c8d;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.5rem;
-}
-
 .candidate-roles-badges {
     display: flex;
     flex-wrap: wrap;
     align-content: flex-start;
     gap: 0.5rem;
-    min-height: 58px;
-    max-height: 58px;
-    overflow: hidden;
-}
-
-.candidate-more-roles {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid #ef7a2d;
-    border-radius: 999px;
-    background: #fff1e8;
-    color: #a64716;
-    font-size: 0.78rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.candidate-more-roles:hover {
-    background: #ef7a2d;
-    color: #fff;
-}
-
-.candidate-roles-badges {
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: 0.5rem;
-
-    /* Keep collapsed cards aligned */
-    min-height: 58px;
-    max-height: 58px;
-    overflow: hidden;
-}
-
-.candidate-roles-badges.roles-expanded {
-    max-height: none;
-    overflow: visible;
-}
-
-.candidate-more-roles {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-
-    min-width: 32px;
-    height: 28px;
-    padding: 0 8px;
-
-    border: 1px solid #ef7a2d;
-    border-radius: 999px;
-
-    background: #fff1e8;
-    color: #a64716;
-
-    font-size: 0.78rem;
-    font-weight: 700;
-
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.candidate-more-roles:hover {
-    background: #ef7a2d;
-    color: #fff;
-}
-
-.candidate-score-section {
-    margin-bottom: 1.5rem;
-}
-
-.candidate-score-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.candidate-score-label {
-    font-weight: 600;
-}
-
-.candidate-score-value {
-    font-weight: 700;
-    color: #3498db;
-}
-
-.candidate-stage-box {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
-}
-
-.candidate-stage-label {
-    font-size: 0.85rem;
-    color: #7f8c8d;
-    margin-bottom: 0.3rem;
-}
-
-.candidate-stage-value {
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-.candidate-view-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    width: 100%;
-    margin-top: auto;
-    text-align: center;
-}
-
-.candidate-skills-heading {
-    flex: 1 0 100%;
-    color: #7f8c8d;
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    line-height: 1.2;
-    text-transform: uppercase;
 }
 
 .profile-actions-footer {
@@ -255,139 +337,6 @@
 .profile-remove-footer-btn {
     min-width: 220px;
     text-align: center;
-}
-
-.candidates-section-title {
-    margin-bottom: 1.5rem;
-}
-
-.candidates-table-container {
-    border-radius: 10px;
-}
-
-.candidates-table {
-    table-layout: fixed;
-    min-width: 1120px;
-}
-
-.candidates-table th,
-.candidates-table td {
-    vertical-align: middle;
-}
-
-.candidate-name-col {
-    width: 13%;
-}
-
-.candidate-category-col {
-    width: 12%;
-}
-
-.candidate-roles-col {
-    width: 27%;
-}
-
-.candidate-client-col {
-    width: 10%;
-}
-
-.candidate-score-col {
-    width: 10%;
-}
-
-.candidate-stage-col {
-    width: 11%;
-}
-
-.candidate-status-col {
-    width: 9%;
-}
-
-.candidate-actions-col {
-    width: 11%;
-}
-
-.candidates-table th:nth-child(4),
-.candidates-table th:nth-child(5),
-.candidates-table th:nth-child(6),
-.candidates-table th:nth-child(7),
-.candidates-table th:nth-child(8),
-.candidates-table td:nth-child(4),
-.candidates-table td:nth-child(5),
-.candidates-table td:nth-child(6),
-.candidates-table td:nth-child(7),
-.candidates-table td:nth-child(8) {
-    text-align: center;
-}
-
-.candidate-table-roles {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.45rem;
-}
-
-/* Table score cell */
-.table-score-cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    min-width: 0;
-}
-
-.table-score-value {
-    font-weight: 700;
-    color: #3498db;
-    flex: 0 0 auto;
-}
-
-.table-progress-wrap {
-    flex: 0 1 76px;
-    width: 76px;
-    min-width: 46px;
-}
-
-/* Table action button */
-.btn-table-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    width: fit-content;
-    max-width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    margin: 0 auto;
-    padding: 0.6rem 0.7rem;
-    font-size: 0.9rem;
-    line-height: 1.1;
-}
-
-.candidate-table-actions {
-    padding-left: 0.4rem !important;
-    padding-right: 0.4rem !important;
-    text-align: center !important;
-}
-
-.btn-table-action span {
-    display: block;
-}
-
-@media (max-width: 1200px) {
-    .candidates-table {
-        min-width: 1040px;
-    }
-
-    .candidate-roles-col {
-        width: 32%;
-    }
-
-    .candidate-score-col,
-    .candidate-stage-col,
-    .candidate-status-col {
-        width: 11%;
-    }
 }
 
 /* Empty state */
@@ -959,79 +908,3 @@
 }
 
 
-/* ===== Table alignment fix: Talent/Candidates ===== */
-.candidates-table-container {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-.candidates-table {
-    width: 100%;
-    min-width: 1240px;
-    table-layout: fixed;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-/* Column widths total 100%; give Status and Actions enough room. */
-.candidates-table .candidate-name-col { width: 12%; }
-.candidates-table .candidate-category-col { width: 10%; }
-.candidates-table .candidate-roles-col { width: 25%; }
-.candidates-table .candidate-client-col { width: 9%; }
-.candidates-table .candidate-score-col { width: 11%; }
-.candidates-table .candidate-stage-col { width: 11%; }
-.candidates-table .candidate-status-col { width: 10%; }
-.candidates-table .candidate-actions-col { width: 12%; }
-
-.candidates-table th,
-.candidates-table td {
-    box-sizing: border-box;
-    vertical-align: middle;
-    overflow-wrap: normal;
-}
-
-.candidates-table th:nth-child(7),
-.candidates-table td:nth-child(7) {
-    white-space: nowrap;
-}
-
-.candidates-table td:nth-child(7) .badge,
-.candidates-table td:nth-child(7) [class*="badge"] {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-    min-width: 76px;
-    max-width: 100%;
-    padding: 0.55rem 0.75rem;
-    line-height: 1.2;
-    overflow-wrap: normal;
-    word-break: keep-all;
-}
-
-.candidates-table td:nth-child(8) {
-    white-space: nowrap;
-}
-
-.candidates-table .candidate-table-actions {
-    padding-left: 0.65rem !important;
-    padding-right: 0.65rem !important;
-    white-space: nowrap;
-}
-
-.candidates-table .btn-table-action {
-    width: 100%;
-    min-width: 112px;
-    white-space: nowrap;
-    word-break: keep-all;
-    line-height: 1.2;
-    padding: 0.65rem 0.75rem;
-}
-
-@media (max-width: 1200px) {
-    .candidates-table {
-        min-width: 1180px;
-    }
-}

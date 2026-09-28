@@ -4,6 +4,7 @@ import Layout from '../components/Layout.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiDelete, apiGet, apiPost, apiPostForm } from '../api.js';
 import { resolveAssessmentRow } from '../utils/assessmentDisplay.js';
+import JdHiringProcessEditor from '../components/JdHiringProcessEditor.jsx';
 import '../styles/jd_details_extra.css';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
@@ -1426,14 +1427,7 @@ const downloadPDF = (reportText) => {
   }
  
   if (!jd) return <Layout><div className="jd-loading"><SkeletonBlock variant="detail" count={3} /></div></Layout>;
- 
-  const assessmentPassedCount = Object.values(assessmentMap).filter(row => row?.status === 'PASSED').length;
-  const pipelineStages = [
-    { label: 'Screening Passed', value: jd.selected_count }, { label: 'Assessment Passed', value: jd.assessment_passed_count ?? assessmentPassedCount },
-    { label: 'Technical Interview', value: 0 }, { label: 'HR Round', value: 0 },
-    { label: 'Offer', value: 0 }, { label: 'Hired', value: 0 },
-  ];
- 
+
   return (
     <Layout>
       <div className="jd-details-container">
@@ -1574,18 +1568,8 @@ const downloadPDF = (reportText) => {
           </div>
         )}
  
-        <h2 className="jd-pipeline-title"><i className="fas fa-stream"></i> Candidate Pipeline</h2>
-        <div className="white-card jd-pipeline-card">
-          <div className="jd-pipeline-stages">
-            {pipelineStages.map(stage => (
-              <div key={stage.label} className="jd-pipeline-stage">
-                <div className="jd-pipeline-stage-label">{stage.label}</div>
-                <div className="jd-pipeline-stage-value">{stage.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
- 
+        <JdHiringProcessEditor jdId={jdId} hiringProcess={jd.hiring_process} />
+
         <h2 className="jd-section-heading"><i className="fas fa-check-circle"></i> Selected Candidates</h2>
         {selected.length > 0 ? (
           <div className="table-container jd-table-section">

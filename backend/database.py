@@ -927,6 +927,7 @@ def create_jd(data: dict) -> int:
         "categorized_date": data.get("categorized_date"),
         "category_reason": data.get("category_reason") or "",
         "sub_tags": _list(data.get("sub_tags")),
+        "hiring_process": data.get("hiring_process") if isinstance(data.get("hiring_process"), dict) else {"steps": [], "event_mappings": {}},
         "created_at": now,
         "updated_at": now,
         **client_fields,
@@ -969,6 +970,7 @@ def update_jd(jd_id: int, data: dict) -> bool:
         "categorized_date": "categorized_date",
         "category_reason": "category_reason",
         "sub_tags": "sub_tags",
+        "hiring_process": "hiring_process",
         "client_id": "client_id",
         "client_account_id": "client_account_id",
         "client_name": "client_name",
@@ -982,7 +984,7 @@ def update_jd(jd_id: int, data: dict) -> bool:
         value = data[key]
         if col in {"skills", "responsibilities", "secondary_categories", "matched_keywords", "sub_tags"}:
             value = _list(value)
-        elif col == "structured_data" and not isinstance(value, dict):
+        elif col in {"structured_data", "hiring_process"} and not isinstance(value, dict):
             value = {}
         elif col == "confidence_score":
             value = int(value or 0)
@@ -1396,23 +1398,37 @@ def get_jds_summary_list() -> list[dict]:
 # Purpose: Fetches all candidates from storage or service context.
 def get_all_candidates(filters: Optional[dict] = None) -> list[dict]:
     filters = filters or {}
-    query: dict[str, Any] = {}
+    and_clauses: list[dict[str, Any]] = []
     if filters.get("status"):
-        query["status"] = filters["status"]
+        and_clauses.append({"status": filters["status"]})
     if filters.get("jd_id") is not None:
-        query["jd_id"] = int(filters["jd_id"])
+        and_clauses.append({"jd_id": int(filters["jd_id"])})
     if filters.get("client_id") is not None:
-        query["client_id"] = int(filters["client_id"])
+        and_clauses.append({"client_id": int(filters["client_id"])})
     if filters.get("project_id") is not None:
-        query["project_id"] = int(filters["project_id"])
+        and_clauses.append({"project_id": int(filters["project_id"])})
     if filters.get("client_account_id"):
-        query["client_account_id"] = str(filters["client_account_id"]).strip().upper()
+        and_clauses.append({"client_account_id": str(filters["client_account_id"]).strip().upper()})
+    if filters.get("stage_id"):
+        and_clauses.append({"stage_id": str(filters["stage_id"]).strip()})
     if filters.get("search"):
-        query.update(_regex_filter(["name", "email", "client_name", "primary_category"], str(filters["search"])))
+        and_clauses.append(_regex_filter(["name", "email", "client_name", "primary_category"], str(filters["search"])))
     if filters.get("category"):
         category = str(filters["category"]).strip()
         if category:
-            query["$or"] = [{"primary_category": category}, {"secondary_categories": category}]
+            and_clauses.append({"$or": [{"primary_category": category}, {"secondary_categories": category}]})
+    uploaded_from = filters.get("uploaded_from")
+    uploaded_to = filters.get("uploaded_to")
+    if uploaded_from is not None or uploaded_to is not None:
+        bounds: dict[str, Any] = {}
+        if uploaded_from is not None:
+            bounds["$gte"] = uploaded_from
+        if uploaded_to is not None:
+            bounds["$lte"] = uploaded_to
+        and_clauses.append({"uploaded_at": bounds})
+    if filters.get("id_in") is not None:
+        and_clauses.append({"id": {"$in": [int(x) for x in filters["id_in"]]}})
+    query: dict[str, Any] = {"$and": and_clauses} if and_clauses else {}
     rows = list(_database().candidates.find(query).sort("uploaded_at", DESCENDING))
     out = _serialize_docs(rows)
     filter_jd_id = filters.get("jd_id")
@@ -1489,6 +1505,9 @@ def create_candidate(data: dict) -> int:
         "categorized_date": data.get("categorized_date"),
         "category_reason": data.get("category_reason") or "",
         "sub_tags": _list(data.get("sub_tags")),
+        "stage_id": data.get("stage_id"),
+        "on_hold": bool(data.get("on_hold")),
+        "automation_paused": bool(data.get("automation_paused")),
         **client_fields,
         **project_fields,
     }
@@ -1532,6 +1551,9 @@ def update_candidate(candidate_id: int, data: dict) -> bool:
         "categorized_date": "categorized_date",
         "category_reason": "category_reason",
         "sub_tags": "sub_tags",
+        "stage_id": "stage_id",
+        "on_hold": "on_hold",
+        "automation_paused": "automation_paused",
     }
     patch: dict[str, Any] = {}
     for key, col in mapping.items():
@@ -1546,6 +1568,8 @@ def update_candidate(candidate_id: int, data: dict) -> bool:
             value = {}
         elif col in {"match_score", "confidence_score", "jd_id", "client_id", "project_id", "source_vendor_id"}:
             value = _int_or_none(value) if col in {"jd_id", "client_id", "project_id", "source_vendor_id"} else int(value or 0)
+        elif col in {"on_hold", "automation_paused"}:
+            value = bool(value)
         patch[col] = value
     if not patch:
         return False
@@ -1793,6 +1817,14 @@ def get_interviews(filters: Optional[dict] = None) -> list[dict]:
         query["candidate_id"] = int(filters["candidate_id"])
     if filters.get("jd_id"):
         query["jd_id"] = int(filters["jd_id"])
+    if filters.get("exclude_cancelled"):
+        query["status"] = {"$nin": ["Cancelled", "cancelled", "canceled"]}
+    range_start = filters.get("range_start")
+    range_end = filters.get("range_end")
+    if range_start is not None:
+        query["interview_end"] = {"$gt": range_start}
+    if range_end is not None:
+        query["interview_start"] = {"$lt": range_end}
     rows = list(_database().interviews.find(query).sort("interview_start", ASCENDING))
     return [_normalize_interview_doc(row) for row in rows]
 

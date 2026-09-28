@@ -1,0 +1,93 @@
+/* ========== JD HIRING PROCESS EDITOR ========== */
+
+.jd-hiring-process-card {
+    margin-bottom: 1.5rem;
+}
+
+.hiring-process-steps {
+    display: grid;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.hiring-process-step-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.hiring-process-step-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(239, 122, 45, 0.16);
+    color: #ef7a2d;
+    font-weight: 700;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+}
+
+.hiring-process-step-row input[type="text"] {
+    flex: 1;
+}
+
+.hiring-process-step-name {
+    flex: 1;
+    font-weight: 600;
+}
+
+.hiring-process-step-actions {
+    display: inline-flex;
+    gap: 0.3rem;
+}
+
+.hiring-process-step-actions button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(15, 20, 40, 0.08);
+    cursor: pointer;
+}
+
+.hiring-process-step-actions button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.hiring-process-mappings-title {
+    margin: 1.25rem 0 0.75rem;
+    font-size: 0.95rem;
+}
+
+.hiring-process-mappings {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.hiring-process-mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.hiring-process-mapping-row label {
+    flex: 0 0 220px;
+    font-weight: 600;
+    text-transform: none;
+    margin: 0;
+}
+
+.hiring-process-mapping-row select {
+    flex: 1;
+    padding: 0.5rem;
+    border-radius: 6px;
+}
+
+.hiring-process-save {
+    margin-top: 1rem;
+    width: auto;
+}

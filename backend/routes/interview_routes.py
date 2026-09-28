@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 
 import database as db
 from services.auth_service import api_login_required, current_user
+from services.hiring_process_service import apply_hiring_event
 from services.interview_service import (
     assert_slot_available,
     day_window,
@@ -19,6 +20,21 @@ from services.interview_service import (
 )
 
 interview_bp = Blueprint("interview_routes", __name__)
+
+
+# Purpose: Applies a configured hiring-process stage mapping, surfacing (not swallowing) failures.
+def _apply_stage_event(candidate_id: int, jd_id, event_key: str) -> str | None:
+    try:
+        apply_hiring_event(candidate_id, jd_id, event_key)
+        return None
+    except Exception as exc:
+        db.log_audit(
+            "Hiring Stage Update Failed",
+            "",
+            f"Could not apply the '{event_key}' stage mapping for candidate id={candidate_id}: {exc}",
+            jd_id,
+        )
+        return str(exc)
 
 
 def _with_candidate_phone(interview: dict) -> dict:
@@ -193,6 +209,7 @@ def api_schedule_interview():
             }
         )
         db.update_candidate(candidate_id, {"hiring_stage": "Interview Scheduled"})
+        stage_error = _apply_stage_event(candidate_id, jd_id, "scheduled")
         db.log_audit(
             "Interview Scheduled",
             user.get("username") or "",
@@ -206,7 +223,10 @@ def api_schedule_interview():
     except Exception:
         return jsonify({"error": "Could not send email or schedule interview."}), 500
 
-    return jsonify({"success": True, "interview_id": interview_id})
+    response = {"success": True, "interview_id": interview_id}
+    if stage_error:
+        response["stage_update_error"] = stage_error
+    return jsonify(response)
 
 
 @interview_bp.route("/api/interviews/<int:interview_id>/reschedule", methods=["POST"], endpoint="api_reschedule_interview")
@@ -263,6 +283,7 @@ def api_reschedule_interview(interview_id: int):
             },
         )
         db.update_candidate(int(interview.get("candidate_id") or 0), {"hiring_stage": "Interview Rescheduled"})
+        stage_error = _apply_stage_event(int(interview.get("candidate_id") or 0), interview.get("jd_id"), "rescheduled")
         updated = _with_candidate_phone(db.get_interview_by_id(interview_id) or {})
         db.log_audit(
             "Interview Rescheduled",
@@ -274,7 +295,10 @@ def api_reschedule_interview(interview_id: int):
         return jsonify({"error": str(exc)}), 400
     except Exception:
         return jsonify({"error": "Could not reschedule interview."}), 500
-    return jsonify({"success": True, "interview": updated})
+    response = {"success": True, "interview": updated}
+    if stage_error:
+        response["stage_update_error"] = stage_error
+    return jsonify(response)
 
 
 @interview_bp.route("/api/interviews/<int:interview_id>/generate-followup", methods=["POST"], endpoint="api_generate_followup")
@@ -374,11 +398,14 @@ def _update_interview_outcome(interview_id: int, payload: dict | None = None):
         return jsonify({"error": f"Could not update interview outcome: {exc}"}), 500
 
     candidate_id = int(interview.get("candidate_id") or 0)
+    stage_error = None
     if candidate_id:
         try:
             db.update_candidate(candidate_id, {"hiring_stage": status})
         except Exception:
             pass
+        event_key = "selected_after_interview" if outcome == "selected" else "rejected_after_interview"
+        stage_error = _apply_stage_event(candidate_id, interview.get("jd_id"), event_key)
 
     try:
         db.log_audit(
@@ -391,7 +418,10 @@ def _update_interview_outcome(interview_id: int, payload: dict | None = None):
         pass
 
     updated = _with_candidate_phone(db.get_interview_by_id(interview_id) or {**interview, "status": status})
-    return jsonify({"success": True, "interview": updated})
+    response = {"success": True, "interview": updated}
+    if stage_error:
+        response["stage_update_error"] = stage_error
+    return jsonify(response)
 
 
 @interview_bp.route("/api/interviews/<int:interview_id>/generate-cancellation", methods=["POST"], endpoint="api_generate_cancellation")
@@ -440,6 +470,7 @@ def api_send_cancellation(interview_id: int):
             },
         )
         db.update_candidate(int(interview.get("candidate_id") or 0), {"hiring_stage": "Interview Cancelled"})
+        stage_error = _apply_stage_event(int(interview.get("candidate_id") or 0), interview.get("jd_id"), "cancelled")
         updated = db.get_interview_by_id(interview_id) or {}
         db.log_audit(
             "Interview Cancelled",
@@ -453,4 +484,7 @@ def api_send_cancellation(interview_id: int):
     except Exception:
         db.update_interview(interview_id, {"cancellation_status": "failed"})
         return jsonify({"error": "Could not send cancellation email."}), 500
-    return jsonify({"success": True, "interview": updated})
+    response = {"success": True, "interview": updated}
+    if stage_error:
+        response["stage_update_error"] = stage_error
+    return jsonify(response)

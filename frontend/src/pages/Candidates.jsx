@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { TALENT_CACHE_KEY, apiGet, readSessionCache, writeSessionCache, apiPost } from '../api.js';
+import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import '../styles/candidates.css';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -58,19 +59,153 @@ function dedupeCandidates(rows) {
   return order.map(key => groups.get(key));
 }
 
+const EMPTY_FILTERS = { clientId: '', projectId: '', status: '', stageId: '', uploadFrom: '', uploadTo: '', interviewFrom: '', interviewTo: '' };
+
 function Candidates() {
   const [candidates, setCandidates] = useState(() => dedupeCandidates(readSessionCache(TALENT_CACHE_KEY) || []));
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
-  const [expandedRoles, setExpandedRoles] = useState({});
+  // --- TEMPORARY: bulk select + delete. Remove this whole block (and its
+  // JSX usages) when no longer needed. ---
+  const confirm = useConfirm();
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = (rows) => {
+    setSelectedIds(prev => (prev.size === rows.length ? new Set() : new Set(rows.map(c => c.id))));
+  };
+  const deleteSelected = async () => {
+    if (!selectedIds.size) return;
+    const approved = await confirm({
+      title: 'Remove candidates',
+      message: `Remove ${selectedIds.size} selected candidate(s) from the repository? This cannot be undone.`,
+      confirmLabel: 'Remove Candidates',
+      icon: 'fas fa-user-times',
+      danger: true,
+    });
+    if (!approved) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const results = await Promise.all(ids.map(id => apiPost(`/api/candidates/${id}/delete`, { confirmed: true })));
+      const removedIds = new Set(ids.filter((id, i) => results[i].ok && results[i].data?.success));
+      const failedCount = ids.length - removedIds.size;
+      setCandidates(prev => {
+        const next = prev.filter(c => !removedIds.has(c.id));
+        writeSessionCache(TALENT_CACHE_KEY, next);
+        return next;
+      });
+      setServerFiltered(prev => (prev ? prev.filter(c => !removedIds.has(c.id)) : prev));
+      setSelectedIds(new Set());
+      toast(failedCount
+        ? { type: 'error', message: `${removedIds.size} removed, ${failedCount} could not be removed.` }
+        : { type: 'success', message: `${removedIds.size} candidate(s) removed.` });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+  // --- END TEMPORARY ---
 
-  const toggleRoles = (candidateId) => {
-    setExpandedRoles(prev => ({
-      ...prev,
-      [candidateId]: !prev[candidateId]
-  }))};
+  // --- FILTERS PANEL STATE ---
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
+  const [serverFiltered, setServerFiltered] = useState(null);
+  const [applying, setApplying] = useState(false);
+  const [dateError, setDateError] = useState('');
+  const [clients, setClients] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [stageGroups, setStageGroups] = useState([]);
+  const filterAnchorRef = useRef(null);
+
+  useEffect(() => {
+    apiGet('/api/clients').then(data => setClients(data.clients || [])).catch(() => {});
+    apiGet('/api/candidates/stage-options').then(data => setStageGroups(data.groups || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!panelOpen) return undefined;
+    const handleClickOutside = (event) => {
+      if (filterAnchorRef.current && !filterAnchorRef.current.contains(event.target)) {
+        setPanelOpen(false);
+      }
+    };
+    const handleEscape = (event) => { if (event.key === 'Escape') setPanelOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [panelOpen]);
+
+  const handleClientChange = async (clientId) => {
+    setDraftFilters(f => ({ ...f, clientId, projectId: '', stageId: '' }));
+    setProjects([]);
+    if (!clientId) {
+      apiGet('/api/candidates/stage-options').then(data => setStageGroups(data.groups || [])).catch(() => {});
+      return;
+    }
+    try {
+      const details = await apiGet(`/api/clients/${clientId}`);
+      setProjects(details.projects || []);
+    } catch { setProjects([]); }
+  };
+
+  const handleProjectChange = (projectId) => {
+    setDraftFilters(f => ({ ...f, projectId, stageId: '' }));
+    const query = projectId ? `?project_id=${projectId}` : '';
+    apiGet(`/api/candidates/stage-options${query}`).then(data => setStageGroups(data.groups || [])).catch(() => setStageGroups([]));
+  };
+
+  const applyFilters = async () => {
+    setDateError('');
+    if (draftFilters.uploadFrom && draftFilters.uploadTo && draftFilters.uploadFrom > draftFilters.uploadTo) {
+      setDateError('Upload date range is reversed.'); return;
+    }
+    if (draftFilters.interviewFrom && draftFilters.interviewTo && draftFilters.interviewFrom > draftFilters.interviewTo) {
+      setDateError('Interview date range is reversed.'); return;
+    }
+    setApplying(true);
+    try {
+      const params = new URLSearchParams();
+      if (draftFilters.clientId) params.set('client_id', draftFilters.clientId);
+      if (draftFilters.projectId) params.set('project_id', draftFilters.projectId);
+      if (draftFilters.status) params.set('status', draftFilters.status);
+      if (draftFilters.stageId) params.set('stage', draftFilters.stageId);
+      if (draftFilters.uploadFrom) params.set('upload_from', draftFilters.uploadFrom);
+      if (draftFilters.uploadTo) params.set('upload_to', draftFilters.uploadTo);
+      if (draftFilters.interviewFrom) params.set('interview_from', draftFilters.interviewFrom);
+      if (draftFilters.interviewTo) params.set('interview_to', draftFilters.interviewTo);
+      params.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+      const data = await apiGet(`/api/candidates?${params.toString()}`);
+      setServerFiltered(dedupeCandidates(Array.isArray(data) ? data : []));
+      setAppliedFilters({ ...draftFilters });
+      setPanelOpen(false);
+    } catch {
+      setDateError('Could not apply filters. Please try again.');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    setServerFiltered(null);
+    setProjects([]);
+    setDateError('');
+    setFilterCategory('');
+  };
+
+  const activeFilterCount = Object.values(appliedFilters).filter(Boolean).length + (filterCategory ? 1 : 0);
 
 
   // --- REPORT MODAL STATE ---
@@ -95,12 +230,12 @@ function Candidates() {
       .catch(() => {});
   }, []);
 
-  const filtered = candidates.filter(c => {
+  const baseRows = serverFiltered ?? candidates;
+  const filtered = baseRows.filter(c => {
     const haystack = `${c.name || ''} ${c.client_name || ''} ${c.primary_category || ''}`.toLowerCase();
     const matchSearch = haystack.includes(searchTerm.toLowerCase());
-    const matchStatus = !filterStatus || (c.status || '').toLowerCase() === filterStatus;
     const matchCategory = !filterCategory || c.primary_category === filterCategory;
-    return matchSearch && matchStatus && matchCategory;
+    return matchSearch && matchCategory;
   });
 
   // ============================================================
@@ -1207,195 +1342,132 @@ function Candidates() {
             <div className="candidates-filter-bar">
               <input type="text" placeholder="Search candidates by name or client..." value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)} />
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="">All Status</option>
-                <option value="selected">Selected</option>
-                <option value="rejected">Rejected</option>
-                <option value="in process">In Process</option>
-              </select>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                <option value="">All Role Categories</option>
-                {ROLE_CATEGORIES.map(category => (
-                  <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
-                ))}
-              </select>
+              <div className="candidates-filters-anchor" ref={filterAnchorRef}>
+                <button type="button" className="candidates-filters-toggle" onClick={() => setPanelOpen(o => !o)}>
+                  <i className="fas fa-sliders"></i> Filters
+                  {activeFilterCount > 0 && <span className="candidates-filters-badge">{activeFilterCount}</span>}
+                </button>
+                {panelOpen && (
+              <div className="candidates-filters-panel">
+                <div className="candidates-filters-grid">
+                  <label>Role Category
+                    <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                      <option value="">All Role Categories</option>
+                      {ROLE_CATEGORIES.map(category => (
+                        <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>Client
+                    <select value={draftFilters.clientId} onChange={(e) => handleClientChange(e.target.value)}>
+                      <option value="">All Clients</option>
+                      {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Requirement
+                    <select value={draftFilters.projectId} onChange={(e) => handleProjectChange(e.target.value)} disabled={!draftFilters.clientId}>
+                      <option value="">{draftFilters.clientId ? 'All Requirements' : 'Select a client first'}</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Status
+                    <select value={draftFilters.status} onChange={(e) => setDraftFilters(f => ({ ...f, status: e.target.value }))}>
+                      <option value="">All Status</option>
+                      <option value="selected">Selected</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="on hold">On Hold</option>
+                      <option value="in process">In Process</option>
+                    </select>
+                  </label>
+                  <label>Stage
+                    <select value={draftFilters.stageId} onChange={(e) => setDraftFilters(f => ({ ...f, stageId: e.target.value }))}>
+                      <option value="">All Stages</option>
+                      {stageGroups.map(group => (
+                        <optgroup key={group.project_id ?? 'none'} label={group.project_name || 'Unassigned'}>
+                          {group.steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="candidates-filters-dates">
+                  <fieldset>
+                    <legend>Upload Date</legend>
+                    <input type="date" value={draftFilters.uploadFrom} onChange={(e) => setDraftFilters(f => ({ ...f, uploadFrom: e.target.value }))} />
+                    <span>to</span>
+                    <input type="date" value={draftFilters.uploadTo} onChange={(e) => setDraftFilters(f => ({ ...f, uploadTo: e.target.value }))} />
+                  </fieldset>
+                  <fieldset>
+                    <legend>Interview Date</legend>
+                    <input type="date" value={draftFilters.interviewFrom} onChange={(e) => setDraftFilters(f => ({ ...f, interviewFrom: e.target.value }))} />
+                    <span>to</span>
+                    <input type="date" value={draftFilters.interviewTo} onChange={(e) => setDraftFilters(f => ({ ...f, interviewTo: e.target.value }))} />
+                  </fieldset>
+                </div>
+                {dateError && <div className="candidates-filters-error">{dateError}</div>}
+                <div className="candidates-filters-actions">
+                  <button type="button" className="btn btn-success jd-table-btn" disabled={applying} onClick={applyFilters}>
+                    {applying ? 'Applying...' : 'Apply'}
+                  </button>
+                  <button type="button" className="btn btn-secondary jd-table-btn" onClick={clearFilters}>Clear</button>
+                </div>
+              </div>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-4 candidates-cards-grid">
-  {filtered.map(c => (
-    <div key={c.id} className="candidate-card">
-      <div className="candidate-card-header">
-        <div className="candidate-name">{c.name}</div>
-        <span
-          className={`candidate-status status-${(c.status || '')
-            .toLowerCase()
-            .replace(' ', '-')}`}
-        >
-          {c.status}
-        </span>
-      </div>
+            <div className="candidates-result-count">
+              {filtered.length} candidate{filtered.length === 1 ? '' : 's'} found
+              {/* TEMPORARY: bulk delete bar — remove with the rest of this block */}
+              {selectedIds.size > 0 && (
+                <span className="candidates-bulk-bar">
+                  <span>{selectedIds.size} selected</span>
+                  <button type="button" className="btn btn-danger candidates-bulk-delete-btn" disabled={bulkDeleting} onClick={deleteSelected}>
+                    {bulkDeleting ? 'Removing...' : <><i className="fas fa-trash"></i> Delete Selected</>}
+                  </button>
+                </span>
+              )}
+            </div>
 
-      <div className="candidate-roles-section">
-        <div className="candidate-client-line">
-          <i className="fas fa-building"></i> {c.client_name || 'ShimentoX'}
-        </div>
+            {filtered.length === 0 ? (
+              <div className="candidates-empty-state">
+                <i className="fas fa-filter-circle-xmark empty-state-icon"></i>
+                <h2 className="empty-state-title">No Matching Candidates</h2>
+                <p className="empty-state-subtitle">Try adjusting or clearing your filters.</p>
+              </div>
+            ) : (<>
 
-        <div className="candidate-category-line">
-          <span className="candidate-category-pill">
-            {c.primary_category || 'Others'}
-          </span>
-        </div>
-
-        <div className="candidate-roles-label">
-          Applied Roles
-        </div>
-
-        <div
-          className={`candidate-roles-badges ${
-            expandedRoles[c.id] ? 'roles-expanded' : ''
-          }`}
-        >
-          {(c.applied_roles || [])
-            .slice(
-              0,
-              expandedRoles[c.id]
-                ? (c.applied_roles || []).length
-                : 3
-            )
-            .map(role => (
-              <span key={role} className="badge badge-primary">
-                {role}
-              </span>
-            ))}
-
-          {(c.applied_roles || []).length > 3 && (
-            <button
-              type="button"
-              className="candidate-more-roles"
-              onClick={() => toggleRoles(c.id)}
-              title={
-                expandedRoles[c.id]
-                  ? 'Show fewer roles'
-                  : `Show ${(c.applied_roles || []).length - 3} more applied role(s)`
-              }
-            >
-              {expandedRoles[c.id]
-                ? '−'
-                : `+${(c.applied_roles || []).length - 3}`}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="candidate-score-section">
-        <div className="candidate-score-row">
-          <span className="candidate-score-label">
-            Latest Match Score
-          </span>
-          <span className="candidate-score-value">
-            {c.match_score}%
-          </span>
-        </div>
-
-        <div className="progress">
-          <div
-            className="progress-bar"
-            style={{ width: `${c.match_score}%` }}
-          ></div>
-        </div>
-      </div>
-
-      <div className="candidate-stage-box">
-        <div className="candidate-stage-label">
-          <i className="fas fa-briefcase"></i> Current Hiring Stage
-        </div>
-
-        <div className="candidate-stage-value">
-          {c.hiring_stage || 'Not Started'}
-        </div>
-      </div>
-
-      <div className="candidate-quick-preview">
-        <div className="candidate-skills-heading">
-          Main Skills
-        </div>
-
-        {(((c.structured_data || {}).skills || c.skills || [])
-          .slice(0, 6))
-          .map(skill => (
-            <span
-              key={skill}
-              className="badge badge-primary"
-            >
-              {skill}
-            </span>
-          ))}
-
-        {(((c.structured_data || {}).skills || c.skills || [])
-          .length === 0) && (
-          <span className="badge badge-primary">
-            Skills pending
-          </span>
-        )}
-      </div>
-
-      <Link
-        to={`/talent/${c.id}`}
-        className="btn btn-primary candidate-view-btn"
-      >
-        <i className="fas fa-eye"></i> View Full Profile
-      </Link>
-    </div>
-  ))}
-</div>
-
-            <h2 className="candidates-section-title"><i className="fas fa-list"></i> Detailed List</h2>
-            <div className="table-container candidates-table-container">
-              <table className="candidates-table">
-                <colgroup>
-                  <col className="candidate-name-col" />
-                  <col className="candidate-category-col" />
-                  <col className="candidate-roles-col" />
-                  <col className="candidate-client-col" />
-                  <col className="candidate-score-col" />
-                  <col className="candidate-stage-col" />
-                  <col className="candidate-status-col" />
-                  <col className="candidate-actions-col" />
-                </colgroup>
+            <div className="candidates-list-container">
+              <table className="candidates-simple-table">
                 <thead>
-                  <tr><th>Name</th><th>Role Category</th><th>Applied Roles</th><th>Client</th><th>Match Score</th><th>Current Stage</th><th>Status</th><th>Actions</th></tr>
+                  <tr>
+                    <th className="candidates-select-col">
+                      <input type="checkbox" checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                        onChange={() => toggleSelectAll(filtered)} aria-label="Select all candidates" />
+                    </th>
+                    <th>Candidate Name</th><th>Client</th><th>All Details</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filtered.map(c => (
                     <tr key={c.id}>
-                      <td><strong>{c.name}</strong></td>
-                      <td>
-                        <div className="candidate-table-categories">
-                          <span className="candidate-category-pill">{c.primary_category || 'Others'}</span>
-                        </div>
+                      <td className="candidates-select-col">
+                        <input type="checkbox" checked={selectedIds.has(c.id)}
+                          onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.name}`} />
                       </td>
-                      <td>
-                        <div className="candidate-table-roles">
-                          {(c.applied_roles || []).map(r => <span key={r} className="badge badge-primary">{r}</span>)}
-                        </div>
+                      <td className="candidates-simple-name">{c.name}</td>
+                      <td className="candidates-simple-client">{c.client_name || 'ShimentoX'}</td>
+                      <td className="candidates-simple-actions">
+                        <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">
+                          <i className="fas fa-eye"></i> All Details
+                        </Link>
                       </td>
-                      <td>{c.client_name || 'ShimentoX'}</td>
-                      <td>
-                        <div className="table-score-cell">
-                          <span className="table-score-value">{c.match_score}%</span>
-                          <div className="progress table-progress-wrap">
-                            <div className="progress-bar" style={{ width: `${c.match_score}%` }}></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{c.hiring_stage || 'Not Started'}</td>
-                      <td><span className={`candidate-status status-${(c.status || '').toLowerCase().replace(' ', '-')}`}>{c.status}</span></td>
-                      <td className="candidate-table-actions"><Link to={`/talent/${c.id}`} className="btn btn-primary btn-table-action"><i className="fas fa-eye"></i><span>View profile</span></Link></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            </>)}
           </>
         ) : (
           <div className="candidates-empty-state">

@@ -91,6 +91,27 @@
     word-break: break-word;
 }
 
+.profile-stage-control {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.profile-stage-control select {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 6px;
+}
+
+.profile-hold-badge {
+    justify-self: start;
+}
+
+.profile-stage-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
 .profile-actions {
     display: flex;
     gap: 1rem;
