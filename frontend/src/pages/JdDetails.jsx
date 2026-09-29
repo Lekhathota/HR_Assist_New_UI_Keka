@@ -1,11 +1,13 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiDelete, apiGet, apiPost, apiPostForm } from '../api.js';
 import { resolveAssessmentRow } from '../utils/assessmentDisplay.js';
+import { formatJdDate, parseJdSections } from '../utils/jdSections.js';
 import JdHiringProcessEditor from '../components/JdHiringProcessEditor.jsx';
 import '../styles/jd_details_extra.css';
+import '../styles/jobs_module.css';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -57,8 +59,24 @@ function buildInterviewTextBody(candidate, jd, interviewDate, interviewTime) {
   ].join(' ');
 }
 
+// Paragraphs and bullet items of one JD section, exactly as written.
+function JdSectionBody({ paragraphs, items }) {
+  return (
+    <>
+      {paragraphs.map((text, i) => <p key={`p${i}`} className="jdd-paragraph">{text}</p>)}
+      {items.length > 0 && (
+        <ul className="jdd-bullets">
+          {items.map((text, i) => <li key={`i${i}`}>{text}</li>)}
+        </ul>
+      )}
+    </>
+  );
+}
+
 function JdDetails() {
-  const { jdId } = useParams();
+  const { jdId: routeJdId } = useParams();
+  const [searchParams] = useSearchParams();
+  const jdId = routeJdId || searchParams.get('id');
   const navigate = useNavigate();
   const confirm = useConfirm();
   const [jd, setJd]           = useState(null);
@@ -1427,64 +1445,107 @@ const downloadPDF = (reportText) => {
   }
  
   if (!jd) return <Layout><div className="jd-loading"><SkeletonBlock variant="detail" count={3} /></div></Layout>;
+ 
+  const jdGroups = parseJdSections(jd);
+  const postedDate = formatJdDate(jd.created_date);
+  const screenedCount = (jd.selected_count || 0) + (jd.rejected_count || 0);
+  const jobInfo = [
+    ['Client Allotted', jd.client_name || '—'],
+    ['No. of Posts', jd.required_candidate_count ?? '—'],
+    ['Job Category', jd.job_category || '—'],
+    ['Date Posted', postedDate || '—'],
+    ['Department', jd.department],
+    ['Location', jd.location],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
 
   return (
     <Layout>
       <div className="jd-details-container">
-        <div className="jd-details-topbar">
-          <h1><i className="fas fa-file-alt"></i> {jd.title}</h1>
-          <div className="jd-topbar-actions">
-            <button type="button" className="btn btn-primary" onClick={openAssignVendors}>
+        <div className="jdd-topbar">
+          <Link to="/jobs" className="jdd-back"><i className="fas fa-arrow-left"></i> Back to Jobs</Link>
+          <button type="button" className="btn btn-secondary jdd-topbar-btn" onClick={() => setShowModal(true)}>
+            <i className="fas fa-file-export"></i> Generate Report
+          </button>
+        </div>
+
+        <div className="jdd-page">
+          <header className="jdd-header">
+            <div className="jdd-title-row">
+              <h1 className="jdd-title">{jd.title}</h1>
+              <span className={`badge ${jd.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{jd.status}</span>
+            </div>
+            <div className="jdd-subtitle">
+              {[jd.job_category, jd.client_name, postedDate && `Posted ${postedDate}`].filter(Boolean).join(' · ')}
+            </div>
+          </header>
+
+          <section className="jdd-section">
+            <h2 className="jdd-section-title">Job Information</h2>
+            <dl className="jdd-info-list">
+              {jobInfo.map(([label, value]) => (
+                <div key={label} className="jdd-info-pair">
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          {jdGroups.map((group, gi) => (group.kind === 'intro' ? (
+            <section key={`g${gi}`} className="jdd-section">
+              <h2 className="jdd-section-title">{gi === 0 ? 'Job Description' : group.title}</h2>
+              {gi === 0 && group.title && <p className="jdd-doc-title">{group.title}</p>}
+              {group.fields.length > 0 && (
+                <dl className="jdd-stacked-fields">
+                  {group.fields.map((field, fi) => (
+                    <div key={`${field.label}-${fi}`} className="jdd-stacked-field">
+                      <dt>{field.label}</dt>
+                      <dd>{field.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {group.blocks.map((block, bi) => (
+                <div key={`b${bi}`} className="jdd-subsection">
+                  {block.heading && <h3 className="jdd-subheading">{block.heading}</h3>}
+                  <JdSectionBody paragraphs={block.paragraphs} items={block.items} />
+                </div>
+              ))}
+            </section>
+          ) : (
+            <section key={`g${gi}`} className="jdd-section">
+              <h2 className="jdd-section-title">{group.heading}</h2>
+              <JdSectionBody paragraphs={group.paragraphs} items={group.items} />
+            </section>
+          )))}
+
+          <section className="jdd-section">
+            <h2 className="jdd-section-title">Resume Statistics</h2>
+            <dl className="jdd-info-row jdd-stats-row">
+              {[['Total Resumes', jd.total_resumes, ''], ['Selected', jd.selected_count, 'jdd-green'], ['Rejected', jd.rejected_count, 'jdd-red']].map(([label, value, tone]) => (
+                <div key={label} className="jdd-info-item">
+                  <dt>{label}</dt>
+                  <dd className={tone}>{value ?? 0}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          {jd.total_resumes > 0 && (
+            <section className="jdd-section">
+              <h2 className="jdd-section-title">Screening Progress</h2>
+              <div className="progress jdd-progress">
+                <div className="progress-bar" style={{ width: `${Math.round((screenedCount / jd.total_resumes) * 100)}%` }}></div>
+              </div>
+              <div className="jdd-progress-label">{screenedCount} of {jd.total_resumes} completed</div>
+            </section>
+          )}
+
+          <section className="jdd-section jdd-actions">
+            <button type="button" className="btn btn-primary jd-table-btn" onClick={openAssignVendors}>
               <i className="fas fa-handshake"></i> Assign Vendors
             </button>
-            <Link to="/jobs" className="btn btn-secondary"><i className="fas fa-arrow-left"></i> Back to JDs</Link>
-          </div>
-        </div>
- 
-        <div className="grid grid-2 jd-details-cards-row">
-          <div className="white-card">
-            <h2 className="white-card-title"><i className="fas fa-briefcase"></i> Job Summary</h2>
-            {[['Client', jd.client_name || 'ShimentoX'], ['Job Category', jd.job_category || 'Others'], ['Department', jd.department], ['Experience Required', jd.experience], ['Location', jd.location]].map(([label, val]) => (
-              <div key={label} className="form-group">
-                <label className="jd-field-label">{label}</label>
-                <div className="jd-field-value">
-                  {label === 'Job Category'
-                    ? <span className="jd-category-pill">{val || 'Others'}</span>
-                    : (val || '—')}
-                </div>
-              </div>
-            ))}
-            <div className="jd-category-evidence">
-              <span>{jd.confidence_score || 0}% confidence</span>
-              <span>Matched: {(jd.matched_keywords || []).slice(0, 6).join(', ') || 'None'}</span>
-              <span>{jd.category_reason || 'Category calculated from uploaded JD information.'}</span>
-            </div>
-            <div className="form-group">
-              <label className="jd-field-label">Status</label>
-              <div className="jd-field-value">
-                <span className={`badge ${jd.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{jd.status}</span>
-              </div>
-            </div>
-          </div>
- 
-          <div className="white-card">
-            <h2 className="white-card-title"><i className="fas fa-chart-pie"></i> Screening Overview</h2>
-            {[['Total Resumes Compared', jd.total_resumes, 'total'], ['Selected', jd.selected_count, 'selected'], ['Rejected', jd.rejected_count, 'rejected']].map(([label, val, type]) => (
-              <div key={label} className={`screening-row screening-row-${type}`}>
-                <span className="screening-row-label">{label}</span>
-                <span className={`screening-val-${type === 'total' ? 'blue' : type === 'selected' ? 'green' : 'red'}`}>{val}</span>
-              </div>
-            ))}
-            {jd.total_resumes > 0 && (
-              <div className="screening-progress-wrap">
-                <div className="screening-progress-label-row">
-                  <span>Screening Progress</span>
-                  <span>{Math.round(((jd.selected_count + jd.rejected_count) / jd.total_resumes) * 100)}%</span>
-                </div>
-                <div className="progress"><div className="progress-bar" style={{ width: `${((jd.selected_count + jd.rejected_count) / jd.total_resumes) * 100}%` }}></div></div>
-              </div>
-            )}
-          </div>
+          </section>
         </div>
 
         <div className="white-card jd-fulfilment-card">
@@ -2042,36 +2103,6 @@ const downloadPDF = (reportText) => {
             {deleting
               ? <><i className="fas fa-spinner fa-spin"></i> Removing…</>
               : <><i className="fas fa-trash-alt"></i> Remove job description</>}
-          </button>
-        </div>
-
-        {/* Generate Job Report Button at Bottom */}
-        <div style={{ 
-          marginTop: '30px', 
-          display: 'flex', 
-          justifyContent: 'center',
-          padding: '20px 0',
-          borderTop: '1px solid #e2e8f0'
-        }}>
-          <button 
-            className="btn btn-primary reports-generate-btn"
-            onClick={() => setShowModal(true)}
-            style={{ 
-              padding: '16px 48px', 
-              fontSize: '18px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
-              color: 'white',
-              border: 'none',
-              boxShadow: '0 4px 16px rgba(79, 70, 229, 0.35)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              fontWeight: '600'
-            }}
-          >
-            <i className="fas fa-plus-circle"></i> Generate Job Report
           </button>
         </div>
 

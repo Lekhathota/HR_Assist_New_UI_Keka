@@ -55,6 +55,7 @@ function App() {
 
         <Route path="/jobs" element={<ProtectedRoute><JdList /></ProtectedRoute>} />
         <Route path="/jobs/create" element={<ProtectedRoute><JdCreate /></ProtectedRoute>} />
+        <Route path="/job-details.html" element={<ProtectedRoute><JdDetails /></ProtectedRoute>} />
         <Route path="/jobs/:jdId" element={<ProtectedRoute><JdDetails /></ProtectedRoute>} />
         <Route path="/jobs/:jdId/assessment/:assessmentId" element={<ProtectedRoute><AssessmentBuilder /></ProtectedRoute>} />
         <Route path="/hiring-pipeline/assessment/:assessmentId" element={<ProtectedRoute><AssessmentBuilder /></ProtectedRoute>} />

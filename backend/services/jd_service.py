@@ -182,7 +182,7 @@ def jd_details_payload(jd_id: int) -> dict[str, Any] | None:
     if not row:
         return None
     row = _apply_jd_category(row)
-    row.pop("raw_text", None)
+    # raw_text is kept: the Job Details page shows it as the Job Description.
     row["experience"] = row.get("experience") or row.get("experience_required") or ""
     row["file"] = row.get("file") or row.get("file_name") or ""
     created = row.get("created") or row.get("created_at") or ""

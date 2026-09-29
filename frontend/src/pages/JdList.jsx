@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { JD_CACHE_KEY, apiGet, readSessionCache, writeSessionCache, apiPost } from '../api.js';
+import { formatJdDate } from '../utils/jdSections.js';
 import '../styles/jd_list.css';
 import '../styles/jd_list_extra.css';
+import '../styles/jobs_module.css';
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
@@ -41,8 +43,13 @@ function JdList() {
   const [loading, setLoading] = useState(() => !readSessionCache(JD_CACHE_KEY));
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('active');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterClient, setFilterClient] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [page, setPage] = useState(1);
 
   // --- REPORT MODAL STATE ---
   const [showModal, setShowModal] = useState(false);
@@ -84,6 +91,15 @@ function JdList() {
     };
   }, [loadJds]);
 
+  // Filter options come only from values present in the loaded JDs.
+  const distinctValues = useCallback(
+    key => [...new Set(jds.map(jd => jd[key]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))),
+    [jds],
+  );
+  const clientOptions = useMemo(() => distinctValues('client_name'), [distinctValues]);
+  const departmentOptions = useMemo(() => distinctValues('department'), [distinctValues]);
+  const locationOptions = useMemo(() => distinctValues('location'), [distinctValues]);
+
   const filteredJds = jds.filter(jd => {
     const haystack = [
       jd.title,
@@ -95,8 +111,32 @@ function JdList() {
     const matchSearch = haystack.includes(searchTerm.toLowerCase());
     const matchStatus = !filterStatus || (jd.status || '').toLowerCase() === filterStatus;
     const matchCategory = !filterCategory || jd.job_category === filterCategory;
-    return matchSearch && matchStatus && matchCategory;
+    const matchClient = !filterClient || jd.client_name === filterClient;
+    const matchDepartment = !filterDepartment || jd.department === filterDepartment;
+    const matchLocation = !filterLocation || jd.location === filterLocation;
+    return matchSearch && matchStatus && matchCategory && matchClient && matchDepartment && matchLocation;
   });
+
+  const PAGE_SIZE = 10;
+  const pageCount = Math.max(1, Math.ceil(filteredJds.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageJds = filteredJds.slice(pageStart, pageStart + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterStatus, filterCategory, filterClient, filterDepartment, filterLocation]);
+
+  const STATUS_HEADINGS = { '': 'All Jobs', active: 'Active Jobs', closed: 'Closed Jobs', inactive: 'Inactive Jobs' };
+  const moreFiltersActive = Boolean(filterDepartment || filterLocation);
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('active');
+    setFilterCategory('');
+    setFilterClient('');
+    setFilterDepartment('');
+    setFilterLocation('');
+  };
 
   // ============================================================
   // JOBS REPORT FUNCTIONS
@@ -891,16 +931,22 @@ function JdList() {
   // ============================================================
   return (
     <Layout>
-      <div className="jd-list-container">
-        <div className="jd-list-topbar">
-          <h1><i className="fas fa-file-alt"></i> Job Descriptions</h1>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <Link to="/jobs/create" className="btn btn-primary"><i className="fas fa-plus"></i> Create JD</Link>
+      <div className="jobs-page">
+        <header className="jobs-head">
+          <div className="jobs-head-text">
+            <h1 className="jobs-head-title">Job Descriptions</h1>
+            <p className="jobs-head-subtitle">Manage and view all job descriptions.</p>
           </div>
-        </div>
+          <div className="jobs-head-actions">
+            <button type="button" className="btn btn-secondary jobs-btn" onClick={() => setShowModal(true)}>
+              <i className="fas fa-file-export"></i> Generate Report
+            </button>
+            <Link to="/jobs/create" className="btn btn-primary jobs-btn"><i className="fas fa-plus"></i> Create JD</Link>
+          </div>
+        </header>
 
         {loading ? (
-          <SkeletonBlock variant="cards" count={4} />
+          <SkeletonBlock variant="detail" count={4} />
         ) : error ? (
           <div className="jd-empty-state">
             <i className="fas fa-exclamation-circle jd-empty-icon"></i>
@@ -908,116 +954,135 @@ function JdList() {
             <p className="jd-empty-text">{error}</p>
           </div>
         ) : jds.length > 0 ? (
-          <>
-            <div className="jd-filter-bar">
-              <input
-                type="text"
-                placeholder="Search JDs by title, client, department, category, or skill..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <section className="jobs-panel">
+            <div className="jobs-toolbar">
+              <label className="jobs-search">
+                <i className="fas fa-search" aria-hidden="true"></i>
+                <input
+                  type="search"
+                  placeholder="Search jobs..."
+                  aria-label="Search jobs by title, client, department, category, or skill"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </label>
+              <select className="jobs-select" aria-label="Job category" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                <option value="">All Categories</option>
+                {ROLE_CATEGORIES.map(category => (
+                  <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
+                ))}
+              </select>
+              <select className="jobs-select" aria-label="Client" value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
+                <option value="">All Clients</option>
+                {clientOptions.map(client => <option key={client} value={client}>{client}</option>)}
+              </select>
+              <select className="jobs-select" aria-label="Status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                 <option value="">All Status</option>
                 <option value="active">Active</option>
                 <option value="closed">Closed</option>
                 <option value="inactive">Inactive</option>
               </select>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                <option value="">All Job Categories</option>
-                {ROLE_CATEGORIES.map(category => (
-                  <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
-                ))}
-              </select>
+              <button
+                type="button"
+                className={`jobs-more-btn${showMoreFilters || moreFiltersActive ? ' is-active' : ''}`}
+                aria-expanded={showMoreFilters}
+                onClick={() => setShowMoreFilters(v => !v)}
+              >
+                <i className="fas fa-sliders-h" aria-hidden="true"></i> More Filters
+              </button>
+            </div>
+
+            {showMoreFilters && (
+              <div className="jobs-toolbar jobs-toolbar-more">
+                <select className="jobs-select" aria-label="Department" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
+                  <option value="">All Departments</option>
+                  {departmentOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <select className="jobs-select" aria-label="Location" value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
+                  <option value="">All Locations</option>
+                  {locationOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <button type="button" className="jobs-clear-btn" onClick={clearFilters}>Clear filters</button>
+              </div>
+            )}
+
+            <div className="jobs-section-head">
+              <h2 className="jobs-section-title">{STATUS_HEADINGS[filterStatus] || 'Jobs'}</h2>
+              <span className="jobs-count">{filteredJds.length}</span>
             </div>
 
             {filteredJds.length === 0 ? (
-              <div className="jd-empty-state jd-filter-empty-state">
-                <i className="fas fa-search jd-empty-icon"></i>
-                <h2 className="jd-empty-title">No Job Descriptions Match</h2>
-                <p className="jd-empty-text">Adjust the search or filters to see more JDs.</p>
+              <div className="jobs-empty">
+                <p>No job descriptions match these filters.</p>
+                <button type="button" className="jobs-clear-btn" onClick={clearFilters}>Clear filters</button>
               </div>
             ) : (
               <>
-            <div className="grid grid-4 jd-cards-grid">
-              {filteredJds.map(jd => (
-                <div key={jd.id} className="jd-card">
-                  <h3 className="jd-card-title">{jd.title}</h3>
-                  <div className="jd-card-meta-row">
-                    <div className="jd-card-meta-info">
-                      <span className="jd-category-pill"><i className="fas fa-layer-group"></i> {jd.job_category || 'Others'}</span>
-                      <span><i className="fas fa-building"></i> {jd.department}</span>
-                      <span><i className="fas fa-handshake"></i> {jd.client_name || 'ShimentoX'}</span>
-                      <span><i className="fas fa-calendar-alt"></i> {jd.created_date || (jd.created || '').slice(0, 10)}</span>
-                    </div>
-                    <span className={`badge ${jd.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{jd.status}</span>
-                  </div>
-
-                  <div className="jd-card-stats">
-                    <div className="jd-card-stats-row">
-                      {[['Total Resumes', jd.total_resumes, 'blue'], ['Selected', jd.selected_count, 'green'], ['Rejected', jd.rejected_count, 'red']].map(([label, val, color]) => (
-                        <div key={label}>
-                          <div className="jd-stat-label">{label}</div>
-                          <div className={`jd-stat-value-${color}`}>{val}</div>
-                        </div>
-                      ))}
-                    </div>
-                    {jd.total_resumes > 0 && (
-                      <div className="jd-card-progress-wrap">
-                        <div className="jd-card-progress-label">Screening Progress</div>
-                        <div className="progress">
-                          <div className="progress-bar" style={{ width: `${Math.round(((jd.selected_count + jd.rejected_count) / jd.total_resumes) * 100)}%` }}></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="jd-card-actions-row jd-card-actions-bottom">
-                    <Link to={`/jobs/${jd.id}`} className="btn btn-primary jd-card-btn">
-                      <i className="fas fa-eye"></i> Details
-                    </Link>
-                    <Link to="/analyze" className="btn btn-secondary jd-card-btn">
-                      <i className="fas fa-exchange-alt"></i> Compare
-                    </Link>
-                  </div>
+                <div className="jobs-table-wrap">
+                  <table className="jobs-table">
+                    <thead>
+                      <tr>
+                        <th>Job Title</th><th>Category</th><th>Client</th><th className="jobs-num">Posts</th>
+                        <th>Date Posted</th><th>Status</th><th className="jobs-action-col">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageJds.map(jd => {
+                        const secondary = [jd.location, jd.experience].filter(Boolean).join(' · ');
+                        return (
+                          <tr key={jd.id}>
+                            <td className="jobs-title-cell">
+                              <Link to={`/jobs/${jd.id}`} className="jobs-title-link">{jd.title}</Link>
+                              {secondary && <span className="jobs-title-meta">{secondary}</span>}
+                            </td>
+                            <td><span className="jobs-pill">{jd.job_category || 'Others'}</span></td>
+                            <td>{jd.client_name || '—'}</td>
+                            <td className="jobs-num">{jd.required_candidate_count ?? '—'}</td>
+                            <td className="jobs-nowrap">{formatJdDate(jd.created_date || (jd.created || '').slice(0, 10)) || '—'}</td>
+                            <td>
+                              <span className={`jobs-status jobs-status-${String(jd.status || '').toLowerCase()}`}>{jd.status}</span>
+                            </td>
+                            <td className="jobs-action-col">
+                              <Link to={`/jobs/${jd.id}`} className="jobs-view-link" aria-label={`View details for ${jd.title}`}>
+                                View<span className="jobs-view-extra"> Details</span>
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
 
-            <h2 className="jd-section-title"><i className="fas fa-list"></i> Detailed View</h2>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Job Title</th><th>Job Category</th><th>Client</th><th>Department</th><th>Created</th>
-                    <th>Total Resumes</th><th>Selected</th><th>Rejected</th>
-                    <th>Status</th><th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredJds.map(jd => (
-                    <tr key={jd.id}>
-                      <td><strong>{jd.title}</strong></td>
-                      <td><span className="jd-category-pill table-pill">{jd.job_category || 'Others'}</span></td>
-                      <td>{jd.client_name || 'ShimentoX'}</td>
-                      <td>{jd.department}</td>
-                      <td>{jd.created_date || (jd.created || '').slice(0, 10)}</td>
-                      <td>{jd.total_resumes}</td>
-                      <td><span className="badge badge-success">{jd.selected_count}</span></td>
-                      <td><span className="badge badge-danger">{jd.rejected_count}</span></td>
-                      <td><span className={`badge ${jd.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{jd.status}</span></td>
-                      <td>
-                        <div className="jd-table-actions">
-                          <Link to={`/jobs/${jd.id}`} className="btn btn-primary jd-table-btn">View</Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                <footer className="jobs-footer">
+                  <span>
+                    Showing {pageStart + 1} to {pageStart + pageJds.length} of {filteredJds.length} results
+                  </span>
+                  {pageCount > 1 && (
+                    <nav className="jobs-pager" aria-label="Pagination">
+                      <button type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+                        <i className="fas fa-chevron-left"></i>
+                      </button>
+                      {Array.from({ length: pageCount }, (_, i) => i + 1).map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={n === currentPage ? 'is-current' : ''}
+                          aria-current={n === currentPage ? 'page' : undefined}
+                          onClick={() => setPage(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                      <button type="button" aria-label="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>
+                        <i className="fas fa-chevron-right"></i>
+                      </button>
+                    </nav>
+                  )}
+                </footer>
               </>
             )}
-          </>
+          </section>
         ) : (
           <div className="jd-empty-state">
             <i className="fas fa-inbox jd-empty-icon"></i>
@@ -1026,36 +1091,6 @@ function JdList() {
             <Link to="/jobs/create" className="btn btn-primary"><i className="fas fa-plus"></i> Create Your First JD</Link>
           </div>
         )}
-
-        {/* BUTTON AT THE BOTTOM */}
-        <div style={{ 
-          marginTop: '40px', 
-          display: 'flex', 
-          justifyContent: 'center',
-          padding: '20px 0',
-          borderTop: '1px solid #e2e8f0'
-        }}>
-          <button 
-            className="btn btn-primary reports-generate-btn"
-            onClick={() => setShowModal(true)}
-            style={{ 
-              padding: '16px 48px', 
-              fontSize: '18px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
-              color: 'white',
-              border: 'none',
-              boxShadow: '0 4px 16px rgba(79, 70, 229, 0.35)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              fontWeight: '600'
-            }}
-          >
-            <i className="fas fa-plus-circle"></i> Generate Jobs Report
-          </button>
-        </div>
 
         <ReportModal />
 

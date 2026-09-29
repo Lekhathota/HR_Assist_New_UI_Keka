@@ -40,7 +40,8 @@ function Navbar() {
   };
 
   const isActive = (path) =>
-    location.pathname === path || location.pathname.startsWith(path + '/');
+    location.pathname === path || location.pathname.startsWith(path + '/')
+    || (path === '/jobs' && location.pathname === '/job-details.html');
 
   const visibleNavigation = navigation.filter(([path]) => roleCanAccess(role, path));
 

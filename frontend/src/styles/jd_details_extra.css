@@ -732,3 +732,502 @@
         flex: 1 1 100%;
     }
 }
+
+/* ========== JOB DETAILS (/jobs/:id) ==========
+   Fills the main area beside the fixed sidebar; rem-based so browser zoom
+   only changes how much fits. Only JD text lines are capped, for readability. Scoped under .app-shell to outrank the theme's global h1/h2,
+   p and button rules. */
+.app-shell .jd-details-container {
+    box-sizing: border-box;
+    width: 100%;
+    padding-bottom: 4.5rem; /* keeps content clear of the floating chat button */
+}
+
+.app-shell .jdd-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.app-shell .jdd-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary, #696b72);
+    text-decoration: none;
+}
+
+.app-shell .jdd-back:hover,
+.app-shell .jdd-back:focus-visible { color: var(--accent-dark, #a64716); }
+
+.app-shell .jd-details-container .btn.jdd-topbar-btn {
+    min-height: 2.25rem;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8125rem;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    white-space: nowrap;
+}
+
+.app-shell .jdd-page {
+    box-sizing: border-box;
+    background: var(--ui-surface, #fff);
+    border: 1px solid var(--border-color, #e7e3dc);
+    border-radius: 0.75rem;
+    padding: 1.1rem 1.5rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.app-shell .jdd-header {
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+}
+
+.app-shell .jdd-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.app-shell .jd-details-container h1.jdd-title {
+    margin: 0;
+    font-size: 1.375rem;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+    color: var(--text-primary, #141416);
+    overflow-wrap: anywhere;
+}
+
+.app-shell .jdd-title-row .badge {
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+}
+
+.app-shell .jd-details-container .jdd-subtitle {
+    margin-top: 0.3rem;
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jdd-section {
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+}
+
+.app-shell .jdd-section:last-child { border-bottom: none; padding-bottom: 0; }
+
+.app-shell .jd-details-container h2.jdd-section-title {
+    margin: 0 0 0.55rem;
+    padding: 0;
+    border: none;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #696b72);
+}
+
+/* Job Information: aligned label / value rows */
+.app-shell .jdd-info-list {
+    display: grid;
+    grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+    gap: 0.4rem 1.5rem;
+    margin: 0;
+    max-width: 45rem;
+}
+
+.app-shell .jdd-info-pair { display: contents; }
+
+.app-shell .jdd-info-pair dt {
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jdd-info-pair dd {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary, #141416);
+    overflow-wrap: anywhere;
+}
+
+/* Resume statistics: one horizontal row */
+.app-shell .jdd-info-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 10rem));
+    gap: 0.25rem 1.5rem;
+    margin: 0;
+}
+
+.app-shell .jdd-info-item dt {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jdd-info-item dd {
+    margin: 0.1rem 0 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jdd-green { color: var(--success-color, #1f8f65) !important; }
+.app-shell .jdd-red { color: var(--danger-color, #c6382d) !important; }
+
+/* Job Description header fields: label above value */
+.app-shell .jdd-stacked-fields {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0 0 0.25rem;
+}
+
+.app-shell .jdd-stacked-field dt {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jdd-stacked-field dd {
+    margin: 0.1rem 0 0;
+    font-size: 0.875rem;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jd-details-container p.jdd-doc-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jdd-subsection { margin-top: 0.75rem; }
+
+.app-shell .jd-details-container h3.jdd-subheading {
+    margin: 0 0 0.25rem;
+    padding: 0;
+    border: none;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jd-details-container p.jdd-paragraph {
+    margin: 0 0 0.4rem;
+    max-width: 75rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jdd-bullets {
+    margin: 0.15rem 0 0;
+    padding-left: 1.2rem;
+    max-width: 75rem;
+}
+
+.app-shell .jdd-bullets li {
+    margin-bottom: 0.3rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jdd-bullets li::marker { color: var(--accent-color, #ef7a2d); }
+
+.app-shell .progress.jdd-progress {
+    height: 0.375rem;
+    margin: 0.2rem 0 0.3rem;
+    max-width: 30rem;
+}
+
+.app-shell .jdd-progress-label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jdd-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.app-shell .jdd-actions .btn.jd-table-btn {
+    min-width: 0;
+    min-height: 2.125rem;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8125rem;
+}
+
+/* Narrow content areas (high zoom / small screens): same order, tighter. */
+@media (max-width: 40rem) {
+    .app-shell .jdd-page { padding: 1rem; }
+    .app-shell .jdd-info-list { grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); gap: 0.4rem 1rem; }
+    .app-shell .jdd-info-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Stage boxes (Fulfilment Summary, Candidate Pipeline): wrap instead of
+   pushing past the content edge when the column is narrow (high zoom). */
+.app-shell .jd-details-container .jd-pipeline-stages {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 0.75rem;
+}
+
+.app-shell .jd-details-container .jd-pipeline-stage {
+    min-width: 0;
+}
+
+.app-shell .jd-details-container .jd-pipeline-stage-label {
+    overflow-wrap: anywhere;
+}
+
+/* ========== JD PROFILE: INTEGRATED INTO THE PAGE (NO CARDS) ==========
+   Every block on the details page sits directly on the page background,
+   separated only by thin dividers. Scoped to .jd-details-container, so
+   cards elsewhere in the app are unaffected. */
+.app-shell .jd-details-container .jdd-page {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+.app-shell .jd-details-container .jdd-page > .jdd-section:last-child {
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+    padding-bottom: 0.875rem;
+}
+
+.app-shell .jd-details-container :is(.white-card, .table-container, .jd-empty-card) {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+}
+
+.app-shell .jd-details-container > .white-card {
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+}
+
+/* Section headings match the JD profile headings above them. */
+.app-shell .jd-details-container :is(h2.white-card-title, h2.jd-section-heading, h2.jd-pipeline-title) {
+    margin: 0 0 0.55rem;
+    padding: 0;
+    border: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jd-details-container :is(h2.white-card-title, h2.jd-section-heading, h2.jd-pipeline-title) i {
+    display: none;
+}
+
+.app-shell .jd-details-container > :is(h2.jd-section-heading, h2.jd-pipeline-title) {
+    padding-top: 0.875rem;
+}
+
+.app-shell .jd-details-container > .jd-pipeline-title + .white-card {
+    padding-top: 0;
+}
+
+.app-shell .jd-details-container > :is(.table-container, .jd-empty-card) {
+    padding: 0 0 0.875rem;
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+}
+
+/* Fulfilment header row: heading left, Recalculate right. */
+.app-shell .jd-details-container .white-card .jd-details-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0 0 0.55rem;
+}
+
+.app-shell .jd-details-container .white-card .jd-details-topbar h2.white-card-title {
+    margin: 0;
+}
+
+.app-shell .jd-details-container .white-card .btn.jd-table-btn {
+    min-width: 0;
+    min-height: 2rem;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.8125rem;
+}
+
+/* Stage figures: plain label / value, like Resume Statistics. */
+.app-shell .jd-details-container .jd-pipeline-stages {
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.5rem 1.5rem;
+}
+
+.app-shell .jd-details-container .jd-pipeline-stage {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    text-align: left;
+}
+
+.app-shell .jd-details-container .jd-pipeline-stage-label {
+    margin-bottom: 0.1rem;
+    font-size: 0.75rem;
+    text-transform: none;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jd-details-container .jd-pipeline-stage-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary, #141416);
+}
+
+/* Timeline entries: a thin accent rule instead of tinted boxes. */
+.app-shell .jd-details-container .jd-fulfilment-event {
+    padding: 0.2rem 0 0.2rem 0.75rem;
+    border-left: 2px solid var(--accent-color, #ef7a2d);
+    border-radius: 0;
+    background: transparent;
+}
+
+/* Empty states: one quiet line, no boxed illustration. */
+.app-shell .jd-details-container .jd-empty-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    text-align: left;
+}
+
+.app-shell .jd-details-container .jd-empty-card .jd-empty-icon {
+    display: none;
+}
+
+.app-shell .jd-details-container .jd-empty-card p.jd-empty-text {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #696b72);
+}
+
+.app-shell .jd-details-container .jd-empty-card .btn {
+    min-height: 2rem;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.8125rem;
+}
+
+/* Remove JD: part of the page flow, not a centred footer block. */
+.app-shell .jd-details-container .jd-details-actions-footer {
+    justify-content: flex-start;
+    margin: 0;
+    padding: 0.875rem 0 0;
+}
+
+.app-shell .jd-details-container .jd-details-actions-footer .btn {
+    min-height: 2.125rem;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8125rem;
+}
+
+/* Workflow facts under Fulfilment Summary: plain muted text, no chips. */
+.app-shell .jd-details-container .jd-category-evidence {
+    gap: 0.25rem 1.25rem;
+    margin: 0.6rem 0 0;
+}
+
+.app-shell .jd-details-container .jd-category-evidence span {
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary, #696b72);
+}
+
+/* Timeline text on the same scale as the rest of the page. */
+.app-shell .jd-details-container .jd-fulfilment-timeline {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.app-shell .jd-details-container .jd-fulfilment-event span {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jd-details-container .jd-fulfilment-event p {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--text-primary, #141416);
+}
+
+.app-shell .jd-details-container .jd-fulfilment-event small {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #696b72);
+}
+
+/* Tables on this page size to their own columns. Overrides the global
+   ".table-container > table" rules (1320px min-width, fixed column
+   percentages) that were written for the old ten-column JD list. */
+.app-shell .jd-details-container .table-container > table {
+    width: 100%;
+    min-width: 0;
+    table-layout: auto;
+    background: transparent;
+}
+
+.app-shell .jd-details-container .table-container > table :is(th, td) {
+    width: auto;
+    text-align: left;
+    white-space: normal;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+    vertical-align: middle;
+}
+
+.app-shell .jd-details-container .table-container > table td {
+    background: transparent;
+}
+
+.app-shell .jd-details-container .table-container > table th {
+    font-size: 0.6875rem;
+    white-space: nowrap;
+}
+
+.app-shell .jd-details-container .table-container > table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.app-shell .jd-details-container :is(.jd-candidate-actions, .jd-vendor-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.app-shell .jd-details-container :is(.jd-candidate-actions, .jd-vendor-actions) .btn.jd-table-btn {
+    min-width: 0;
+    min-height: 1.875rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* body.theme-shimento prefix outranks the theme's white table row/cell rule. */
+body.theme-shimento .app-shell .jd-details-container .table-container > table tbody tr,
+body.theme-shimento .app-shell .jd-details-container .table-container > table tbody td {
+    background: transparent;
+    box-shadow: none;
+}

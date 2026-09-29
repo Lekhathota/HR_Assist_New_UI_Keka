@@ -8,6 +8,7 @@ export const ROLES = ['admin', 'finance', 'recruiter', 'hr', 'managers_consultan
 
 const RESTRICTED_ROUTES = [
   { prefix: '/jobs', roles: ['recruiter'] },
+  { prefix: '/job-details.html', roles: ['recruiter'] },
   { prefix: '/analyze', roles: ['recruiter'] },
   { prefix: '/talent', roles: ['recruiter'] },
   { prefix: '/clients', roles: ['managers_consultant'] },
