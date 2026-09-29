@@ -938,10 +938,18 @@ function HiringPipeline() {
                           {past && !cancelled && !lockedOutcome ? (
                             <>
                               <button type="button" className="btn btn-success" onClick={() => setInterviewOutcome(item, 'selected')} disabled={outcomeBusyId === item.id}>
-                                <i className="fas fa-check"></i> Selected
+                                {outcomeBusyId === item.id ? (
+                                  <><i className="fas fa-spinner fa-spin"></i> Updating...</>
+                                ) : (
+                                  <><i className="fas fa-check"></i> Selected</>
+                                )}
                               </button>
                               <button type="button" className="btn btn-danger" onClick={() => setInterviewOutcome(item, 'rejected')} disabled={outcomeBusyId === item.id}>
-                                <i className="fas fa-xmark"></i> Rejected
+                                {outcomeBusyId === item.id ? (
+                                  <><i className="fas fa-spinner fa-spin"></i> Updating...</>
+                                ) : (
+                                  <><i className="fas fa-xmark"></i> Rejected</>
+                                )}
                               </button>
                             </>
                           ) : (

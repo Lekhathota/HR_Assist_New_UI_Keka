@@ -11,6 +11,7 @@ function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === 'undefined') return false;
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -35,6 +36,7 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
     try {
       const { ok, data } = await apiPost('/api/login', { username, password });
       if (ok && data.success) {
@@ -44,12 +46,14 @@ function Login() {
           localStorage.setItem(LOGIN_USER_KEY, JSON.stringify({ username: savedUsername, role, email }));
         }
         navigate('/welcome');
+        return;
       } else {
         setError(data.message || 'Invalid credentials');
       }
     } catch {
       setError('Login failed. Please try again.');
     }
+    setSubmitting(false);
   };
 
   return (
@@ -104,8 +108,12 @@ function Login() {
                   placeholder="Enter password"
                 />
               </div>
-              <button type="submit">
-                <i className="fas fa-sign-in-alt"></i> Login
+              <button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <><i className="fas fa-spinner fa-spin"></i> Signing in...</>
+                ) : (
+                  <><i className="fas fa-sign-in-alt"></i> Login</>
+                )}
               </button>
             </form>
 

@@ -51,6 +51,7 @@ function Dashboard() {
   const [teamData, setTeamData]                   = useState(Array.isArray(cachedTeamRef.current) ? cachedTeamRef.current : []);
   const [searchTerm, setSearchTerm]               = useState('');
   const [dashboardLoading, setDashboardLoading]    = useState(!cachedDashboardRef.current);
+  const [dashboardError, setDashboardError]        = useState('');
   const startDateRef = useRef(null);
   const endDateRef   = useRef(null);
   const fpStart      = useRef(null);
@@ -70,7 +71,12 @@ function Dashboard() {
     apiGet('/api/dashboard').then(data => {
       writeSessionCache(DASHBOARD_CACHE_KEY, data || {});
       applyDashboardData(data || {});
-    }).catch(() => {}).finally(() => {
+      if (!cancelled) setDashboardError('');
+    }).catch(() => {
+      if (!cancelled && !cachedDashboardRef.current) {
+        setDashboardError('Could not load dashboard metrics. Please refresh to try again.');
+      }
+    }).finally(() => {
       if (!cancelled) setDashboardLoading(false);
     });
 
@@ -135,6 +141,8 @@ function Dashboard() {
     <Layout>
       <div className="dashboard-container">
         <h1><i className="fas fa-chart-line"></i> Dashboard</h1>
+
+        {dashboardError && <div className="analyze-submit-error" role="alert">{dashboardError}</div>}
 
         {/* Metrics */}
         {dashboardLoading ? (

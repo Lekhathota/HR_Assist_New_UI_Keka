@@ -48,6 +48,7 @@ function CandidateProfile() {
   const [candidate, setCandidate] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const canEditStage = ['recruiter', 'admin'].includes(getCurrentRole());
 
   const updateHiringState = async (body) => {
@@ -76,13 +77,20 @@ function CandidateProfile() {
   const [showEmailInput, setShowEmailInput] = useState(false);
 
   useEffect(() => {
+    setLoadError('');
     apiGet(`/api/candidates/${candidateId}`)
       .then(data => {
         const row = data.candidate || null;
+        if (!row) {
+          setLoadError('Candidate not found.');
+          return;
+        }
         setCandidate(row);
         setTimeline(data.timeline || []);
       })
-      .catch(() => {});
+      .catch(() => {
+        setLoadError('Could not load this candidate. Please check your connection and try again.');
+      });
   }, [candidateId]);
 
   const handleRemove = async () => {
@@ -1036,6 +1044,18 @@ function CandidateProfile() {
     );
   };
 
+  if (!candidate && loadError) {
+    return (
+      <Layout>
+        <div className="profile-loading">
+          <div className="analyze-submit-error" role="alert">{loadError}</div>
+          <button type="button" onClick={() => navigate('/talent')}>
+            <i className="fas fa-arrow-left"></i> Back to Talent
+          </button>
+        </div>
+      </Layout>
+    );
+  }
   if (!candidate) return <Layout><div className="profile-loading"><SkeletonBlock variant="profile" count={3} /></div></Layout>;
 
   const sd = candidate.structured_data || {};

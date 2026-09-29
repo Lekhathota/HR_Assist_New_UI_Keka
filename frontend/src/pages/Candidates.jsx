@@ -123,6 +123,7 @@ function Candidates() {
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
   const [stageGroups, setStageGroups] = useState([]);
+  const [listError, setListError] = useState('');
   const filterAnchorRef = useRef(null);
 
   useEffect(() => {
@@ -226,8 +227,11 @@ function Candidates() {
         const rows = Array.isArray(data) ? data : [];
         setCandidates(dedupeCandidates(rows));
         writeSessionCache(TALENT_CACHE_KEY, rows);
+        setListError('');
       })
-      .catch(() => {});
+      .catch(() => {
+        setListError('Could not load the latest candidate list. Showing cached results, if any.');
+      });
   }, []);
 
   const baseRows = serverFiltered ?? candidates;
@@ -1337,6 +1341,8 @@ function Candidates() {
           </div>
         </div>
 
+        {listError && <div className="analyze-submit-error" role="alert">{listError}</div>}
+
         {candidates.length > 0 ? (
           <>
             <div className="candidates-filter-bar">
@@ -1469,6 +1475,12 @@ function Candidates() {
             </div>
             </>)}
           </>
+        ) : listError ? (
+          <div className="candidates-empty-state">
+            <i className="fas fa-triangle-exclamation empty-state-icon"></i>
+            <h2 className="empty-state-title">Could Not Load Candidates</h2>
+            <p className="empty-state-subtitle">{listError}</p>
+          </div>
         ) : (
           <div className="candidates-empty-state">
             <i className="fas fa-inbox empty-state-icon"></i>

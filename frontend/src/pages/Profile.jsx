@@ -14,7 +14,9 @@ function Profile() {
     apiGet('/api/profile').then(data => {
       setUser(data.user || {});
       setForm(prev => ({ ...prev, email: data.user?.email || '' }));
-    }).catch(() => {});
+    }).catch(() => {
+      toast({ type: 'error', message: 'Could not load your profile. Please refresh the page.' });
+    });
   }, []);
 
   const handleSubmit = async (e) => {

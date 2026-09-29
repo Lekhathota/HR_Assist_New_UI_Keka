@@ -13,6 +13,7 @@ function JdCreate() {
   const [error, setError]         = useState('');
   const [clients, setClients]     = useState([]);
   const [clientId, setClientId]   = useState('');
+  const [clientsError, setClientsError] = useState('');
   const [requiredCount, setRequiredCount] = useState('');
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -23,9 +24,11 @@ function JdCreate() {
         const rows = Array.isArray(data.clients) ? data.clients : [];
         setClients(rows);
         setClientId(String(rows[0]?.id || ''));
+        setClientsError('');
       })
       .catch(() => {
         setClients([]);
+        setClientsError('Could not load clients. Please refresh the page and try again.');
       });
   }, []);
 
@@ -47,7 +50,7 @@ function JdCreate() {
     const formData = new FormData(e.target);
     if (!formData.get('client_id')) {
       setLoading(false);
-      setError('Select a client before uploading a job description.');
+      setError(clientsError || 'Select a client before uploading a job description.');
       return;
     }
     if (!Number.isInteger(Number(formData.get('required_candidate_count'))) || Number(formData.get('required_candidate_count')) <= 0) {
@@ -106,6 +109,9 @@ function JdCreate() {
               <div className="file-info">
                 <i className="fas fa-link"></i> This job and its screened candidates will be linked to the selected client.
               </div>
+              {clientsError && (
+                <div className="analyze-submit-error" role="alert">{clientsError}</div>
+              )}
             </div>
 
             <div className="form-group">

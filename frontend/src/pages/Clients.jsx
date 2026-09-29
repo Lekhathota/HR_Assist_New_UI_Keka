@@ -65,6 +65,7 @@ function Clients() {
       })
       .catch(() => {
         setDetails(null);
+        toast({ type: 'error', message: 'Could not load client details. Please try again.' });
       });
   }, [activeClientId]);
 
