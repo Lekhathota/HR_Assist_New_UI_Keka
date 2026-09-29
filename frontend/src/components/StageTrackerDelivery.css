@@ -1,0 +1,94 @@
+.stx {
+  --stx-idle: #d6d6d6;
+  --stx-faded: #ececec;
+  --stx-ok: #1d9e75;
+  --stx-halo: #cdeee0;
+  --stx-bad: #e24b4a;
+  --stx-warn: #d98e1a;
+  --stx-muted: #888;
+  --stx-w: 230px;
+  width: var(--stx-w);
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.stx__steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stx__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.stx__step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  width: 100%;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--stx-idle);
+}
+
+.stx__dot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--stx-idle);
+  color: #fff;
+}
+
+.stx__label {
+  color: #555;
+}
+
+.stx--ok .stx__step:first-child .stx__dot { background: var(--stx-ok); }
+.stx--ok .stx__step:first-child::after { background: var(--stx-ok); }
+.stx--ok .stx__step:nth-child(2) .stx__dot { box-shadow: 0 0 0 5px var(--stx-halo); }
+
+.stx--warn .stx__step:first-child .stx__dot { background: var(--stx-warn); }
+
+.stx--bad .stx__step:first-child .stx__dot { background: var(--stx-bad); }
+.stx--bad .stx__step::after,
+.stx--bad .stx__step:not(:first-child) .stx__dot { background: var(--stx-faded); }
+.stx--bad .stx__step:not(:first-child) .stx__label { opacity: 0.45; }
+
+.stx__status {
+  margin-top: 6px;
+  text-align: center;
+  color: var(--stx-muted);
+}
+
+.stx--ok .stx__status { color: var(--stx-ok); }
+.stx--warn .stx__status { color: var(--stx-warn); }
+.stx--bad .stx__status { color: var(--stx-bad); }
+
+@media (prefers-color-scheme: dark) {
+  .stx {
+    --stx-idle: #4a4a4a;
+    --stx-faded: #333;
+    --stx-halo: #1d4a3a;
+  }
+  .stx__label { color: #bbb; }
+}
+
+@media (max-width: 900px) {
+  .stx { --stx-w: 150px; }
+  .stx__label { display: none; }
+}

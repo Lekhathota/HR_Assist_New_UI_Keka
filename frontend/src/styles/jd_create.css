@@ -1,112 +1,223 @@
-/* JD Create Page Styles */
+.jd-create-container.client-create-page.jd-create-page {
+    width: 100%;
+    max-width: none;
+    margin: 1.25rem auto 0;
+    padding: 1.5rem;
+}
 
-    /* Container & Header */
-    .jd-create-container { max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
-    .jd-create-header { text-align: center; margin-bottom: 2.5rem; }
-    .jd-create-header h1 { color: #ef7a2d; font-size: 2.5rem; margin-bottom: 0.5rem; text-shadow: 0 0 20px rgba(239, 122, 45, 0.3); }
-    .jd-create-header p { color: #ffffff; font-size: 1.1rem; }
+.jd-create-page .jd-create-header {
+    margin-bottom: 0;
+}
 
-    /* Form & visibility Fix */
-    .form-container {
-        background: linear-gradient(135deg, rgba(26,31,58,0.9), rgba(45,53,97,0.9));
-        border: 2px solid rgba(239, 122, 45, 0.3);
-        border-radius: 15px;
-        padding: 2.5rem;
-        box-shadow: 0 0 30px rgba(239, 122, 45, 0.1);
+.jd-create-page .jd-create-header p {
+    color: var(--text-secondary);
+    margin: 0.25rem 0 0;
+}
+
+.jd-create-page .form-container {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.jd-create-page .jd-create-section {
+    margin: 44px 0 0;
+}
+
+.jd-create-page .jd-create-form > .jd-create-section:first-child {
+    margin-top: 32px;
+}
+
+.jd-create-page .jd-create-section-heading {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+}
+
+.jd-create-page .client-create-section-rule {
+    background: var(--border-color, #e2e8f0);
+}
+
+.jd-create-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 20px;
+}
+
+.jd-create-field {
+    min-width: 0;
+    margin: 0;
+}
+
+.jd-create-field > label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 8px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.jd-create-field > label i,
+.jd-create-hint i {
+    color: var(--accent-color, #ef7a2d);
+}
+
+.jd-create-field > input,
+.jd-create-field > select {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    padding: 0 0.75rem;
+    background: #fff;
+    color: var(--text-primary, #25364a);
+}
+
+.jd-create-page .jd-create-select,
+.jd-create-page .jd-create-select:focus,
+.jd-create-page .jd-create-select:active {
+    border: 1px solid rgba(239, 122, 45, 0.55);
+    border-radius: 8px;
+    color-scheme: light;
+}
+
+.jd-create-page .jd-create-select option {
+    background: #fff;
+    color: var(--text-primary, #25364a);
+}
+
+.jd-create-page .jd-create-select option:checked,
+.jd-create-page .jd-create-select option:hover {
+    background: #ef7a2d;
+    color: #071427;
+}
+
+.jd-create-hint {
+    margin-top: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.jd-create-hint i {
+    margin-right: 0.25rem;
+}
+
+.jd-create-page .drop-zone {
+    height: 120px;
+    padding: 20px;
+    background: #fff;
+    border: 2px dashed rgba(239, 122, 45, 0.55);
+    color: var(--text-secondary);
+}
+
+.jd-create-page .drop-zone--over {
+    border-style: solid;
+    border-color: var(--accent-color, #ef7a2d);
+    background: rgba(239, 122, 45, 0.08);
+}
+
+.jd-create-page .drop-zone__input {
+    display: none;
+}
+
+.jd-create-page .drop-zone__thumb {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.jd-create-page .jd-create-file-icon {
+    margin-right: 10px;
+    color: var(--accent-color, #ef7a2d);
+}
+
+.jd-create-page .jd-create-error {
+    margin-top: 20px;
+}
+
+.jd-create-page .client-create-footer {
+    margin-top: 24px;
+    padding: 20px 0 40px;
+}
+
+.jd-create-page .client-create-footer .back-link {
+    margin: 0;
+}
+
+.jd-create-page .jd-create-submit {
+    width: auto;
+    height: 40px;
+    margin: 0;
+    padding: 0 32px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent-color, #ef7a2d);
+    color: #fff;
+    font-weight: 700;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.jd-create-page .jd-create-submit:hover:not(:disabled) {
+    background: var(--accent-dark, #a64716);
+    box-shadow: none;
+    transform: none;
+}
+
+body.theme-shimento .jd-create-container.client-create-page.jd-create-page .form-container {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+body.theme-shimento .jd-create-container.client-create-page.jd-create-page .form-container select.jd-create-select {
+    background: #fff;
+    border-color: rgba(239, 122, 45, 0.55);
+    color: var(--text-primary);
+}
+
+body.theme-shimento .jd-create-page .drop-zone {
+    background: #fff;
+    border-color: rgba(239, 122, 45, 0.55);
+    color: var(--text-secondary);
+}
+
+body.theme-shimento .jd-create-page .jd-create-field > label {
+    color: var(--text-secondary);
+}
+
+body.theme-shimento .jd-create-container.client-create-page.jd-create-page form button.jd-create-submit {
+    background: var(--accent-color);
+    border-color: transparent;
+    color: #fff;
+}
+
+@media (max-width: 699px) {
+    .jd-create-container.client-create-page.jd-create-page {
+        padding: 1.5rem 1rem;
     }
-    
-    label { 
-        display: block;
-        font-weight: 600; 
-        text-transform: uppercase; 
-        letter-spacing: 0.5px; 
-        margin-bottom: 10px;
+
+    .jd-create-grid {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    /* Drag and Drop Zone */
-    .drop-zone {
-        height: 150px;
-        padding: 25px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        cursor: pointer;
-        color: #ffffff;
-        background: rgba(31, 47, 90, 0.6);
-        border: 2px dashed rgba(239, 122, 45, 0.4);
-        border-radius: 10px;
-        transition: all 0.3s ease;
+    .jd-create-page .jd-create-submit {
+        padding: 0 1rem;
     }
-
-    .drop-zone--over {
-        border-style: solid;
-        border-color: #ef7a2d;
-        background: rgba(239, 122, 45, 0.1);
-    }
-
-    .drop-zone__input { display: none; }
-
-    .jd-create-container .form-container select.jd-create-select,
-    .jd-create-container .form-container select.jd-create-select:focus,
-    .jd-create-container .form-container select.jd-create-select:active {
-        width: 100%;
-        padding: 0.9rem 1rem;
-        border-radius: 8px;
-        border: 1px solid rgba(239, 122, 45, 0.55);
-        background-color: #1a2f5a;
-        color: #ffffff;
-        font-size: 1rem;
-        color-scheme: dark;
-        box-shadow: 0 0 0 1px rgba(239, 122, 45, 0.08);
-    }
-
-    .jd-create-container .form-container select.jd-create-select option {
-        background: #1a2f5a;
-        color: #ffffff;
-    }
-
-    .jd-create-container .form-container select.jd-create-select option:checked,
-    .jd-create-container .form-container select.jd-create-select option:hover {
-        background: #ef7a2d;
-        color: #071427;
-    }
-
-    .drop-zone__thumb {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        color: #ef7a2d;
-    }
-
-    /* Info and Button */
-    .file-info {
-        background: rgba(239, 122, 45, 0.1);
-        border-left: 4px solid #ef7a2d;
-        padding: 1rem;
-        border-radius: 8px;
-        color: #ffffff;
-        font-size: 0.95rem;
-        margin-top: 1rem;
-    }
-
-    form button {
-        width: 100%;
-        padding: 1.1rem;
-        background: linear-gradient(135deg, #ef7a2d 0%, #0088cc 100%);
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        text-transform: uppercase;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        margin-top: 1rem;
-    }
-
-    form button:hover { transform: translateY(-2px); box-shadow: 0 0 20px rgba(239, 122, 45, 0.5); }
-
-    .back-link { display: inline-block; margin-top: 2rem; color: #ef7a2d; text-decoration: none; font-weight: 600; }
+}

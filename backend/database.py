@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import hashlib
 import json
+from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -514,6 +515,28 @@ def create_client(data: dict) -> int:
     name = str(data.get("name") or data.get("client_name") or "").strip()
     if not name:
         raise ValueError("Client name is required.")
+    hiring_stages = data.get("hiring_stages")
+    if "hiring_stages" not in data or hiring_stages == []:
+        hiring_stages = ["Sourced", "Screening", "Interview", "Offer", "Hired"]
+    if not isinstance(hiring_stages, list):
+        raise ValueError("Hiring stages must be a list of strings.")
+    validated_hiring_stages = []
+    seen_stage_names = set()
+    for stage in hiring_stages:
+        if not isinstance(stage, str):
+            raise ValueError("Each hiring stage must be a string.")
+        stage_name = stage.strip()
+        if not stage_name:
+            raise ValueError("Hiring stage names cannot be empty.")
+        if len(stage_name) >= 40:
+            raise ValueError("Hiring stage names must be under 40 characters.")
+        normalized_stage_name = stage_name.casefold()
+        if normalized_stage_name in seen_stage_names:
+            raise ValueError("Hiring stage names must be unique.")
+        seen_stage_names.add(normalized_stage_name)
+        validated_hiring_stages.append(
+            {"id": uuid4().hex[:8], "name": stage_name, "order": len(validated_hiring_stages)}
+        )
     if not account_id:
         account_id = "".join(ch for ch in name.upper() if ch.isalnum())[:24] or f"CLIENT{_next_id('clients')}"
     existing = get_client_by_account_id(account_id)
@@ -535,6 +558,7 @@ def create_client(data: dict) -> int:
             "account_owner": data.get("account_owner") or "",
             "status": data.get("status") or "Active",
             "notes": data.get("notes") or "",
+            "hiring_stages": validated_hiring_stages,
             "created_at": now,
             "updated_at": now,
         }
@@ -1437,6 +1461,11 @@ def get_all_candidates(filters: Optional[dict] = None) -> list[dict]:
         if candidate_jd_id:
             comparison = _database().comparisons.find_one({"jd_id": int(candidate_jd_id), "candidate_id": int(row.get("id") or 0)}) or {}
             row.update({key: comparison.get(key) for key in ("selection_status", "qualification_status", "candidate_source") if key in comparison})
+            if comparison:
+                row["_screening_comparison"] = {
+                    "status": comparison.get("status"),
+                    "selection_status": comparison.get("selection_status"),
+                }
     return out
 
 
@@ -1633,6 +1662,10 @@ def get_candidates_for_jd(jd_id: int, status: Optional[str] = None) -> list[dict
                 "candidate_source": comp_doc.get("candidate_source") or merged.get("candidate_source", ""),
                 "selection_status": comp_doc.get("selection_status") or "",
                 "qualification_status": comp_doc.get("qualification_status") or "",
+                "_screening_comparison": {
+                    "status": comp_doc.get("status"),
+                    "selection_status": comp_doc.get("selection_status"),
+                },
                 "analysis_run_id": comp_doc.get("analysis_run_id") or "",
                 "analysis_error": comp_doc.get("analysis_error") or "",
             }

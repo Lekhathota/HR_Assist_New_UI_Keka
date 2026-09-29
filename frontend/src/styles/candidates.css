@@ -253,6 +253,12 @@
     font-weight: 600;
 }
 
+.candidates-simple-stage-col,
+.candidates-simple-stage {
+    width: 230px;
+    white-space: nowrap;
+}
+
 .candidates-simple-actions {
     text-align: right;
 }
@@ -283,6 +289,21 @@
 
     .candidates-simple-table td {
         padding: 0.2rem 0;
+    }
+
+    .candidates-simple-stage {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+    }
+
+    .candidates-simple-stage::before {
+        content: attr(data-label);
+        flex: 0 0 5.5rem;
+        color: #7f8c8d;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
     }
 
     .candidates-simple-name {
@@ -606,19 +627,6 @@
     color: #ddd;
     margin-bottom: 0.35rem;
     line-height: 1.35;
-}
-
-.profile-screening-status {
-    font-size: 0.8rem;
-    color: #999;
-}
-
-.profile-screening-status-selected {
-    color: #00ff88;
-}
-
-.profile-screening-status-rejected {
-    color: #ff6b6b;
 }
 
 .profile-screening-strengths {

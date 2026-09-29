@@ -80,5 +80,25 @@ class CandidatesPayloadStatusFilterTests(unittest.TestCase):
         self.assertEqual(sorted(row["id"] for row in rows), [1, 2])
 
 
+class DeriveScreeningStatusTests(unittest.TestCase):
+    def test_comparison_status_and_waitlist_precedence(self) -> None:
+        candidate = {"status": "Rejected"}
+        self.assertEqual(candidate_service.derive_screening_status(candidate, {"status": "sElEcTeD"}), "accepted")
+        self.assertEqual(candidate_service.derive_screening_status(candidate, {"status": "rejected"}), "rejected")
+        self.assertEqual(
+            candidate_service.derive_screening_status(
+                candidate,
+                {"status": "Selected", "selection_status": "waitlisted_bench"},
+            ),
+            "waitlisted",
+        )
+
+    def test_candidate_status_fallback_only_without_comparison(self) -> None:
+        self.assertEqual(candidate_service.derive_screening_status({"status": "Selected"}, None), "accepted")
+        self.assertEqual(candidate_service.derive_screening_status({"status": "Rejected"}, None), "rejected")
+        self.assertIsNone(candidate_service.derive_screening_status({"status": "Selected"}, {}))
+        self.assertIsNone(candidate_service.derive_screening_status({"status": "Pending"}, None))
+
+
 if __name__ == "__main__":
     unittest.main()

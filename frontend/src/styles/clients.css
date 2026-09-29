@@ -560,13 +560,14 @@
 
 .client-form-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.9rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 20px;
+    column-gap: 16px;
 }
 
 .client-form-grid label {
     display: grid;
-    gap: 0.45rem;
+    gap: 8px;
     margin: 0;
 }
 
@@ -581,7 +582,8 @@
 .client-form-grid input,
 .client-form-grid textarea {
     width: 100%;
-    padding: 0.85rem 0.95rem;
+    height: 36px;
+    padding: 0 0.75rem;
     border-radius: 8px;
     border: 1px solid rgba(239, 122, 45, 0.3);
     background: rgba(13, 18, 43, 0.85);
@@ -590,7 +592,8 @@
 }
 
 .client-form-grid textarea {
-    min-height: 92px;
+    min-height: 64px;
+    height: auto;
     resize: vertical;
 }
 
@@ -598,11 +601,278 @@
     grid-column: 1 / -1;
 }
 
+.client-hiring-stages {
+    margin-top: 1.6rem;
+}
+
+.client-hiring-stages .client-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.client-hiring-stages .client-section-title h3 {
+    color: #ef7a2d;
+    margin: 0;
+}
+
+.client-hiring-stages .client-section-title > span {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85rem;
+}
+
+.client-hiring-stage-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+    column-gap: 16px;
+}
+
+.client-hiring-stage-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.client-hiring-stage-number {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: rgba(239, 122, 45, 0.16);
+    text-align: center;
+    color: #a64716;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.client-hiring-stage-row input {
+    flex: 1;
+    width: 100%;
+    height: 36px;
+    padding: 0 0.75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 122, 45, 0.3);
+    background: rgba(13, 18, 43, 0.85);
+    color: #fff;
+    font: inherit;
+}
+
+.client-hiring-stage-remove {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border-radius: 6px;
+    border: 1px solid rgba(239, 122, 45, 0.22);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    cursor: pointer;
+}
+
 .client-modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
     margin-top: 1.1rem;
+}
+
+.client-create-container {
+    max-width: none;
+    margin: 1.25rem auto 0;
+}
+
+.client-create-page {
+    max-width: none;
+    padding: 1.5rem;
+}
+
+.client-create-container .jd-create-header {
+    margin-bottom: 0;
+}
+
+.client-create-container .jd-create-header h1 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+}
+
+.client-create-container .jd-create-header p {
+    color: #64748b;
+    margin: 0.25rem 0 0;
+}
+
+.client-create-icon {
+    width: 48px;
+    height: 48px;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 48px;
+    border-radius: 50%;
+    background: #1e293b;
+    color: #fff;
+    font-size: 1.15rem;
+    text-shadow: none;
+}
+
+.client-create-container .form-container {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.client-create-section {
+    margin: 44px 0 0;
+}
+
+.client-create-container form > .client-create-section:first-child {
+    margin-top: 32px;
+}
+
+.client-create-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 16px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.client-create-section-rule {
+    height: 1px;
+    flex: 1;
+    background: #e2e8f0;
+}
+
+.client-create-container .client-form-grid span {
+    color: #475569;
+}
+
+.client-create-container .client-form-grid > label > span {
+    display: block;
+}
+
+.client-create-container .client-form-grid span i {
+    width: 1rem;
+    color: #ef7a2d;
+    text-align: center;
+}
+
+.client-create-container .client-required-mark {
+    color: #dc2626 !important;
+}
+
+.client-create-container .client-form-grid input,
+.client-create-container .client-form-grid textarea,
+.client-create-container .client-hiring-stage-row input {
+    background: #fff;
+    color: #25364a;
+    border-color: #cbd5e1;
+}
+
+.client-create-container .client-hiring-stages {
+    margin-top: 44px;
+    margin-bottom: 0;
+}
+
+.client-create-stage-count {
+    flex: 0 0 auto;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.client-create-stage-help {
+    color: #64748b;
+    margin: 0 0 8px;
+    font-size: 0.875rem;
+}
+
+.client-create-container .client-hiring-stage-number {
+    width: 22px;
+    height: 22px;
+    background: rgba(239, 122, 45, 0.16);
+    color: #a64716;
+}
+
+.client-create-container .client-hiring-stage-remove {
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.client-create-container .client-hiring-stage-add {
+    width: 100%;
+    height: 36px;
+    margin: 0;
+    padding: 0 0.75rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #64748b;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.client-create-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 24px 0 0;
+    padding: 20px 0 40px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.client-create-footer .back-link {
+    margin: 0;
+}
+
+.client-create-footer .client-create-submit {
+    height: 40px;
+    margin: 0;
+    padding: 0 32px;
+    border: 0;
+    border-radius: 8px;
+    background: #ef7a2d;
+    color: #fff;
+    box-shadow: none;
+    white-space: nowrap;
+}
+
+@media (min-width: 700px) and (max-width: 1299px) {
+    .client-create-container .client-form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 699px) {
+    .client-create-page {
+        padding: 1.5rem 1rem;
+    }
+
+    .client-create-container .client-form-grid,
+    .client-create-container .client-hiring-stage-list {
+        grid-template-columns: 1fr;
+    }
+
 }
 
 /* Clients uses a light card treatment to keep the page distinct from the

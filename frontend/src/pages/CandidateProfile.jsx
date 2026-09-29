@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
+import StageTrackerDelivery from '../components/StageTrackerDelivery.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPost } from '../api.js';
 import { getCurrentRole } from '../roleAccess.js';
@@ -1073,7 +1074,13 @@ function CandidateProfile() {
             <div className="profile-hero-avatar" aria-hidden="true">
               <i className="fas fa-user"></i>
             </div>
-            <h1 className="profile-hero-name">{candidate.name}</h1>
+            <div className="profile-hero-copy">
+              <h1 className="profile-hero-name">{candidate.name}</h1>
+              <div className="profile-screening-result">
+                <span>Screening result</span>
+                <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} />
+              </div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <button type="button" className="btn btn-secondary profile-back-btn" onClick={goBack}>

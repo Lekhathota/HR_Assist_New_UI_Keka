@@ -333,7 +333,9 @@ body.theme-shimento :is(.command-palette-list button, .command-palette-empty,
 }
 body.theme-shimento .command-palette-list button:hover { background: var(--ui-soft); }
 body.theme-shimento :is(.command-palette-list button i, .enterprise-confirm-icon) { background: var(--ui-soft); color: var(--accent-dark); }
-body.theme-shimento :is(.jd-modal-close, .vendor-modal-close, .client-modal-close) { color: var(--text-primary); background: var(--ui-inset); border-color: var(--border-color); }
+body.theme-shimento :is(.jd-modal-close, .vendor-modal-close, .client-modal-close, .client-hiring-stage-remove) { color: var(--text-primary); background: var(--ui-inset); border-color: var(--border-color); }
+body.theme-shimento .client-create-container .form-container { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
+body.theme-shimento .client-create-container .client-hiring-stage-number { color: var(--accent-dark); background: var(--ui-soft); }
 body.theme-shimento :is(.flatpickr-months, .flatpickr-month, .flatpickr-weekdays, .flatpickr-weekday,
   .flatpickr-current-month, .flatpickr-time, .flatpickr-day) { background: #fff; color: var(--text-primary); border-color: var(--border-color); }
 body.theme-shimento .flatpickr-day.selected { background: #b6531c; color: #fff; border-color: #b6531c; }

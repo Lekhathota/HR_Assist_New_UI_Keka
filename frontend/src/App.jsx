@@ -64,6 +64,7 @@ function App() {
         <Route path="/talent" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
         <Route path="/talent/:candidateId" element={<ProtectedRoute><CandidateProfile /></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+        <Route path="/clients/create" element={<ProtectedRoute><Clients createPage /></ProtectedRoute>} />
         <Route path="/clients/:clientId/projects/:projectId" element={<ProtectedRoute><ClientProject /></ProtectedRoute>} />
         <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />

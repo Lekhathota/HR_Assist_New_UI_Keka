@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
+import StageTrackerDelivery from '../components/StageTrackerDelivery.jsx';
 import { TALENT_CACHE_KEY, apiGet, readSessionCache, writeSessionCache, apiPost } from '../api.js';
 import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import '../styles/candidates.css';
@@ -1451,7 +1452,7 @@ function Candidates() {
                       <input type="checkbox" checked={filtered.length > 0 && selectedIds.size === filtered.length}
                         onChange={() => toggleSelectAll(filtered)} aria-label="Select all candidates" />
                     </th>
-                    <th>Candidate Name</th><th>Client</th><th>All Details</th>
+                    <th>Candidate Name</th><th>Client</th><th className="candidates-simple-stage-col">Stage</th><th>All Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1463,6 +1464,9 @@ function Candidates() {
                       </td>
                       <td className="candidates-simple-name">{c.name}</td>
                       <td className="candidates-simple-client">{c.client_name || 'ShimentoX'}</td>
+                      <td className="candidates-simple-stage" data-label="Stage">
+                        <StageTrackerDelivery screeningStatus={c.screening_status ?? null} />
+                      </td>
                       <td className="candidates-simple-actions">
                         <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">
                           <i className="fas fa-eye"></i> All Details

@@ -63,6 +63,25 @@ def _status_from_score(score: Any) -> str:
     return "Selected" if _match_score(score) >= SELECTION_MATCH_THRESHOLD else "Rejected"
 
 
+def derive_screening_status(candidate: dict[str, Any], comparison: dict[str, Any] | None) -> str | None:
+    if comparison is not None:
+        if str(comparison.get("selection_status") or "").strip().lower() == "waitlisted_bench":
+            return "waitlisted"
+        comparison_status = str(comparison.get("status") or "").strip().lower()
+        if comparison_status == "selected":
+            return "accepted"
+        if comparison_status == "rejected":
+            return "rejected"
+        return None
+
+    candidate_status = str(candidate.get("status") or "").strip().lower()
+    if candidate_status == "selected":
+        return "accepted"
+    if candidate_status == "rejected":
+        return "rejected"
+    return None
+
+
 # Purpose: Cleans and normalizes education field values.
 def _clean_education_field(value: Any) -> str:
     field = str(value or "").replace("\ufb01", "fi").replace("\ufb02", "fl").strip()
@@ -407,6 +426,8 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
     if filters.get("jd_id") is not None:
         rows = db.get_candidates_for_jd(int(filters["jd_id"]), str(filters.get("status") or "").strip() or None)
         rows = [normalize_candidate_record(row) for row in rows]
+        for row in rows:
+            row["screening_status"] = derive_screening_status(row, row.pop("_screening_comparison", None))
         search = str(filters.get("search") or "").strip().lower()
         if search:
             rows = [
@@ -418,6 +439,8 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
 
     db_filters = {k: v for k, v in filters.items() if k not in {"status"}}
     rows = [normalize_candidate_record(row) for row in db.get_all_candidates(db_filters if db_filters else None)]
+    for row in rows:
+        row["screening_status"] = derive_screening_status(row, row.pop("_screening_comparison", None))
     status_filter = str(filters.get("status") or "").strip().lower()
     if status_filter == "on hold":
         # "On Hold" is a manual flag layered on top of the score-driven Selected/Rejected
@@ -467,6 +490,12 @@ def candidate_profile_payload(candidate_id: int) -> dict[str, Any] | None:
     candidate = normalize_candidate_record(candidate)
     _apply_current_hiring_stage(candidate)
     comps = db.get_comparisons(candidate_id=candidate_id)
+    candidate_jd_id = int(candidate.get("jd_id") or 0)
+    screening_comparison = next(
+        (co for co in comps if int(co.get("jd_id") or 0) == candidate_jd_id),
+        None,
+    )
+    candidate["screening_status"] = derive_screening_status(candidate, screening_comparison)
     for co in comps:
         co["match_score"] = _match_score(co.get("match_score"))
         co["status"] = _status_from_score(co["match_score"])

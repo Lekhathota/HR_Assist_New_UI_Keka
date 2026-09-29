@@ -48,6 +48,23 @@
     filter: drop-shadow(0 0 18px rgba(239, 122, 45, 0.25));
 }
 
+.profile-hero-copy {
+    display: grid;
+    justify-items: start;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.profile-screening-result {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    color: #dbe5ec;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
 .profile-info {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
