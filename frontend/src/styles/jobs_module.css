@@ -188,6 +188,28 @@
     color: var(--accent-dark, #a64716);
 }
 
+.app-shell .jobs-select-col {
+    width: 42px;
+    text-align: center !important;
+}
+
+.app-shell .jobs-bulk-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: auto;
+    color: var(--text-secondary, #696b72);
+    font-size: 0.8125rem;
+}
+
+.app-shell .jobs-bulk-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8125rem;
+}
+
 /* Table: scrolls inside its own wrapper only if the columns genuinely
    cannot fit; the page itself never scrolls sideways. */
 .app-shell .jobs-table-wrap {
@@ -257,6 +279,7 @@
     color: var(--accent-dark, #a64716);
     text-decoration: underline;
 }
+
 
 .app-shell .jobs-page span.jobs-title-meta {
     display: block;

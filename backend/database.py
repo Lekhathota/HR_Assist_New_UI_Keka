@@ -925,6 +925,7 @@ def create_jd(data: dict) -> int:
     doc = {
         "id": new_id,
         "title": data.get("title") or "",
+        "job_code": str(data.get("job_code") or "").strip(),
         "department": data.get("department") or "",
         "location": data.get("location") or "",
         "experience_required": data.get("experience_required") or data.get("experience") or "",
@@ -966,6 +967,7 @@ def create_jd(data: dict) -> int:
 def update_jd(jd_id: int, data: dict) -> bool:
     mapping = {
         "title": "title",
+        "job_code": "job_code",
         "department": "department",
         "location": "location",
         "experience_required": "experience_required",
@@ -1710,6 +1712,23 @@ def get_comparisons(jd_id: Optional[int] = None, candidate_id: Optional[int] = N
     return out
 
 
+# Purpose: Closes a JD automatically once enough candidates have been selected for it.
+def _close_jd_if_fulfilled(jd_id: int) -> None:
+    db = _database()
+    jd = db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1, "required_candidate_count": 1})
+    if not jd or jd.get("status") != "Active":
+        return
+    required = jd.get("required_candidate_count")
+    if required in (None, "") or int(required) <= 0:
+        return
+    selected = db.comparisons.count_documents({"jd_id": int(jd_id), "status": "Selected"})
+    if selected >= int(required):
+        db.job_descriptions.update_one(
+            {"id": int(jd_id)},
+            {"$set": {"status": "Closed", "updated_at": _now()}},
+        )
+
+
 # Purpose: Implements the upsert comparison backend behavior.
 def upsert_comparison(data: dict) -> int:
     db = _database()
@@ -1724,12 +1743,13 @@ def upsert_comparison(data: dict) -> int:
         comparison_date = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
     else:
         comparison_date = _now()
+    status = data.get("status") or "Pending"
     doc = {
         "id": comparison_id,
         "jd_id": jd_id,
         "candidate_id": candidate_id,
         "match_score": int(data.get("match_score") or 0),
-        "status": data.get("status") or "Pending",
+        "status": status,
         "strengths": _list(data.get("strengths")),
         "gaps": _list(data.get("gaps")),
         "recommendation": data.get("recommendation") or "",
@@ -1747,6 +1767,8 @@ def upsert_comparison(data: dict) -> int:
         {"$set": doc},
         upsert=True,
     )
+    if status == "Selected":
+        _close_jd_if_fulfilled(jd_id)
     refresh_dashboard_metrics()
     return comparison_id
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
-import { SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
+import { SkeletonBlock, toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import { JD_CACHE_KEY, apiGet, readSessionCache, writeSessionCache, apiPost } from '../api.js';
 import { formatJdDate } from '../utils/jdSections.js';
 import '../styles/jd_list.css';
@@ -50,6 +50,49 @@ function JdList() {
   const [filterLocation, setFilterLocation] = useState('');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
+
+  const confirm = useConfirm();
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = (rows) => {
+    setSelectedIds(prev => (prev.size === rows.length && rows.length > 0 ? new Set() : new Set(rows.map(jd => jd.id))));
+  };
+  const deleteSelected = async () => {
+    if (!selectedIds.size) return;
+    const approved = await confirm({
+      title: 'Remove job descriptions',
+      message: `Remove ${selectedIds.size} selected job description(s)? Related comparisons may be removed. This cannot be undone.`,
+      confirmLabel: 'Remove JDs',
+      icon: 'fas fa-trash-alt',
+      danger: true,
+    });
+    if (!approved) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const results = await Promise.all(ids.map(id => apiPost(`/api/jds/${id}/delete`, { confirmed: true })));
+      const removedIds = new Set(ids.filter((id, i) => results[i].ok && results[i].data?.success));
+      const failedCount = ids.length - removedIds.size;
+      setJds(prev => {
+        const next = prev.filter(jd => !removedIds.has(jd.id));
+        writeSessionCache(JD_CACHE_KEY, next);
+        return next;
+      });
+      setSelectedIds(new Set());
+      toast(failedCount
+        ? { type: 'error', message: `${removedIds.size} removed, ${failedCount} could not be removed.` }
+        : { type: 'success', message: `${removedIds.size} job description(s) removed.` });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   // --- REPORT MODAL STATE ---
   const [showModal, setShowModal] = useState(false);
@@ -1009,6 +1052,14 @@ function JdList() {
             <div className="jobs-section-head">
               <h2 className="jobs-section-title">{STATUS_HEADINGS[filterStatus] || 'Jobs'}</h2>
               <span className="jobs-count">{filteredJds.length}</span>
+              {selectedIds.size > 0 && (
+                <span className="jobs-bulk-bar">
+                  <span>{selectedIds.size} selected</span>
+                  <button type="button" className="btn btn-danger jobs-bulk-delete-btn" disabled={bulkDeleting} onClick={deleteSelected}>
+                    {bulkDeleting ? 'Removing...' : <><i className="fas fa-trash"></i> Delete Selected</>}
+                  </button>
+                </span>
+              )}
             </div>
 
             {filteredJds.length === 0 ? (
@@ -1022,7 +1073,11 @@ function JdList() {
                   <table className="jobs-table">
                     <thead>
                       <tr>
-                        <th>Job Title</th><th>Category</th><th>Client</th><th className="jobs-num">Posts</th>
+                        <th className="jobs-select-col">
+                          <input type="checkbox" checked={pageJds.length > 0 && selectedIds.size === pageJds.length}
+                            onChange={() => toggleSelectAll(pageJds)} aria-label="Select all job descriptions" />
+                        </th>
+                        <th>Job Title</th><th>Job ID</th><th>Category</th><th>Client</th><th className="jobs-num">Posts</th>
                         <th>Date Posted</th><th>Status</th><th className="jobs-action-col">Action</th>
                       </tr>
                     </thead>
@@ -1031,10 +1086,15 @@ function JdList() {
                         const secondary = [jd.location, jd.experience].filter(Boolean).join(' · ');
                         return (
                           <tr key={jd.id}>
+                            <td className="jobs-select-col">
+                              <input type="checkbox" checked={selectedIds.has(jd.id)}
+                                onChange={() => toggleSelect(jd.id)} aria-label={`Select ${jd.title}`} />
+                            </td>
                             <td className="jobs-title-cell">
                               <Link to={`/jobs/${jd.id}`} className="jobs-title-link">{jd.title}</Link>
                               {secondary && <span className="jobs-title-meta">{secondary}</span>}
                             </td>
+                            <td className="jobs-nowrap">{jd.job_code || '—'}</td>
                             <td><span className="jobs-pill">{jd.job_category || 'Others'}</span></td>
                             <td>{jd.client_name || '—'}</td>
                             <td className="jobs-num">{jd.required_candidate_count ?? '—'}</td>

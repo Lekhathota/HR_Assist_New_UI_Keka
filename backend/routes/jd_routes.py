@@ -36,7 +36,8 @@ def jd_create():
             required_count = int(request.form.get("required_candidate_count") or 0)
             if required_count <= 0:
                 raise ValueError("required_candidate_count must be greater than zero")
-            created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count)
+            job_code = request.form.get("job_code") or ""
+            created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count, job_code)
             user = current_user()
             db.log_audit(
                 "JD Created",
@@ -110,7 +111,8 @@ def api_create_jd():
         required_count = int(request.form.get("required_candidate_count") or 0)
         if required_count <= 0:
             return jsonify({"error": "required_candidate_count must be greater than zero"}), 400
-        created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count)
+        job_code = request.form.get("job_code") or ""
+        created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count, job_code)
         user = current_user()
         db.log_audit(
             "JD Created",
@@ -122,6 +124,56 @@ def api_create_jd():
         return jsonify({"success": True, "jd": created["jd"], "workflow": workflow})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+# Purpose: API endpoint handler for editing a JD's core fields.
+@jd_bp.route("/api/jds/<int:jd_id>", methods=["PUT"], endpoint="api_jd_update")
+@api_login_required
+def api_jd_update(jd_id: int):
+    jd = db.get_jd_by_id(jd_id)
+    if not jd:
+        return jsonify({"error": "JD not found"}), 404
+    data = request.get_json(silent=True) or {}
+
+    if "required_candidate_count" in data:
+        try:
+            required_count = int(data["required_candidate_count"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "required_candidate_count must be a number"}), 400
+        if required_count <= 0:
+            return jsonify({"error": "required_candidate_count must be greater than zero"}), 400
+        data["required_candidate_count"] = required_count
+
+    if "title" in data and not str(data.get("title") or "").strip():
+        return jsonify({"error": "Title cannot be empty."}), 400
+
+    allowed = {
+        "title",
+        "job_code",
+        "department",
+        "location",
+        "experience_required",
+        "job_category",
+        "required_candidate_count",
+        "skills",
+        "responsibilities",
+        "raw_text",
+        "status",
+    }
+    patch = {key: data[key] for key in allowed if key in data}
+    if not patch:
+        return jsonify({"error": "No editable fields provided."}), 400
+
+    db.update_jd(jd_id, patch)
+    user = current_user()
+    db.log_audit(
+        "JD Updated",
+        user["username"] if user else "",
+        f"User '{user['username'] if user else 'unknown'}' updated JD '{jd.get('title') or jd_id}' fields: {', '.join(sorted(patch))}.",
+        jd_id,
+    )
+    payload = jd_details_payload(jd_id)
+    return jsonify({"success": True, "jd": payload["jd"]})
 
 
 # Purpose: API endpoint handler for saving a JD's configurable hiring process.

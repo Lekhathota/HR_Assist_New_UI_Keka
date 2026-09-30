@@ -1127,6 +1127,7 @@ Job Description Text:
 Return ONLY valid JSON in this format (empty fields should be empty strings or empty arrays, NO null values):
 {{
   "job_title": "",
+  "summary": "",
   "required_skills": [],
   "preferred_skills": [],
   "experience_range": "",
@@ -1150,18 +1151,21 @@ Rules:
 - If not mentioned, use empty values
 - Do NOT invent or assume information
 - Keep extracted values exact and concise
+- "summary" is a plain-English overview of the role in 2-4 sentences (no bullet points), covering what the role
+  is, the core responsibilities, and the key experience/skills expected. Base it only on the JD text.
 """
-    
+
     jd_json = llm_json(prompt)
-    
+
     # If LLM extraction failed or returned empty, use regex fallback
     if not jd_json or not jd_json.get("job_title"):
         print(f"[INFO] LLM extraction empty, using regex fallback for JD extraction")
         jd_json = extract_jd_regex(jd_text)
-    
+
     # Ensure all required fields exist
     default_fields = {
         "job_title": "",
+        "summary": "",
         "required_skills": [],
         "preferred_skills": [],
         "experience_range": "",
@@ -1176,7 +1180,7 @@ Rules:
         "industry": "",
         "company_name": ""
     }
-    
+
     for key, default_value in default_fields.items():
         if key not in jd_json:
             jd_json[key] = default_value
@@ -1186,7 +1190,29 @@ Rules:
     # Backward-compatible key consumed elsewhere.
     jd_json["experience_required"] = jd_json.get("experience_range") or ""
 
+    if not str(jd_json.get("summary") or "").strip():
+        jd_json["summary"] = _fallback_jd_summary(jd_json)
+
     return jd_json
+
+
+# Purpose: Builds a short plain-English JD summary when the LLM/regex path didn't produce one.
+def _fallback_jd_summary(jd_json: dict) -> str:
+    title = jd_json.get("job_title") or "This role"
+    experience = jd_json.get("experience_range") or ""
+    skills = [s for s in (jd_json.get("required_skills") or []) if s][:5]
+    parts = [f"{title} position"]
+    if experience and experience != "Not specified":
+        parts.append(f"requiring {experience} of experience")
+    if skills:
+        parts.append(f"with a focus on {', '.join(skills)}")
+    location = jd_json.get("location") or ""
+    if location and location != "Not specified":
+        parts.append(f"based in {location}")
+    text = " ".join(parts).strip()
+    if not text:
+        return ""
+    return text[0].upper() + text[1:] + "."
 
 
 # Purpose: Extracts resume json from input data.

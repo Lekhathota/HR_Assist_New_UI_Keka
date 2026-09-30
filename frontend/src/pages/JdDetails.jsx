@@ -2,7 +2,7 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
-import { apiDelete, apiGet, apiPost, apiPostForm } from '../api.js';
+import { apiDelete, apiGet, apiPost, apiPostForm, apiPut } from '../api.js';
 import { resolveAssessmentRow } from '../utils/assessmentDisplay.js';
 import { formatJdDate, parseJdSections } from '../utils/jdSections.js';
 import JdHiringProcessEditor from '../components/JdHiringProcessEditor.jsx';
@@ -59,6 +59,29 @@ function buildInterviewTextBody(candidate, jd, interviewDate, interviewTime) {
   ].join(' ');
 }
 
+function jdStructuredData(jd) {
+  const sd = jd && jd.structured_data;
+  if (!sd) return {};
+  if (typeof sd === 'string') {
+    try { return JSON.parse(sd) || {}; } catch { return {}; }
+  }
+  return sd;
+}
+
+// Short overview used when the JD was uploaded before summaries were generated.
+function synthesizeJdSummary(jd, sd) {
+  const title = jd.title || 'This role';
+  const experience = sd.experience_range || jd.experience || '';
+  const skills = (sd.required_skills?.length ? sd.required_skills : jd.skills || []).filter(Boolean).slice(0, 5);
+  const parts = [`${title} position`];
+  if (experience) parts.push(`requiring ${experience} of experience`);
+  if (skills.length) parts.push(`with a focus on ${skills.join(', ')}`);
+  if (jd.location) parts.push(`based in ${jd.location}`);
+  const text = parts.join(' ').trim();
+  if (!text) return '';
+  return text.charAt(0).toUpperCase() + text.slice(1) + '.';
+}
+
 // Paragraphs and bullet items of one JD section, exactly as written.
 function JdSectionBody({ paragraphs, items }) {
   return (
@@ -84,6 +107,11 @@ function JdDetails() {
   const [rejected, setRejected] = useState([]);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [showFullJd, setShowFullJd] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
   const [assessmentMap, setAssessmentMap] = useState({});
   const [generatingAssessment, setGeneratingAssessment] = useState(null);
   const [scheduleCandidate, setScheduleCandidate] = useState(null);
@@ -162,19 +190,6 @@ function JdDetails() {
     loadAssignedVendors();
     loadFulfilmentTimeline();
   }, [jdId, loadAssignedVendors, loadFulfilmentTimeline]);
-
-  const recalculateFulfilment = async () => {
-    try {
-      const { ok, data } = await apiPost(`/api/jds/${jdId}/fulfilment/recalculate`, {});
-      if (!ok) throw new Error(data.error || 'Could not recalculate fulfilment.');
-      setFulfilment(data);
-      toast({ type: 'success', message: 'Fulfilment recalculated.' });
-      loadAssignedVendors();
-      loadFulfilmentTimeline();
-    } catch (err) {
-      toast({ type: 'error', message: err.message || 'Could not recalculate fulfilment.' });
-    }
-  };
 
   const acceptVendorCandidate = async (candidate) => {
     try {
@@ -306,6 +321,66 @@ function JdDetails() {
       toast({ type: 'error', message: 'Remove failed. Please try again.' });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const openEditModal = () => {
+    if (!jd) return;
+    setEditError('');
+    setEditForm({
+      title: jd.title || '',
+      job_code: jd.job_code || '',
+      department: jd.department || '',
+      location: jd.location || '',
+      experience_required: jd.experience || jd.experience_required || '',
+      job_category: jd.job_category || '',
+      required_candidate_count: jd.required_candidate_count ?? '',
+      status: jd.status || 'Active',
+      skills: (jd.skills || []).join(', '),
+      responsibilities: (jd.responsibilities || []).join('\n'),
+      raw_text: jd.raw_text || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editForm) return;
+    const requiredCount = Number(editForm.required_candidate_count);
+    if (!editForm.title.trim()) {
+      setEditError('Title cannot be empty.');
+      return;
+    }
+    if (!Number.isInteger(requiredCount) || requiredCount <= 0) {
+      setEditError('Enter a required candidate count greater than zero.');
+      return;
+    }
+    setEditError('');
+    setSavingEdit(true);
+    try {
+      const { ok, data } = await apiPut(`/api/jds/${jdId}`, {
+        title: editForm.title.trim(),
+        job_code: editForm.job_code.trim(),
+        department: editForm.department.trim(),
+        location: editForm.location.trim(),
+        experience_required: editForm.experience_required.trim(),
+        job_category: editForm.job_category.trim(),
+        required_candidate_count: requiredCount,
+        status: editForm.status,
+        skills: editForm.skills.split(',').map(s => s.trim()).filter(Boolean),
+        responsibilities: editForm.responsibilities.split('\n').map(s => s.trim()).filter(Boolean),
+        raw_text: editForm.raw_text,
+      });
+      if (ok && data.success) {
+        setJd(data.jd);
+        setShowEditModal(false);
+        toast({ type: 'success', message: 'Job description updated.' });
+      } else {
+        setEditError(data.error || 'Could not update job description.');
+      }
+    } catch {
+      setEditError('Update failed. Please try again.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -1447,9 +1522,15 @@ const downloadPDF = (reportText) => {
   if (!jd) return <Layout><div className="jd-loading"><SkeletonBlock variant="detail" count={3} /></div></Layout>;
  
   const jdGroups = parseJdSections(jd);
+  const structuredData = jdStructuredData(jd);
+  const jdSummary = structuredData.summary || synthesizeJdSummary(jd, structuredData);
+  const highlightSkills = (structuredData.required_skills?.length ? structuredData.required_skills : jd.skills || []).filter(Boolean).slice(0, 10);
+  const highlightResponsibilities = (structuredData.responsibilities?.length ? structuredData.responsibilities : jd.responsibilities || []).filter(Boolean).slice(0, 5);
+  const highlightGoodToHave = (structuredData.nice_to_haves || structuredData.preferred_skills || []).filter(Boolean).slice(0, 5);
   const postedDate = formatJdDate(jd.created_date);
   const screenedCount = (jd.selected_count || 0) + (jd.rejected_count || 0);
   const jobInfo = [
+    ['Job ID', jd.job_code],
     ['Client Allotted', jd.client_name || '—'],
     ['No. of Posts', jd.required_candidate_count ?? '—'],
     ['Job Category', jd.job_category || '—'],
@@ -1463,9 +1544,14 @@ const downloadPDF = (reportText) => {
       <div className="jd-details-container">
         <div className="jdd-topbar">
           <Link to="/jobs" className="jdd-back"><i className="fas fa-arrow-left"></i> Back to Jobs</Link>
-          <button type="button" className="btn btn-secondary jdd-topbar-btn" onClick={() => setShowModal(true)}>
-            <i className="fas fa-file-export"></i> Generate Report
-          </button>
+          <div className="jdd-topbar-actions">
+            <button type="button" className="btn btn-secondary jdd-topbar-btn" onClick={openEditModal}>
+              <i className="fas fa-pen"></i> Edit JD
+            </button>
+            <button type="button" className="btn btn-secondary jdd-topbar-btn" onClick={() => setShowModal(true)}>
+              <i className="fas fa-file-export"></i> Generate Report
+            </button>
+          </div>
         </div>
 
         <div className="jdd-page">
@@ -1479,19 +1565,70 @@ const downloadPDF = (reportText) => {
             </div>
           </header>
 
-          <section className="jdd-section">
-            <h2 className="jdd-section-title">Job Information</h2>
-            <dl className="jdd-info-list">
-              {jobInfo.map(([label, value]) => (
-                <div key={label} className="jdd-info-pair">
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+          <div className="jdd-top-row">
+            <section className="jdd-section">
+              <h2 className="jdd-section-title">Job Information</h2>
+              <dl className="jdd-info-list">
+                {jobInfo.map(([label, value]) => (
+                  <div key={label} className="jdd-info-pair">
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
 
-          {jdGroups.map((group, gi) => (group.kind === 'intro' ? (
+            {highlightResponsibilities.length > 0 && (
+              <section className="jdd-section">
+                <h2 className="jdd-section-title">Key Responsibilities</h2>
+                <ul className="jdd-bullets">
+                  {highlightResponsibilities.map((item, i) => <li key={i}>{item}</li>)}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          {(jdSummary || highlightSkills.length > 0 || highlightGoodToHave.length > 0) && (
+            <section className="jdd-section">
+              <h2 className="jdd-section-title">Summary</h2>
+              {jdSummary && <p className="jdd-summary-text">{jdSummary}</p>}
+              {(highlightSkills.length > 0 || highlightGoodToHave.length > 0) && (
+                <div className="jdd-highlights-grid">
+                  {highlightSkills.length > 0 && (
+                    <div className="jdd-highlight-block">
+                      <h3 className="jdd-subheading">Required Skills</h3>
+                      <div className="jdd-chip-row">
+                        {highlightSkills.map((skill, i) => <span key={`${skill}-${i}`} className="jdd-chip">{skill}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {highlightGoodToHave.length > 0 && (
+                    <div className="jdd-highlight-block">
+                      <h3 className="jdd-subheading">Good to Have Skills</h3>
+                      <div className="jdd-chip-row">
+                        {highlightGoodToHave.map((skill, i) => <span key={`${skill}-${i}`} className="jdd-chip">{skill}</span>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {jdGroups.length > 0 && (
+            <section className="jdd-section">
+              <div className="jdd-section-title-row">
+                <h2 className="jdd-section-title">Full Job Description</h2>
+                <button type="button" className="btn btn-secondary jdd-toggle-full-btn" onClick={() => setShowFullJd(v => !v)}>
+                  {showFullJd
+                    ? <><i className="fas fa-chevron-up"></i> Hide</>
+                    : <><i className="fas fa-chevron-down"></i> View Full Description</>}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {showFullJd && jdGroups.map((group, gi) => (group.kind === 'intro' ? (
             <section key={`g${gi}`} className="jdd-section">
               <h2 className="jdd-section-title">{gi === 0 ? 'Job Description' : group.title}</h2>
               {gi === 0 && group.title && <p className="jdd-doc-title">{group.title}</p>}
@@ -1548,22 +1685,6 @@ const downloadPDF = (reportText) => {
           </section>
         </div>
 
-        <div className="white-card jd-fulfilment-card">
-          <div className="jd-details-topbar">
-            <h2 className="white-card-title"><i className="fas fa-chart-line"></i> Fulfilment Summary</h2>
-            <button type="button" className="btn btn-secondary jd-table-btn" onClick={recalculateFulfilment}><i className="fas fa-rotate"></i> Recalculate</button>
-          </div>
-          <div className="jd-pipeline-stages">
-            {[
-              ['Required', fulfilment?.total_required ?? jd.required_candidate_count ?? 0],
-              ['Bench Selected', fulfilment?.selected_bench_count ?? jd.selected_bench_count ?? 0],
-              ['Vendor Accepted', fulfilment?.accepted_vendor_count ?? jd.accepted_vendor_count ?? 0],
-              ['Remaining Shortage', fulfilment?.remaining_vendor_requirement ?? jd.remaining_vendor_requirement ?? 0],
-            ].map(([label, value]) => <div key={label} className="jd-pipeline-stage"><div className="jd-pipeline-stage-label">{label}</div><div className="jd-pipeline-stage-value">{value}</div></div>)}
-          </div>
-          <div className="jd-category-evidence"><span>Workflow: {fulfilment?.workflow_status || jd.workflow_status || 'ACTIVE'}</span><span>Bench analyzed: {fulfilment?.bench_analyzed_count ?? jd.bench_analyzed_count ?? 0}</span><span>Qualified: {fulfilment?.bench_qualified_count ?? jd.bench_qualified_count ?? 0}</span></div>
-        </div>
-
         <div className="white-card jd-fulfilment-timeline-card">
           <h2 className="white-card-title"><i className="fas fa-timeline"></i> Fulfilment Timeline</h2>
           {fulfilmentTimeline.length > 0 ? (
@@ -1581,15 +1702,6 @@ const downloadPDF = (reportText) => {
           )}
         </div>
  
-        {(jd.skills || []).length > 0 && (
-          <div className="white-card jd-skills-card">
-            <h2 className="white-card-title"><i className="fas fa-tags"></i> Required Skills</h2>
-            <div className="jd-skills-list">
-              {jd.skills.map(skill => <span key={skill} className="badge badge-primary">{skill}</span>)}
-            </div>
-          </div>
-        )}
-
         <h2 className="jd-section-heading"><i className="fas fa-handshake"></i> Assigned Vendors</h2>
         {assignedVendors.length > 0 ? (
           <div className="table-container jd-vendor-table-section">
@@ -1625,7 +1737,6 @@ const downloadPDF = (reportText) => {
           <div className="jd-empty-card">
             <i className="fas fa-handshake jd-empty-icon"></i>
             <p className="jd-empty-text">No vendors assigned to this JD</p>
-            <button type="button" className="btn btn-primary" onClick={openAssignVendors}><i className="fas fa-plus"></i> Assign Vendors</button>
           </div>
         )}
  
@@ -2086,6 +2197,87 @@ const downloadPDF = (reportText) => {
                 </button>
                 <button type="button" className="btn btn-success" onClick={handleSendSchedule} disabled={generatingEmail || sendingEmail || !emailPreview.subject || !emailPreview.body || !interviewDetails.interviewer.trim() || (interviewDetails.interview_mode === 'Online' && !interviewDetails.meeting_link.trim())}>
                   {sendingEmail ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send & Schedule</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showEditModal && editForm && (
+          <div className="jd-modal-backdrop" role="presentation">
+            <div className="jd-schedule-modal jd-edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-jd-title">
+              <div className="jd-modal-header">
+                <div>
+                  <h2 id="edit-jd-title">Edit Job Description</h2>
+                  <p>{jd.title}</p>
+                </div>
+                <button type="button" className="jd-modal-close" onClick={() => setShowEditModal(false)} aria-label="Close edit job description">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+
+              <div className="jd-edit-form">
+                <div className="form-group">
+                  <label>Title</label>
+                  <input type="text" value={editForm.title} onChange={(e) => setEditForm(f => ({ ...f, title: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Job ID</label>
+                  <input type="text" value={editForm.job_code} onChange={(e) => setEditForm(f => ({ ...f, job_code: e.target.value }))} placeholder="e.g. REQ-1023" />
+                </div>
+                <div className="jd-edit-form-row">
+                  <div className="form-group">
+                    <label>Department</label>
+                    <input type="text" value={editForm.department} onChange={(e) => setEditForm(f => ({ ...f, department: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Location</label>
+                    <input type="text" value={editForm.location} onChange={(e) => setEditForm(f => ({ ...f, location: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="jd-edit-form-row">
+                  <div className="form-group">
+                    <label>Experience Required</label>
+                    <input type="text" value={editForm.experience_required} onChange={(e) => setEditForm(f => ({ ...f, experience_required: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Job Category</label>
+                    <input type="text" value={editForm.job_category} onChange={(e) => setEditForm(f => ({ ...f, job_category: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="jd-edit-form-row">
+                  <div className="form-group">
+                    <label>No. of Posts</label>
+                    <input type="number" min="1" value={editForm.required_candidate_count} onChange={(e) => setEditForm(f => ({ ...f, required_candidate_count: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select value={editForm.status} onChange={(e) => setEditForm(f => ({ ...f, status: e.target.value }))}>
+                      <option value="Active">Active</option>
+                      <option value="Closed">Closed</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Skills (comma separated)</label>
+                  <input type="text" value={editForm.skills} onChange={(e) => setEditForm(f => ({ ...f, skills: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Responsibilities (one per line)</label>
+                  <textarea rows="4" value={editForm.responsibilities} onChange={(e) => setEditForm(f => ({ ...f, responsibilities: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Job Description Text</label>
+                  <textarea rows="8" value={editForm.raw_text} onChange={(e) => setEditForm(f => ({ ...f, raw_text: e.target.value }))} />
+                </div>
+                {editError && <div className="jd-schedule-alert jd-schedule-alert-error">{editError}</div>}
+              </div>
+
+              <div className="jd-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)} disabled={savingEdit}>Cancel</button>
+                <button type="button" className="btn btn-success" onClick={saveEdit} disabled={savingEdit}>
+                  {savingEdit ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save Changes</>}
                 </button>
               </div>
             </div>

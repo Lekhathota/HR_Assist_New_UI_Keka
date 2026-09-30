@@ -55,7 +55,7 @@ def _apply_jd_category(row: dict[str, Any]) -> dict[str, Any]:
 
 
 # Purpose: Creates jd from upload records or payloads.
-def create_jd_from_upload(file: FileStorage, upload_folder: str, client_id: int | None = None, required_candidate_count: int | None = None) -> dict[str, Any]:
+def create_jd_from_upload(file: FileStorage, upload_folder: str, client_id: int | None = None, required_candidate_count: int | None = None, job_code: str | None = None) -> dict[str, Any]:
     filename = unique_upload_filename(file.filename or "")
     os.makedirs(upload_folder, exist_ok=True)
     filepath = os.path.join(upload_folder, filename)
@@ -85,6 +85,7 @@ def create_jd_from_upload(file: FileStorage, upload_folder: str, client_id: int 
             "status": "Active",
             "client_id": client_id,
             "required_candidate_count": required_candidate_count,
+            "job_code": (job_code or "").strip(),
         }
     )
     jd = _apply_jd_category(db.get_jd_by_id(new_id, include_raw_text=True) or {})
@@ -143,6 +144,7 @@ def jd_summary_list_payload() -> list[dict[str, Any]]:
             {
                 "id": row["id"],
                 "title": row.get("title", ""),
+                "job_code": row.get("job_code") or "",
                 "department": row.get("department", ""),
                 "location": row.get("location", ""),
                 "experience": row.get("experience_required", ""),

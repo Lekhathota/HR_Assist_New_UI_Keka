@@ -153,6 +153,7 @@ function clearMutableCaches(path, body = {}) {
   const isJdMutation =
     apiPath === '/api/jds/create' ||
     /^\/api\/jds\/\d+\/delete$/.test(apiPath) ||
+    /^\/api\/jds\/\d+$/.test(apiPath) ||
     taskType === 'jd_create' ||
     taskType === 'jd_delete';
   const isCandidateMutation =
