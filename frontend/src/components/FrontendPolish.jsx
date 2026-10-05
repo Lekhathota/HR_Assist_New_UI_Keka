@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
 
 const PolishContext = createContext({ enabled: false, setEnabled: () => {}, toggle: () => {} });
 const STORAGE_KEY = 'frontend_motion_polish';
@@ -58,15 +59,13 @@ export function AnimatedNumber({ value, alwaysAnimate = false, from = 0, duratio
 }
 
 export function CommandPalette() {
-  const { enabled } = useFrontendPolish();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
   const commands = useMemo(
     () => [
-      { label: 'Open Dashboard', hint: 'Recruiting overview', icon: 'fas fa-chart-line', path: '/dashboard' },
-      { label: 'Open Welcome', hint: 'Daily command center', icon: 'fas fa-house-laptop', path: '/welcome' },
+      { label: 'Open Home', hint: 'Recruiting overview', icon: 'fas fa-house', path: '/welcome' },
       { label: 'Open Jobs', hint: 'Job descriptions', icon: 'fas fa-briefcase', path: '/jobs' },
       { label: 'Create Job Description', hint: 'Upload a JD', icon: 'fas fa-file-circle-plus', path: '/jobs/create' },
       { label: 'Analyze Resumes', hint: 'Screen candidates', icon: 'fas fa-code-compare', path: '/analyze' },
@@ -79,7 +78,8 @@ export function CommandPalette() {
   );
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    const onOpen = () => setOpen(true);
+    window.addEventListener('open-command-palette', onOpen);
     const onKeyDown = (event) => {
       const isPaletteChord = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
       if (!isPaletteChord) return;
@@ -87,13 +87,13 @@ export function CommandPalette() {
       setOpen(true);
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [enabled]);
+    return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('open-command-palette', onOpen); };
+  }, []);
 
-  if (!enabled || !open) return null;
+  if (!open) return null;
 
   const needle = query.trim().toLowerCase();
-  const visible = commands.filter((cmd) => `${cmd.label} ${cmd.hint}`.toLowerCase().includes(needle));
+  const visible = commands.filter((cmd) => roleCanAccess(getCurrentRole(), cmd.path) && `${cmd.label} ${cmd.hint}`.toLowerCase().includes(needle));
   const run = (path) => {
     setOpen(false);
     setQuery('');

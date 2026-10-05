@@ -4,14 +4,13 @@ import { apiPost, clearToken } from '../api.js';
 import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
 
 const navigation = [
-  ['/dashboard', 'Dashboard', 'fa-chart-line'],
+  ['/welcome', 'Home', 'fa-house'],
   ['/jobs', 'Jobs', 'fa-briefcase'],
-  ['/analyze', 'Analyze', 'fa-code-compare'],
   ['/talent', 'Talent', 'fa-users'],
+  ['/analyze', 'Analyze', 'fa-code-compare'],
+  ['/hiring-pipeline', 'Hiring Pipeline', 'fa-route'],
   ['/clients', 'Clients', 'fa-building'],
   ['/vendors', 'Vendors', 'fa-handshake'],
-  ['/admin/users', 'User Management', 'fa-user-gear'],
-  ['/hiring-pipeline', 'Pipeline', 'fa-route'],
   ['/insights', 'Reports', 'fa-chart-bar'],
 ];
 
@@ -57,7 +56,7 @@ function Navbar() {
         onKeyDown={(event) => {
           if (event.key === 'Escape' && menuOpen) { event.preventDefault(); closeMenu(); }
         }}>
-        <Link to="/welcome" className="workspace-brand" aria-label="Open welcome page" onClick={closeMenu}>
+        <Link to="/welcome" className="workspace-brand" aria-label="Open home page" onClick={closeMenu}>
           <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX"
             onError={(e) => { e.target.style.display = 'none'; }} />
         </Link>
@@ -71,10 +70,11 @@ function Navbar() {
           ))}
         </nav>
         <div className="workspace-account">
+          {roleCanAccess(role, '/admin/users') && <Link to="/admin/users" className={`workspace-nav-link${isActive('/admin/users') ? ' active' : ''}`} aria-current={isActive('/admin/users') ? 'page' : undefined} onClick={closeMenu}><i className="fas fa-user-gear" aria-hidden="true" /><span>User Management</span></Link>}
           {roleCanAccess(role, '/profile') && (
             <Link to="/profile" className={`workspace-nav-link${isActive('/profile') ? ' active' : ''}`}
               aria-current={isActive('/profile') ? 'page' : undefined} onClick={closeMenu}>
-              <i className="fas fa-user-circle" aria-hidden="true"></i><span>Profile</span>
+              <i className="fas fa-gear" aria-hidden="true"></i><span>Profile &amp; Settings</span>
             </Link>
           )}
           <button type="button" onClick={handleLogout} className="workspace-nav-link">

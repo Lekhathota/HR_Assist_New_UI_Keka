@@ -47,13 +47,12 @@ test('keeps all existing navigation labels, order, destinations, and the welcome
   renderWorkspace('/jobs/123');
   const links = Array.from(container.querySelectorAll('.workspace-links a'));
   expect(links.map(link => [link.textContent, link.getAttribute('href')])).toEqual([
-    ['Dashboard', '/dashboard'], ['Jobs', '/jobs'], ['Analyze', '/analyze'],
-    ['Talent', '/talent'], ['Clients', '/clients'], ['Vendors', '/vendors'],
-    ['User Management', '/admin/users'], ['Pipeline', '/hiring-pipeline'], ['Reports', '/insights'],
+    ['Home', '/welcome'], ['Jobs', '/jobs'], ['Talent', '/talent'], ['Analyze', '/analyze'],
+    ['Hiring Pipeline', '/hiring-pipeline'], ['Clients', '/clients'], ['Vendors', '/vendors'], ['Reports', '/insights'],
   ]);
   expect(container.querySelector('[aria-current="page"]').textContent).toBe('Jobs');
   expect(container.querySelector('.workspace-brand').getAttribute('href')).toBe('/welcome');
-  expect(container.querySelector('.workspace-account a').getAttribute('href')).toBe('/profile');
+  expect(container.querySelector('.workspace-account a[href="/profile"]').getAttribute('href')).toBe('/profile');
   expect(container.querySelector('.workspace-account button').textContent).toBe('Exit');
 });
 
@@ -82,11 +81,9 @@ test('Escape closes mobile navigation and returns keyboard focus', () => {
   expect(document.activeElement).toBe(toggle);
 });
 
-test('fresh public pages receive the warm palette without requiring navigation to mount', () => {
+test('fresh public pages receive the shared palette without navigation', () => {
   renderWorkspace('/assessment/example', false);
   expect(document.body.classList.contains('theme-shimento')).toBe(true);
-  expect(localStorage.getItem('color_theme_version')).toBe('ember-v1');
-  expect(localStorage.getItem('color_theme')).toBe('warm');
 });
 
 test('removes the header and its appearance controls', () => {

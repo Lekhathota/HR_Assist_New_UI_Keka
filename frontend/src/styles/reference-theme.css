@@ -71,7 +71,7 @@
 .workspace-nav-link:hover { color: #fff; background: #202128; text-decoration: none; }
 .workspace-nav-link.active { color: #fff; background: #202128; box-shadow: inset 3px 0 var(--accent-color); }
 .workspace-nav-link.active i { color: var(--accent-color); }
-.workspace-account { margin-top: auto; flex-shrink: 0; padding-top: 18px; border-top: 1px solid #29292e; }
+.workspace-account { margin-top: auto; flex-shrink: 0; padding-top: 18px; border-top: 1px solid #e6e7f6; }
 .workspace-links { padding-bottom: 24px; }
 .workspace-content {
   grid-column: 2;
@@ -98,43 +98,43 @@
 .workspace-content > .app-footer { position: relative; flex-shrink: 0; min-width: 0; margin: 0; padding: 10px 28px; min-height: 64px; }
 .main-container > * { min-width: 0; }
 
-/* The reference palette replaces the previous graphite/ember overrides. */
+/* Shared lavender design tokens for all application modules. */
 body.theme-shimento {
-  --primary-color: #141416;
-  --primary-light: #29292e;
-  --primary-dark: #0b0b0d;
-  --accent-color: #ef7a2d;
-  --accent-dark: #a64716;
-  --accent-light: #f5a536;
+  --primary-color: #161935;
+  --primary-light: #e6e7f6;
+  --primary-dark: #f4f5fc;
+  --accent-color: #5145bd;
+  --accent-dark: #4035a2;
+  --accent-light: #8a80dc;
   --success-color: #1f8f65;
   --warning-color: #ad6411;
   --danger-color: #c6382d;
-  --light-bg: #f5f4f1;
+  --light-bg: #f4f5fc;
   --lighter-bg: #fff;
-  --border-color: #e7e3dc;
-  --text-primary: #141416;
-  --text-secondary: #696b72;
-  --glow-color: #ef7a2d;
+  --border-color: #e1e5f3;
+  --text-primary: #161935;
+  --text-secondary: #60698a;
+  --glow-color: #5145bd;
   --ui-surface: #fff;
-  --ui-soft: #fff4eb;
-  --ui-inset: #f8f7f4;
-  --ui-shadow: 0 12px 36px rgba(19, 17, 15, .07);
-  --ui-gradient: linear-gradient(100deg, #f5a536, #ef7a2d, #e9472f);
+  --ui-soft: #eeecfc;
+  --ui-inset: #f6f7fd;
+  --ui-shadow: 0 3px 14px rgba(54, 47, 120, .035);
+  --ui-gradient: #5145bd;
   color-scheme: light;
   background: var(--light-bg);
   color: var(--text-primary);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  scrollbar-color: #b5aea3 var(--light-bg);
+  scrollbar-color: #b5bad3 var(--light-bg);
 }
 body.theme-shimento ::-webkit-scrollbar-track { background: var(--light-bg); }
-body.theme-shimento ::-webkit-scrollbar-thumb { background: #b5aea3; border-color: var(--light-bg); }
-body.theme-shimento :focus-visible { outline: 3px solid #a64716; outline-offset: 3px; }
+body.theme-shimento ::-webkit-scrollbar-thumb { background: #b5bad3; border-color: var(--light-bg); }
+body.theme-shimento :focus-visible { outline: 3px solid #4035a2; outline-offset: 3px; }
 
 
 
-body.theme-shimento .workspace-sidebar { background: #0b0b0d; }
-body.theme-shimento .workspace-nav-link.active { background: #201914; }
-body.theme-shimento .workspace-sidebar :focus-visible { outline-color: #f5a536; }
+body.theme-shimento .workspace-sidebar { background: #f4f5fc; }
+body.theme-shimento .workspace-nav-link.active { background: #eeecfc; }
+body.theme-shimento .workspace-sidebar :focus-visible { outline-color: #8a80dc; }
 body.theme-shimento .shimento-bg-logo { display: none; }
 
 /* Shared page typography and surfaces. Explicit classes avoid altering status
@@ -160,7 +160,7 @@ body.theme-shimento :is(.card, .jd-card, .candidate-card, .analytics-card, .acti
   color: var(--text-primary);
   background: var(--ui-surface);
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 12px;
   box-shadow: var(--ui-shadow);
 }
 body.theme-shimento :is(.jd-card, .candidate-card, .dashboard-metric-card, .welcome-action-card):hover {
@@ -200,18 +200,18 @@ body.theme-shimento :is(.list-group-item a, .candidate-name, .client-project-car
 body.theme-shimento :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select) {
   color: var(--text-primary);
   background: #fff;
-  border-color: #d9d4cb;
+  border-color: #dce0ef;
   border-radius: 11px;
   box-shadow: none;
   color-scheme: light;
 }
 body.theme-shimento :is(input, textarea)::placeholder { color: #74716c; }
-body.theme-shimento :is(input, textarea, select):focus { border-color: #c06327; box-shadow: 0 0 0 3px rgba(239, 122, 45, .13); }
-body.theme-shimento :is(input, textarea, select):focus-visible { outline: 2px solid #a64716; outline-offset: 2px; }
+body.theme-shimento :is(input, textarea, select):focus { border-color: #5145bd; box-shadow: 0 0 0 3px rgba(81, 69, 189, .13); }
+body.theme-shimento :is(input, textarea, select):focus-visible { outline: 2px solid #4035a2; outline-offset: 2px; }
 body.theme-shimento :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: #b6531c; }
 body.theme-shimento :is(.form-group label, .login-container label, .ab-label, .ca-code-label) { color: var(--text-primary); }
 body.theme-shimento .jd-create-container .form-container select.jd-create-select,
-body.theme-shimento .jd-create-container .form-container select.jd-create-select option { color: var(--text-primary); background: #fff; border-color: #d9d4cb; color-scheme: light; }
+body.theme-shimento .jd-create-container .form-container select.jd-create-select option { color: var(--text-primary); background: #fff; border-color: #dce0ef; color-scheme: light; }
 body.theme-shimento :is(.drop-zone, .upload-zone, .file-upload-area, .file-info,
   .candidate-container, .select-all-bar, .candidate-item, .list-group-item,
   .welcome-pipeline-step, .profile-field, .profile-activity-card, .workflow-admin-item,
@@ -223,28 +223,28 @@ body.theme-shimento :is(.drop-zone, .upload-zone, .file-upload-area, .file-info,
   border-radius: 12px;
   box-shadow: none;
 }
-body.theme-shimento :is(.drop-zone--over, .client-list-item.active, .vendor-job-option.selected) { background: var(--ui-soft); border-color: #c06327; }
+body.theme-shimento :is(.drop-zone--over, .client-list-item.active, .vendor-job-option.selected) { background: var(--ui-soft); border-color: #5145bd; }
 body.theme-shimento :is(.drop-zone__thumb, .candidate-client-line, .welcome-eyebrow,
   .welcome-action-card i, .welcome-briefing-card i, .dashboard-metric-icon,
   .client-section-title h2, .client-metric-card i, .activity-card-title i) { color: var(--accent-dark); }
 
 body.theme-shimento :is(.btn, .ca-btn, .date-reset-btn, .login-container button[type="submit"]) {
-  border-radius: 999px;
-  font-weight: 750;
+  border-radius: 8px;
+  font-weight: 600;
   text-shadow: none;
   box-shadow: none;
 }
 body.theme-shimento :is(.btn-primary, .ca-btn-primary, .date-reset-btn, .login-container button[type="submit"], .jd-create-container form button[type="submit"]) {
   background: var(--ui-gradient);
   border-color: transparent;
-  color: #141416;
+  color: #fff;
   box-shadow: none;
 }
-body.theme-shimento :is(.btn-secondary, .ca-btn-secondary) { background: #fff; border: 1px solid #d9d4cb; color: var(--text-primary); }
+body.theme-shimento :is(.btn-secondary, .ca-btn-secondary) { background: #fff; border: 1px solid #dce0ef; color: var(--text-primary); }
 body.theme-shimento :is(.btn-success, .ca-btn-success) { background: #187554; border-color: #187554; color: #fff; }
 body.theme-shimento .btn-danger { background: #b53028; border-color: #b53028; color: #fff; }
 body.theme-shimento .btn-warning { background: #fff0cf; border-color: #e0be80; color: #7c490c; }
-body.theme-shimento :is(.btn-info, .btn-outline-primary) { background: var(--ui-soft); border: 1px solid #ecc4a5; color: var(--accent-dark); }
+body.theme-shimento :is(.btn-info, .btn-outline-primary) { background: var(--ui-soft); border: 1px solid #d5d0f3; color: var(--accent-dark); }
 body.theme-shimento :is(.btn, .ca-btn):hover:not(:disabled) { filter: brightness(.97); box-shadow: 0 4px 12px rgba(19, 17, 15, .08); }
 body.theme-shimento :is(.badge, .tag, .candidate-category-pill, .profile-skill-badge) { border-radius: 999px; }
 body.theme-shimento .badge-primary { background: var(--ui-soft); color: var(--accent-dark); }
@@ -256,11 +256,11 @@ body.theme-shimento :is(.table-container, .table-responsive, .vendor-table-wrap,
   .reports-white-card, .reports-table-wrapper, .candidates-table-wrapper) { overflow-x: auto; }
 body.theme-shimento table { border-collapse: collapse; }
 body.theme-shimento :is(table thead, table th, .reports-insights-heading, .dbBoxHeadView) {
-  background: #faf9f7;
+  background: #f2f4fc;
   color: var(--text-secondary);
   border-color: var(--border-color);
 }
-body.theme-shimento table th { padding: 13px 15px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+body.theme-shimento table th { padding: 13px 15px; font-size: 11px; letter-spacing: .06em; text-transform: none; }
 body.theme-shimento :is(table td, table tbody tr, table tfoot, .table_block tbody tr.odd, .table_block tbody tr.even) {
   background: #fff;
   color: var(--text-primary);
@@ -289,7 +289,7 @@ body.theme-shimento .welcome-hero::before {
   height: 360px;
   inset: -160px -120px auto auto;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 65%, rgba(245,165,54,.85), rgba(239,122,45,.55) 40%, rgba(233,71,47,.12) 67%, transparent 69%);
+  background: radial-gradient(circle at 35% 65%, rgba(245,165,54,.85), rgba(81,69,189,.55) 40%, rgba(233,71,47,.12) 67%, transparent 69%);
   animation: none;
   transform: none;
 }
@@ -297,7 +297,7 @@ body.theme-shimento .welcome-hero-logo { width: 195px; filter: none; animation: 
 body.theme-shimento .welcome-hero h1 { color: #fff; font-size: clamp(30px, 3vw, 42px); line-height: 1.08; text-shadow: none; }
 body.theme-shimento .welcome-hero .welcome-eyebrow { color: #ffbe7e; font-size: 11px; }
 body.theme-shimento .welcome-hero-text { color: #b9bbc1; font-size: 14px; line-height: 1.65; }
-body.theme-shimento .welcome-module-panel { padding: 14px; gap: 7px; background: rgba(255,255,255,.07); border: 1px solid #38383c; border-radius: 20px; }
+body.theme-shimento .welcome-module-panel { padding: 14px; gap: 7px; background: rgba(255,255,255,.07); border: 1px solid #38383c; border-radius: 12px; }
 body.theme-shimento .welcome-module-row { padding: 10px; background: rgba(255,255,255,.045); border-color: #353539; border-radius: 12px; }
 body.theme-shimento .welcome-module-row strong { color: #fff; font-size: 13px; }
 body.theme-shimento .welcome-module-row small { color: #b9bbc1; font-size: 12px; }
@@ -322,7 +322,7 @@ body.theme-shimento :is(.enterprise-confirm-modal, .enterprise-confirm-dialog, .
   color: var(--text-primary);
   background: #fff;
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 12px;
   box-shadow: 0 20px 60px rgba(19,17,15,.2);
 }
 body.theme-shimento :is(.command-palette-list button, .command-palette-empty,
@@ -343,7 +343,7 @@ body.theme-shimento .flatpickr-day.today { border-color: #b6531c; }
 body.theme-shimento :is(.flatpickr-day.flatpickr-disabled, .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay) { color: #8b8882; }
 
 /* Keep the working assistant floating, styled like the reference's dark panel. */
-body.theme-shimento .floating-chat-panel { background: #111113; color: #fff; border: 1px solid #34343a; border-radius: 20px; box-shadow: var(--ui-shadow); }
+body.theme-shimento .floating-chat-panel { background: #111113; color: #fff; border: 1px solid #34343a; border-radius: 12px; box-shadow: var(--ui-shadow); }
 body.theme-shimento :is(.floating-chat-header, .floating-chat-input) { background: #111113; border-color: #34343a; }
 body.theme-shimento :is(.floating-chat-header strong, .floating-chat-header button, .floating-chat-bubble) { color: #f1f1f3; }
 body.theme-shimento :is(.floating-chat-empty p, .floating-chat-empty small) { color: #b9bbc1; }
@@ -351,8 +351,8 @@ body.theme-shimento .floating-chat-bubble { background: #202024; border-color: #
 body.theme-shimento :is(.floating-chat-actions button, .floating-chat-suggestions button, .floating-chat-starters button) { background: #2b211b; color: #ffc18b; border-color: #60412b; }
 body.theme-shimento .floating-chat-input input { background: #202024; color: #fff; border-color: #49494f; }
 body.theme-shimento .floating-chat-input input::placeholder { color: #b9bbc1; }
-body.theme-shimento .floating-chat-input button { background: var(--ui-gradient); color: #141416; }
-body.theme-shimento .floating-chat-toggle { background: #111113; border-color: #ef7a2d; box-shadow: 0 8px 24px rgba(19,17,15,.18); }
+body.theme-shimento .floating-chat-input button { background: var(--ui-gradient); color: #161935; }
+body.theme-shimento .floating-chat-toggle { background: #111113; border-color: #5145bd; box-shadow: 0 8px 24px rgba(19,17,15,.18); }
 
 body.theme-shimento .app-footer { background: #fff; color: var(--text-secondary); border-top: 1px solid var(--border-color); box-shadow: none; margin-top: 0; }
 body.theme-shimento .app-footer::before { display: none; }
@@ -368,22 +368,22 @@ body.theme-shimento .login-visual-brand { color: #e0dcd6; text-shadow: none; }
 body.theme-shimento .login-visual-logo { filter: none; animation: none; }
 body.theme-shimento .login-container { background: #fff; color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: var(--ui-shadow); border-radius: 24px; }
 body.theme-shimento .login-header img { background: #fff; padding: 0; border-radius: 0; filter: none; animation: none; }
-body.theme-shimento .login-container input:focus { color: var(--text-primary); background: #fff; border-color: #c06327; box-shadow: 0 0 0 3px rgba(239,122,45,.13); }
+body.theme-shimento .login-container input:focus { color: var(--text-primary); background: #fff; border-color: #5145bd; box-shadow: 0 0 0 3px rgba(81,69,189,.13); }
 body.theme-shimento .login-startup { background: #111113; border-radius: 24px; }
 body.theme-shimento .login-startup-status { color: #ffc18b; }
 body.theme-shimento .login-auth-panel { min-height: 0; overflow: visible; }
 body.theme-shimento .ca-page { background: var(--light-bg); color: var(--text-primary); }
 body.theme-shimento :is(.ca-header, .ca-footer) { background: #111113; border-color: #34343a; color: #fff; }
 body.theme-shimento .ca-nav-item { color: var(--text-primary); border-radius: 10px; }
-body.theme-shimento .ca-nav-item.active { background: var(--ui-soft); border-color: #c06327; }
-body.theme-shimento .ca-nav-num { background: #e7e3dc; color: #141416; }
+body.theme-shimento .ca-nav-item.active { background: var(--ui-soft); border-color: #5145bd; }
+body.theme-shimento .ca-nav-num { background: #e1e5f3; color: #161935; }
 body.theme-shimento .ca-nav-item.answered .ca-nav-num { background: #187554; color: #fff; }
 body.theme-shimento .ca-question-badge { background: var(--ui-soft); color: var(--accent-dark); border-radius: 999px; }
-body.theme-shimento .ca-code-input { background: #141416; color: #e7e3dc; border-color: #45454c; }
-body.theme-shimento .ca-code-input:focus { background: #141416; color: #e7e3dc; }
-body.theme-shimento .ca-option:hover { border-color: #c06327; background: var(--ui-soft); }
-body.theme-shimento .ca-brand i { color: #f5a536; }
-body.theme-shimento .ca-spinner { border-top-color: #c06327; }
+body.theme-shimento .ca-code-input { background: #161935; color: #e1e5f3; border-color: #45454c; }
+body.theme-shimento .ca-code-input:focus { background: #161935; color: #e1e5f3; }
+body.theme-shimento .ca-option:hover { border-color: #5145bd; background: var(--ui-soft); }
+body.theme-shimento .ca-brand i { color: #8a80dc; }
+body.theme-shimento .ca-spinner { border-top-color: #5145bd; }
 body.theme-shimento .ca-inline-error { background: #fceceb; color: #a42c24; border-color: #e8b5ae; }
 
 /* Page-specific details previously authored with fixed dark-theme colors. */
@@ -392,7 +392,7 @@ body.theme-shimento :is(.analyze-jd-context, .analyze-result-card, .analyze-resu
   color: var(--text-primary);
   background: #fff;
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 12px;
   box-shadow: var(--ui-shadow);
 }
 body.theme-shimento :is(.analyze-jd-context-grid > div, .analyze-explain-grid > div,
@@ -426,7 +426,7 @@ body.theme-shimento :is(.analyze-skill-row span, .analyze-skill-row em, .profile
   .jd-category-pill, .candidate-category-pill, .vendor-file-picker) {
   background: var(--ui-soft);
   color: var(--accent-dark);
-  border-color: #ecc4a5;
+  border-color: #d5d0f3;
   border-radius: 999px;
 }
 body.theme-shimento .vendor-table td span:not([class]) { color: var(--text-secondary); }
@@ -440,7 +440,7 @@ body.theme-shimento :is(.comparison-tab, .hp-main-tabs button, .interviews-tabs 
   border-radius: 999px;
 }
 body.theme-shimento :is(.comparison-tab.active, .hp-main-tabs button.active, .interviews-tabs button.active,
-  .paginate_button.current, .paginate_button:hover:not(.disabled)) { background: var(--ui-soft); color: var(--accent-dark); border-color: #c06327; }
+  .paginate_button.current, .paginate_button:hover:not(.disabled)) { background: var(--ui-soft); color: var(--accent-dark); border-color: #5145bd; }
 body.theme-shimento .paginate_button.disabled { color: #76716a; background: var(--ui-inset); }
 body.theme-shimento .interviews-search { color: var(--text-secondary); background: #fff; border-color: var(--border-color); border-radius: 999px; }
 body.theme-shimento .date-range-picker-container { background: #fff; border-color: var(--border-color); box-shadow: none; }
@@ -470,10 +470,10 @@ body.theme-shimento :is(.progress-label span, .analytics-card .list-group-item s
 body.theme-shimento .activity-card .list-group-item a:is(:hover, :focus-visible) { color: var(--accent-dark); }
 body.theme-shimento .profile-hero { border-color: var(--border-color); }
 body.theme-shimento .profile-hero-name { background: none; -webkit-text-fill-color: currentColor; color: var(--text-primary); filter: none; }
-body.theme-shimento .profile-hero-avatar { background: var(--ui-gradient); color: #141416; box-shadow: none; }
+body.theme-shimento .profile-hero-avatar { background: var(--ui-gradient); color: #161935; box-shadow: none; }
 body.theme-shimento .profile-toggle-slider { background: #b6531c; }
 body.theme-shimento .screening-loader { background: var(--ui-soft); box-shadow: none; }
-body.theme-shimento .screening-loader-line { background: linear-gradient(90deg, transparent, #ef7a2d, #1f8f65, transparent); box-shadow: none; }
+body.theme-shimento .screening-loader-line { background: linear-gradient(90deg, transparent, #5145bd, #1f8f65, transparent); box-shadow: none; }
 body.theme-shimento .client-gap-bar span { background: var(--ui-gradient); }
 body.theme-shimento .result-progress-bar-rejected { background: linear-gradient(90deg, #c6382d, #a42c24); }
 body.theme-shimento :is(.result-score-selected, .profile-category-confidence) { color: #187554; }
@@ -484,13 +484,13 @@ body.theme-shimento :is(.vendor-alert:not(.vendor-alert-error), .upload-warning-
 body.theme-shimento :is(.enterprise-confirm-close, .command-palette-input kbd) { color: var(--text-secondary); background: var(--ui-inset); border-color: var(--border-color); }
 body.theme-shimento .flatpickr-day.inRange { background: var(--ui-soft); color: var(--text-primary); border-color: var(--ui-soft); box-shadow: -5px 0 0 var(--ui-soft), 5px 0 0 var(--ui-soft); }
 body.theme-shimento :is(.flatpickr-prev-month, .flatpickr-next-month) { color: var(--text-primary); fill: currentColor; }
-body.theme-shimento .ab-code-preview { background: #141416; color: #e7e3dc; }
+body.theme-shimento .ab-code-preview { background: #161935; color: #e1e5f3; }
 body.theme-shimento .floating-chat-message-user .floating-chat-bubble { background: #2b211b; color: #ffc18b; border-color: #60412b; }
-body.theme-shimento .login-startup-ring { border-color: #9a552a; box-shadow: 0 0 30px rgba(239,122,45,.12); }
-body.theme-shimento .login-startup-scan { background: linear-gradient(90deg, transparent, #f5a536, transparent); }
+body.theme-shimento .login-startup-ring { border-color: #9a552a; box-shadow: 0 0 30px rgba(81,69,189,.12); }
+body.theme-shimento .login-startup-scan { background: linear-gradient(90deg, transparent, #8a80dc, transparent); }
 body.theme-shimento .login-container button[type="submit"]:hover { box-shadow: 0 8px 20px rgba(19,17,15,.12); }
 body.theme-shimento .enterprise-skeleton-item { border-color: var(--border-color); border-radius: 18px; box-shadow: none; }
-body.theme-shimento .enterprise-skeleton-item span { background: linear-gradient(90deg, #e7e3dc, #faf9f7, #e7e3dc); background-size: 200% 100%; }
+body.theme-shimento .enterprise-skeleton-item span { background: linear-gradient(90deg, #e1e5f3, #f2f4fc, #e1e5f3); background-size: 200% 100%; }
 body.theme-shimento :is(.profile-edu-meta, .profile-exp-item, .profile-exp-dates,
   .profile-jd-date, .profile-jd-date-day, .profile-pref-desc, .profile-screening-summary,
   .profile-screening-strengths, .profile-screening-gaps) { color: var(--text-secondary); }
@@ -500,7 +500,7 @@ body.theme-shimento :is(.profile-jd-score, .profile-skill-badge, .profile-screen
 body.theme-shimento :is(.profile-screening-status-rejected, .vendor-status.status-inactive) { color: #a42c24; }
 body.theme-shimento .required-card.priority-high { border-color: #d38e85; }
 body.theme-shimento .required-card.priority-high .client-role-card-head span { color: #a42c24; background: #fceceb; border-color: #e8b5ae; }
-body.theme-shimento .client-project-card.active { background: var(--ui-soft); border-color: #c06327; }
+body.theme-shimento .client-project-card.active { background: var(--ui-soft); border-color: #5145bd; }
 body.theme-shimento .analyze-result-selected { border-color: #9bcab6; }
 body.theme-shimento .analyze-result-rejected { border-color: #dba29c; }
 body.theme-shimento .interview-card-highlight { border-color: #187554; box-shadow: 0 0 0 3px rgba(31,143,101,.15); }
@@ -634,7 +634,7 @@ body.theme-shimento.frontend-polish .workspace-content > .main-container {
 
 /* Login sizing works at ordinary and zoomed/short viewport heights. The form
    sets the minimum page height, so scrolling never clips inputs or errors. */
-body:has(.login-page) { display: block; overflow: auto; background: #0b0b0d; }
+body:has(.login-page) { display: block; overflow: auto; background: #f4f5fc; }
 body .login-page {
   position: relative;
   inset: auto;
@@ -653,7 +653,7 @@ body .login-page.login-full {
   gap: 0;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  background: #0b0b0d;
+  background: #f4f5fc;
 }
 body .login-full .login-visual-panel {
   background: transparent;
@@ -685,12 +685,12 @@ body .login-page.login-full .login-visual-logo.login-logo-alive {
   0%, 100% {
     opacity: .72;
     transform: scale(1);
-    filter: drop-shadow(0 0 0 rgba(239, 122, 45, 0));
+    filter: drop-shadow(0 0 0 rgba(81, 69, 189, 0));
   }
   50% {
     opacity: 1;
     transform: scale(1.035);
-    filter: drop-shadow(0 0 24px rgba(239, 122, 45, .34));
+    filter: drop-shadow(0 0 24px rgba(81, 69, 189, .34));
   }
 }
 body .login-full .login-auth-panel { padding: 32px 16px; }
@@ -703,27 +703,27 @@ body .login-full .login-container {
 }
 body .login-full .login-header img { background: transparent; }
 body .login-full .login-header p { color: #bbb9b5; text-shadow: none; }
-body .login-full .login-container label { color: #f5f4f1; }
+body .login-full .login-container label { color: var(--text-primary); }
 body .login-full .login-container input {
   background: #fff;
-  color: #141416;
-  border: 1px solid #e7e3dc;
+  color: #161935;
+  border: 1px solid #e1e5f3;
 }
 body .login-full .login-container input:focus {
   background: #fff;
-  color: #141416;
-  border-color: #ef7a2d;
-  box-shadow: 0 0 0 3px rgba(239,122,45,.25);
+  color: #161935;
+  border-color: #5145bd;
+  box-shadow: 0 0 0 3px rgba(81,69,189,.25);
 }
 body .login-full .login-container input::placeholder { color: #6a6865; }
 body .login-full .login-container button[type="submit"] {
-  background: linear-gradient(110deg, #f5a32d, #ef482d);
-  color: #141416;
+  background: var(--ui-gradient);
+  color: #fff;
   border: 0;
   border-radius: 999px;
   box-shadow: none;
 }
-body .login-full .login-startup { background: #0b0b0d; }
+body .login-full .login-startup { background: #f4f5fc; }
 body .login-page .login-auth-panel { min-height: 0; overflow: visible; }
 body .login-page .login-container { width: 100%; max-width: 440px; margin: 0; padding: 32px; }
 body .login-page .login-header { margin-bottom: 28px; }
@@ -735,8 +735,8 @@ body .login-page .login-container input { min-height: 46px; padding: 12px 14px; 
 body .login-page .login-container button[type="submit"] { padding: 13px 18px; min-height: 46px; font-size: 14px; letter-spacing: .06em; }
 body.theme-shimento .login-container input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 1000px #fff inset;
-  -webkit-text-fill-color: #141416;
-  caret-color: #141416;
+  -webkit-text-fill-color: #161935;
+  caret-color: #161935;
 }
 body .login-page .login-startup { min-height: 420px; }
 body .login-page .login-startup-logo { width: min(220px, calc(100% - 16px)); border: 0; border-radius: 2px; box-shadow: none; }
@@ -1180,4 +1180,52 @@ body {
         width: 34px;
         height: 34px;
     }
+}
+
+/* Page spacing audit: the shell owns outer gutters; modules own their sections.
+   Keep control, editor and assessment footer dimensions intact. */
+body.theme-shimento .workspace-content > .main-container > :is(
+  .jobs-page, .candidates-container, .jd-details-container, .interviews-container,
+  .clients-page, .vendors-page, .profile-container, .workflow-admin-page, .um-page,
+  .ab-container, .jd-create-container) {
+  padding: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  min-height: 0;
+}
+body.theme-shimento :is(.jobs-head, .candidates-header, .interviews-header,
+  .clients-header, .vendors-header, .profile-header, .ab-topbar,
+  .project-detail-header, .profile-details-topbar, .jdd-topbar) { margin-bottom: 16px; }
+body.theme-shimento :is(.jd-create-page .jd-create-section,
+  .client-create-container .client-create-section,
+  .client-create-container .client-hiring-stages) { margin-top: 24px; }
+body.theme-shimento :is(.jd-create-page .jd-create-form > .jd-create-section:first-child,
+  .client-create-container form > .client-create-section:first-child) { margin-top: 20px; }
+body.theme-shimento :is(.profile-box, .profile-section-box, .um-card,
+  .workflow-admin-head, .workflow-admin-panel, .ab-settings, .ab-question-card) { padding: 20px; }
+body.theme-shimento :is(.profile-grid-gap, .profile-resume-grid, .clients-layout,
+  .project-detail-page, .um-page, .workflow-admin-page) { gap: 16px; }
+body.theme-shimento :is(.profile-box-title, .profile-update-title) { margin-bottom: 16px; }
+body.theme-shimento .profile-activity-section { margin-top: 20px; }
+body.theme-shimento .profile-hr { margin: 20px 0; }
+body.theme-shimento .profile-info { margin-top: 16px; gap: 12px; }
+body.theme-shimento .profile-field { padding: 12px 16px; }
+body.theme-shimento :is(.client-project-card, .client-role-card,
+  .project-info-grid .client-info-item) { min-height: 0; }
+body.theme-shimento .vendor-metrics > div { min-height: 80px; padding: 12px 16px; }
+body.theme-shimento :is(.jd-empty-state, .jd-empty-card, .candidates-empty-state,
+  .profile-loading, .ab-loading, .ab-empty, .results-empty, .analyze-results-empty,
+  .interviews-empty, .clients-empty, .vendors-empty) { padding: 24px; min-height: 0; }
+body.theme-shimento .results-section { margin-top: 24px; }
+body.theme-shimento .jd-list-section { margin-top: 24px; }
+body.theme-shimento .ab-container { padding-bottom: 0; }
+body.theme-shimento .ca-card { margin: 24px auto; padding: 24px; }
+body.theme-shimento .ca-question-card { padding: 20px; }
+/* Login keeps its dedicated two-panel layout and viewport centering. */
+body.theme-shimento .login-container .form-group { margin-bottom: 20px; }
+@media (max-width: 640px) {
+  body.theme-shimento :is(.profile-box, .profile-section-box, .um-card,
+    .workflow-admin-head, .workflow-admin-panel, .ab-settings, .ab-question-card,
+    .ca-question-card) { padding: 16px; }
+  body.theme-shimento .ca-card { margin: 16px; padding: 20px; }
 }

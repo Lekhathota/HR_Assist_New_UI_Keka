@@ -38,7 +38,7 @@ function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const { ok, data } = await apiPost('/api/login', { username, password });
+      const { ok, status, data } = await apiPost('/api/login', { username, password });
       if (ok && data.success) {
         saveToken(data.token);
         if (data.user) {
@@ -48,7 +48,9 @@ function Login() {
         navigate('/welcome');
         return;
       } else {
-        setError(data.message || 'Invalid credentials');
+        setError(data?.message || data?.error || (status === 401
+          ? 'Invalid username or password.'
+          : 'Login service unavailable. Make sure the backend is running and try again.'));
       }
     } catch {
       setError('Login failed. Please try again.');

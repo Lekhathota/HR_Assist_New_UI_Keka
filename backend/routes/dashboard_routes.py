@@ -1,7 +1,8 @@
 # Backend file purpose: Flask route handlers for dashboard features.
 from __future__ import annotations
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+from services.analytics_service import analytics_payload
 
 from spa_urls import redirect_to_spa
 
@@ -22,6 +23,11 @@ def dashboard():
 @dashboard_bp.route("/api/dashboard", endpoint="api_dashboard")
 @api_login_required
 def api_dashboard():
+    if any(key in request.args for key in ('analytics', 'start_date', 'end_date', 'jd_id')):
+        try:
+            return jsonify(analytics_payload(request.args))
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
     return jsonify(dashboard_payload())
 
 

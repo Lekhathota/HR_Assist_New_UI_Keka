@@ -5,6 +5,7 @@ import App from './App.jsx';
 import { AppearanceProvider } from './components/AppearanceProvider.jsx';
 // Load the reference theme after every existing page stylesheet.
 import './styles/reference-theme.css';
+import './styles/analytics.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<AppearanceProvider><App /></AppearanceProvider>);

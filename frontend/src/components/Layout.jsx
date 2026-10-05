@@ -1,11 +1,12 @@
 import React from 'react';
-import { useAppearance } from './AppearanceProvider.jsx';
+import { Link } from 'react-router-dom';
 import Navbar from './Navbar.jsx';
 import FloatingRecruiterChat from './FloatingRecruiterChat.jsx';
+import { readUser, displayName, initials } from '../utils/userDisplay.js';
 
 
 function Layout({ children }) {
-  const { colorTheme } = useAppearance();
+  const user = readUser();
   return (
     <div className="app-shell">
       <img
@@ -17,6 +18,13 @@ function Layout({ children }) {
       />
       <Navbar />
       <div className="workspace-content">
+      <header className="workspace-topbar">
+        <button className="workspace-search" type="button" onClick={() => window.dispatchEvent(new Event('open-command-palette'))}>
+          <i className="fas fa-search" aria-hidden="true" /><span>Search pages and actions…</span><kbd>Ctrl K</kbd>
+        </button>
+        <div className="workspace-header-account"><span className="workspace-notification" role="img" aria-label="Notifications are not configured" title="Notifications are not configured"><i className="far fa-bell" aria-hidden="true" /></span>
+        <Link className="workspace-user" to="/profile"><span className="workspace-avatar">{initials(displayName(user))}</span><span><strong>{displayName(user)}</strong><small>{String(user.role || '').replaceAll('_', ' ')}</small></span><i className="fas fa-chevron-down" aria-hidden="true" /></Link></div>
+      </header>
       <main className="main-container">
         {children}
       </main>

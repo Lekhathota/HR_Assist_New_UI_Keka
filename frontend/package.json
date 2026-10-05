@@ -2,7 +2,7 @@
   "name": "recruitment-assist-frontend",
   "version": "1.0.0",
   "private": true,
-  "proxy": "http://127.0.0.1:5000",
+  "proxy": "http://127.0.0.1:5001",
   "dependencies": {
     "docx": "^8.5.0",
     "file-saver": "^2.0.5",

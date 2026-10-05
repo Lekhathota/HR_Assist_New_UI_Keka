@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import Login from './pages/Login.jsx';
-import Dashboard from './pages/Dashboard.jsx';
 import Welcome from './pages/Welcome.jsx';
 import JdList from './pages/JdList.jsx';
 import JdCreate from './pages/JdCreate.jsx';
@@ -51,7 +50,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/assessment/:token" element={<CandidateAssessment />} />
         <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><Navigate to="/welcome" replace /></ProtectedRoute>} />
 
         <Route path="/jobs" element={<ProtectedRoute><JdList /></ProtectedRoute>} />
         <Route path="/jobs/create" element={<ProtectedRoute><JdCreate /></ProtectedRoute>} />

@@ -249,7 +249,7 @@ if __name__ == "__main__":
     # to 0.0.0.0 so its internal proxy can route traffic in. FLASK_HOST/PORT
     # are kept as overrides for local development.
     host = (os.environ.get("FLASK_HOST") or "0.0.0.0").strip()
-    port = int(os.environ.get("DATABRICKS_APP_PORT") or os.environ.get("PORT", "5000"))
+    port = int(os.environ.get("DATABRICKS_APP_PORT") or os.environ.get("PORT", "5001"))
     debug = os.environ.get("FLASK_DEBUG", "").lower() == "true"
     try:
         init_db()

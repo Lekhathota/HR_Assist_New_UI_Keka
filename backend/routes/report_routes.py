@@ -12,6 +12,7 @@ import os
 import base64
 from datetime import datetime
 from services.report_service import reports_payload
+from services.analytics_service import analytics_payload
 from services.auth_service import api_login_required
 
 report_bp = Blueprint('report_routes', __name__)
@@ -110,4 +111,9 @@ def api_reports():
     """
     Get report data for dashboards and report exports.
     """
+    if any(key in request.args for key in ('analytics', 'start_date', 'end_date', 'jd_id')):
+        try:
+            return jsonify(analytics_payload(request.args))
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
     return jsonify(reports_payload())
