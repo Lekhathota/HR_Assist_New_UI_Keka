@@ -179,3 +179,17 @@
   .auth-page .auth-blob, .auth-page .auth-card, .auth-page .auth-logo { animation: none; }
   .auth-page *, .auth-page *::before, .auth-page *::after { transition: none !important; }
 }
+
+/* Shown briefly while a remembered session is verified. */
+.auth-page .auth-resuming { display: grid; justify-items: center; gap: 18px; color: var(--auth-muted); font-size: 14px; }
+.auth-page .auth-resuming p { display: flex; align-items: center; gap: 10px; margin: 0; }
+.auth-page .auth-resuming i { color: var(--auth-accent); }
+
+/* The whole field box shows focus (orange border + soft ring via :focus-within),
+   so the inner text input must not draw the theme's own focus outline. */
+.auth-page .auth-field-body input:focus,
+.auth-page .auth-field-body input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}

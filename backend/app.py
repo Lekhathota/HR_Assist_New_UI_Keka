@@ -233,6 +233,9 @@ def _ensure_db():
 
 @app.get("/favicon.ico")
 def favicon():
+    # Serve the ShimentoX tab icon from the React build when it exists.
+    if os.path.isfile(os.path.join(BUILD_DIR, "favicon.ico")):
+        return send_from_directory(BUILD_DIR, "favicon.ico")
     return ("", 204)
 
 

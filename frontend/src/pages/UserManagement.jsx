@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../api.js';
+import { apiGet, apiPost, getToken } from '../api.js';
 import Layout from '../components/Layout.jsx';
 import '../styles/user-management.css';
 
@@ -35,7 +35,7 @@ export default function UserManagement() {
   const update = async (user, patch) => {
     setError(''); setNotice('');
     try {
-      const res = await fetch(`/api/admin/users/${user.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Session-Token': localStorage.getItem('session_token') || '' }, body: JSON.stringify(patch) });
+      const res = await fetch(`/api/admin/users/${user.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Session-Token': getToken() }, body: JSON.stringify(patch) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Update failed.');
       setNotice('User updated.'); setReload(v => v + 1);

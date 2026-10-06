@@ -2,9 +2,9 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import Login from './Login.jsx';
-import { apiPost, saveToken } from '../api.js';
+import { apiGet, apiPost, getToken, saveToken } from '../api.js';
 
-jest.mock('../api.js', () => ({ apiPost: jest.fn(), saveToken: jest.fn() }));
+jest.mock('../api.js', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), getToken: jest.fn(() => ''), saveToken: jest.fn() }));
 
 let container, root;
 const $ = selector => container.querySelector(selector);
@@ -43,8 +43,8 @@ test('signs in, stores the session and opens Home', async () => {
   await type($('#username'), 'lekha');
   await type($('#password'), 'secret');
   await act(async () => $('.auth-submit').click());
-  expect(apiPost).toHaveBeenCalledWith('/api/login', { username: 'lekha', password: 'secret' });
-  expect(saveToken).toHaveBeenCalledWith('t1');
+  expect(apiPost).toHaveBeenCalledWith('/api/login', { username: 'lekha', password: 'secret', remember: false });
+  expect(saveToken).toHaveBeenCalledWith('t1', false);
   expect(JSON.parse(localStorage.getItem('recruitment_assist_user')).role).toBe('admin');
   expect($('output').textContent).toBe('/welcome');
 });
@@ -64,6 +64,8 @@ test('Remember me stores only the username and prefills it next time', async () 
   await type($('#password'), 'secret');
   await act(async () => $('.auth-remember input').click());
   await act(async () => $('.auth-submit').click());
+  expect(apiPost).toHaveBeenCalledWith('/api/login', { username: 'lekha', password: 'secret', remember: true });
+  expect(saveToken).toHaveBeenCalledWith('t1', true);
   expect(localStorage.getItem('shimentox_remembered_username')).toBe('lekha');
   expect(JSON.stringify(localStorage)).not.toContain('secret');
 
@@ -82,4 +84,32 @@ test('forgot password explains how to reset, and no social sign-in is offered', 
   expect(apiPost).not.toHaveBeenCalled();
   expect($('.auth-sso')).toBeNull();
   expect(container.textContent).not.toMatch(/Google|Microsoft|continue with/i);
+});
+
+async function renderFresh(entry = '/login') {
+  act(() => root.unmount());
+  root = createRoot(container);
+  await act(async () => root.render(
+    <MemoryRouter initialEntries={[entry]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Login /><LocationProbe />
+    </MemoryRouter>
+  ));
+}
+
+test('a remembered session skips the form and opens the app', async () => {
+  getToken.mockReturnValue('saved-token');
+  apiGet.mockResolvedValue({ user: { username: 'lekha' } });
+  await renderFresh();
+  expect(apiGet).toHaveBeenCalledWith('/api/profile');
+  expect($('output').textContent).toBe('/welcome');
+  expect($('#password')).toBeNull();
+});
+
+test('an expired saved session falls back to the sign-in form', async () => {
+  getToken.mockReturnValue('expired-token');
+  apiGet.mockRejectedValue(new Error('GET /api/profile failed: 401'));
+  await renderFresh();
+  expect($('#password')).not.toBeNull();
+  expect($('output').textContent).toBe('/login');
+  getToken.mockReturnValue('');
 });

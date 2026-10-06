@@ -84,9 +84,9 @@ def authenticate(username: str, password: str) -> Optional[dict]:
 
 
 # Purpose: Implements the login user backend behavior.
-def login_user(user: dict) -> str:
+def login_user(user: dict, remember: bool = False) -> str:
     token = secrets.token_urlsafe(32)
-    db.replace_user_session_token(int(user["id"]), token)
+    db.create_user_session_token(int(user["id"]), token, remember=remember)
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     session["role"] = user.get("role", "")

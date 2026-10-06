@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiPost, saveToken } from '../api.js';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { apiGet, apiPost, getToken, saveToken } from '../api.js';
 import '../styles/login.css';
 import '../styles/auth.css';
 
@@ -22,12 +22,26 @@ function Login() {
   const [error, setError]       = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // A saved session (from "Remember me") is verified and skips the form entirely.
+  const [resuming, setResuming] = useState(() => Boolean(getToken()));
   const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || getToken()) return false;
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     return !prefersReducedMotion && sessionStorage.getItem(LOGIN_INTRO_SEEN_KEY) !== 'true';
   });
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = location.state?.from?.pathname && location.state.from.pathname !== '/login'
+    ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/welcome';
+
+  useEffect(() => {
+    if (!resuming) return undefined;
+    let cancelled = false;
+    apiGet('/api/profile')
+      .then(() => { if (!cancelled) navigate(destination, { replace: true }); })
+      .catch(() => { if (!cancelled) setResuming(false); });  // expired/invalid: show the form
+    return () => { cancelled = true; };
+  }, [resuming, navigate, destination]);
 
   useEffect(() => {
     if (!showIntro) return undefined;
@@ -49,9 +63,9 @@ function Login() {
     setNotice('');
     setSubmitting(true);
     try {
-      const { ok, status, data } = await apiPost('/api/login', { username, password });
+      const { ok, status, data } = await apiPost('/api/login', { username, password, remember });
       if (ok && data.success) {
-        saveToken(data.token);
+        saveToken(data.token, remember);
         try {
           if (remember) localStorage.setItem(REMEMBERED_USERNAME_KEY, username.trim());
           else localStorage.removeItem(REMEMBERED_USERNAME_KEY);
@@ -60,7 +74,7 @@ function Login() {
           const { username: savedUsername, role, email } = data.user;
           localStorage.setItem(LOGIN_USER_KEY, JSON.stringify({ username: savedUsername, role, email }));
         }
-        navigate('/welcome');
+        navigate(destination, { replace: true });
         return;
       } else {
         setError(data?.message || data?.error || (status === 401
@@ -72,6 +86,17 @@ function Login() {
     }
     setSubmitting(false);
   };
+
+  if (resuming) {
+    return (
+      <div className="auth-page">
+        <div className="auth-resuming" role="status">
+          <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX" className="auth-logo" />
+          <p><i className="fas fa-spinner fa-spin" aria-hidden="true" /> Signing you in…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">

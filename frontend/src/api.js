@@ -43,8 +43,14 @@ function clearVendorCache() {
   sessionStorage.removeItem(VENDOR_CACHE_KEY);
 }
 
+const TOKEN_KEY = 'session_token';
+
 export function getToken() {
-  return localStorage.getItem('session_token') || '';
+  try {
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
 }
 
 function authHeaders(extra = {}) {
@@ -315,12 +321,23 @@ export async function apiPostForm(path, formData) {
   return { ok: res.ok, status: res.status, data: unwrapAgentic(data) };
 }
 
-export function saveToken(token) {
-  localStorage.setItem('session_token', token);
+/**
+ * "Remember me" keeps the session in localStorage so it survives closing the browser;
+ * otherwise it lives in sessionStorage and ends with the browser session.
+ */
+export function saveToken(token, remember = false) {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, token);
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 export function clearToken() {
-  localStorage.removeItem('session_token');
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ }
+  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(LOGIN_USER_KEY);
   clearJdCache();
   clearTalentCache();

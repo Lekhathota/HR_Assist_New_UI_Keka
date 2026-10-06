@@ -68,8 +68,9 @@ def api_login():
         return jsonify({"success": False, "message": "Service unavailable. Check database configuration."}), 503
     if not user:
         return jsonify({"success": False, "message": "Invalid username or password."}), 401
-    token = login_user(user)
-    return jsonify({"success": True, "token": token, "user": {"id": user.get("id"), "username": user.get("username"), "email": user.get("email"), "role": user.get("role")}})
+    remember = data.get("remember") is True
+    token = login_user(user, remember=remember)
+    return jsonify({"success": True, "token": token, "remember": remember, "user": {"id": user.get("id"), "username": user.get("username"), "email": user.get("email"), "role": user.get("role")}})
 
 
 # Purpose: API endpoint handler for logout.

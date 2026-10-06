@@ -133,6 +133,18 @@ def _session_token_ttl_seconds() -> int:
     return max(1, hours) * 60 * 60
 
 
+# "Remember me" sessions last this long (default 30 days); normal sessions use the hours above.
+def _remember_session_ttl_seconds() -> int:
+    try:
+        days = int(os.environ.get("REMEMBER_ME_DAYS") or "30")
+    except ValueError:
+        days = 30
+    return max(1, days) * 24 * 60 * 60
+
+
+MAX_SESSIONS_PER_USER = 10
+
+
 def _coerce_datetime(value: Any) -> Optional[datetime]:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -225,7 +237,15 @@ def _ensure_indexes() -> None:
     db.agent_runs.create_index([("username", ASCENDING), ("created_at", DESCENDING)])
     db.user_session_tokens.create_index([("token", ASCENDING)], unique=True)
     db.user_session_tokens.create_index([("user_id", ASCENDING)])
-    db.user_session_tokens.create_index([("created_at", ASCENDING)], expireAfterSeconds=_session_token_ttl_seconds())
+    # Each token now carries its own expiry, so remembered sessions can outlive the
+    # normal TTL. Replace the old created_at TTL index, which would delete them early.
+    try:
+        for name, spec in db.user_session_tokens.index_information().items():
+            if spec.get("key") == [("created_at", 1)] and "expireAfterSeconds" in spec:
+                db.user_session_tokens.drop_index(name)
+    except OperationFailure:
+        pass
+    db.user_session_tokens.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
     db.dashboard_metrics.create_index([("updated_at", DESCENDING)])
     from assessment.repository import ensure_assessment_indexes
 
@@ -2599,11 +2619,33 @@ def verify_audit_chain() -> dict[str, Any]:
     return {"valid": True, "checked": checked, "broken_id": None, "reason": ""}
 
 
-# Purpose: Implements the replace user session token backend behavior.
-def replace_user_session_token(user_id: int, token: str) -> None:
+def _session_expiry(row: dict) -> Optional[datetime]:
+    expires_at = _coerce_datetime(row.get("expires_at"))
+    if expires_at:
+        return expires_at
+    created_at = _coerce_datetime(row.get("created_at"))  # tokens issued before per-token expiry
+    return created_at + timedelta(seconds=_session_token_ttl_seconds()) if created_at else None
+
+
+# Purpose: Stores a new session token. Other devices stay signed in; expired and
+# surplus (oldest beyond MAX_SESSIONS_PER_USER) sessions for the user are pruned.
+def create_user_session_token(user_id: int, token: str, remember: bool = False) -> datetime:
     db = _database()
-    db.user_session_tokens.delete_many({"user_id": int(user_id)})
-    db.user_session_tokens.insert_one({"token": token, "user_id": int(user_id), "created_at": _now()})
+    uid = int(user_id)
+    now = _now()
+    ttl = _remember_session_ttl_seconds() if remember else _session_token_ttl_seconds()
+    expires_at = now + timedelta(seconds=ttl)
+    db.user_session_tokens.insert_one({
+        "token": token, "user_id": uid, "created_at": now, "expires_at": expires_at, "remember": bool(remember),
+    })
+    rows = list(db.user_session_tokens.find({"user_id": uid}, {"token": 1, "created_at": 1, "expires_at": 1}))
+    live = [row for row in rows if (_session_expiry(row) or now) > now]
+    stale = [row["token"] for row in rows if row not in live]
+    live.sort(key=lambda row: _coerce_datetime(row.get("created_at")) or now, reverse=True)
+    stale += [row["token"] for row in live[MAX_SESSIONS_PER_USER:]]
+    if stale:
+        db.user_session_tokens.delete_many({"token": {"$in": stale}})
+    return expires_at
 
 
 # Purpose: Deletes session token records or payloads.
@@ -2619,8 +2661,8 @@ def user_id_for_session_token(token: str) -> Optional[int]:
     row = _database().user_session_tokens.find_one({"token": token})
     if not row:
         return None
-    created_at = _coerce_datetime(row.get("created_at"))
-    if not created_at or created_at < (_now() - timedelta(seconds=_session_token_ttl_seconds())):
+    expires_at = _session_expiry(row)
+    if not expires_at or expires_at <= _now():
         delete_session_token(token)
         return None
     return int(row["user_id"])
