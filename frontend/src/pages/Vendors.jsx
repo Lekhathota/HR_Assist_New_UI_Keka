@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import { apiDelete, apiGet, apiPost, apiPostForm, apiPut, readSessionCache, VENDOR_CACHE_KEY, writeSessionCache } from '../api.js';
@@ -19,8 +20,16 @@ const EMPTY_VENDOR_FORM = {
 function Vendors() {
   const confirm = useConfirm();
   const [vendors, setVendors] = useState(() => readSessionCache(VENDOR_CACHE_KEY) || []);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Active');
+  // ?search=<name> (e.g. from global search) prefills the search across all statuses.
+  const [searchParams] = useSearchParams();
+  const requestedSearch = searchParams.get('search') || '';
+  const [searchTerm, setSearchTerm] = useState(requestedSearch);
+  const [statusFilter, setStatusFilter] = useState(requestedSearch ? 'All' : 'Active');
+  useEffect(() => {
+    if (!requestedSearch) return;
+    setSearchTerm(requestedSearch);
+    setStatusFilter('All');
+  }, [requestedSearch]);
   const [sortBy, setSortBy] = useState('company_name');
   const [loading, setLoading] = useState(!readSessionCache(VENDOR_CACHE_KEY));
   const [error, setError] = useState('');

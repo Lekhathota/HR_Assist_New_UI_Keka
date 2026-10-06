@@ -100,6 +100,7 @@ function isDirectApi(path) {
     apiPath.startsWith('/api/agentic/') ||
     apiPath === '/api/notifications' ||
     apiPath === '/api/reports/issue' ||
+    apiPath === '/api/search' ||
     apiPath.startsWith('/api/profile/') ||
     apiPath.startsWith('/api/meta/') ||
     apiPath.startsWith('/api/notifications/')

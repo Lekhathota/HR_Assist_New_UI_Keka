@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPost } from '../api.js';
@@ -29,8 +29,11 @@ function isShimentoXInternalProject(project) {
 
 function Clients({ createPage = false }) {
   const navigate = useNavigate();
+  // ?client=<id> (e.g. from global search) opens that client directly.
+  const [searchParams] = useSearchParams();
+  const requestedClientId = Number(searchParams.get('client')) || null;
   const [clients, setClients] = useState([]);
-  const [activeClientId, setActiveClientId] = useState(null);
+  const [activeClientId, setActiveClientId] = useState(requestedClientId);
   const [details, setDetails] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -54,6 +57,10 @@ function Clients({ createPage = false }) {
   useEffect(() => {
     loadClients();
   }, []);
+
+  useEffect(() => {
+    if (requestedClientId) setActiveClientId(requestedClientId);
+  }, [requestedClientId]);
 
   useEffect(() => {
     if (!activeClientId) {

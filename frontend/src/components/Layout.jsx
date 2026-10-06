@@ -18,7 +18,7 @@ function Layout({ children }) {
       />
       <header className="workspace-topbar">
         <button className="workspace-search" type="button" onClick={() => window.dispatchEvent(new Event('open-command-palette'))}>
-          <i className="fas fa-search" aria-hidden="true" /><span>Search pages and actions…</span><kbd>Ctrl K</kbd>
+          <i className="fas fa-search" aria-hidden="true" /><span>Search jobs, candidates, clients or pages…</span><kbd>Ctrl K</kbd>
         </button>
         <div className="workspace-header-account"><NotificationBell />
         <UserMenu /></div>

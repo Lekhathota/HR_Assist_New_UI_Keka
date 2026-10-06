@@ -584,3 +584,20 @@ body.theme-shimento .app-shell .workspace-brand .workspace-brand-full { display:
 @media (max-width: 640px) {
   body.theme-shimento .app-shell .workspace-notification-panel { position: fixed; top: calc(var(--shell-bar) + 4px); left: 12px; right: 12px; width: auto; }
 }
+
+/* Global search (command palette): grouped results with a keyboard-highlighted row. */
+body.theme-shimento .command-palette { width: min(640px, calc(100vw - 32px)); }
+body.theme-shimento .command-palette-list { max-height: min(460px, 62vh); overflow-y: auto; }
+body.theme-shimento .command-palette-group {
+  padding: 12px 14px 6px;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+body.theme-shimento .command-palette-list button.active { background: #fff4ed; }
+body.theme-shimento .command-palette-list button.active i { color: #ea580c; }
+body.theme-shimento .command-palette-list button span { min-width: 0; }
+body.theme-shimento .command-palette-list button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.theme-shimento .command-palette-tip { padding: 10px 14px 12px; color: #9ca3af; font-size: 12px; border-top: 1px solid #f3f4f6; }

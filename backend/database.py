@@ -9,6 +9,7 @@ documents keep an integer `id` field in addition to Mongo's internal `_id`.
 from __future__ import annotations
 
 import os
+import re
 import hashlib
 import json
 from uuid import uuid4
@@ -1808,6 +1809,50 @@ def _close_jd_if_fulfilled(jd_id: int) -> None:
                 _fulfilment_message(title, selected, int(required)),
                 jd_id=int(jd_id),
             )
+
+
+# Global search (top-bar search box)
+
+
+def _search_rows(collection: str, fields: list[str], needle: str, projection: dict, limit: int,
+                 extra: Optional[dict] = None, sort_field: str = "updated_at") -> list[dict]:
+    query: dict[str, Any] = _regex_filter(fields, re.escape(needle))
+    if extra:
+        query = {"$and": [query, extra]}
+    cursor = _database()[collection].find(query, {**projection, "_id": 0}).sort(sort_field, DESCENDING).limit(limit)
+    return [_serialize_doc(row) or {} for row in cursor]
+
+
+# Purpose: Finds JDs, candidates, clients and vendors whose names or key fields match.
+def global_search(needle: str, sections: set[str], limit: int = 6) -> dict[str, list[dict]]:
+    needle = str(needle or "").strip()
+    results: dict[str, list[dict]] = {key: [] for key in ("jobs", "candidates", "clients", "vendors")}
+    if len(needle) < 2:
+        return results
+    if "jobs" in sections:
+        results["jobs"] = _search_rows(
+            "job_descriptions", ["title", "job_code", "client_name", "department", "location", "project_name"], needle,
+            {"id": 1, "title": 1, "job_code": 1, "client_name": 1, "status": 1, "location": 1}, limit)
+    if "candidates" in sections:
+        rows = _search_rows(
+            "candidates", ["name", "email", "phone", "primary_category"], needle,
+            {"id": 1, "name": 1, "email": 1, "primary_category": 1, "jd_id": 1, "client_name": 1, "status": 1}, limit,
+            sort_field="uploaded_at")
+        jd_ids = {int(r["jd_id"]) for r in rows if r.get("jd_id")}
+        titles = {int(j["id"]): j.get("title") or "" for j in _database().job_descriptions.find({"id": {"$in": list(jd_ids)}}, {"id": 1, "title": 1})} if jd_ids else {}
+        for row in rows:
+            row["jd_title"] = titles.get(int(row["jd_id"])) if row.get("jd_id") else ""
+        results["candidates"] = rows
+    if "clients" in sections:
+        results["clients"] = _search_rows(
+            "clients", ["name", "client_account_id", "industry", "contact_person"], needle,
+            {"id": 1, "name": 1, "client_account_id": 1, "industry": 1, "status": 1}, limit)
+    if "vendors" in sections:
+        results["vendors"] = _search_rows(
+            "vendors", ["company_name", "vendor_name", "contact_person", "email"], needle,
+            {"id": 1, "company_name": 1, "vendor_name": 1, "contact_person": 1, "status": 1}, limit,
+            extra={"deleted_at": None})
+    return results
 
 
 # Notifications
