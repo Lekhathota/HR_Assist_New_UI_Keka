@@ -285,6 +285,23 @@ export async function apiPut(path, body) {
   return { ok: res.ok, status: res.status, data };
 }
 
+export async function apiPatch(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'include',
+    body: JSON.stringify(body),
+  });
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    /* non-JSON body */
+  }
+  redirectIfUnauthorized(path, res.status);
+  return { ok: res.ok, status: res.status, data };
+}
+
 export async function apiDelete(path) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'DELETE',
