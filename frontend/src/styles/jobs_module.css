@@ -158,6 +158,59 @@
     color: var(--text-secondary, #696b72);
 }
 
+/* Single filter control: every filter lives in one popover. */
+.app-shell .jobs-panel { overflow: visible; }
+.app-shell .jobs-filter { position: relative; flex: 0 0 auto; }
+.app-shell .jobs-filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: var(--accent-color, #5145bd);
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+.app-shell .jobs-filter-panel {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    z-index: 60;
+    width: min(22rem, calc(100vw - 2rem));
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--ui-surface, #fff);
+    border: 1px solid var(--border-color, #e1e5f3);
+    border-radius: 0.75rem;
+    box-shadow: 0 12px 32px rgba(37, 32, 87, 0.14);
+}
+.app-shell .jobs-filter-field {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+}
+.app-shell .jobs-filter-field > span {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary, #60698a);
+}
+.app-shell .jobs-page .jobs-filter-panel select.jobs-select {
+    width: 100%;
+    flex: none;
+    min-width: 0;
+}
+.app-shell .jobs-filter-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color, #e1e5f3);
+}
+
 /* Section heading */
 .app-shell .jobs-section-head {
     display: flex;

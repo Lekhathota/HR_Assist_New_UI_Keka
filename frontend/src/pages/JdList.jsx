@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { SkeletonBlock, toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
@@ -171,7 +171,23 @@ function JdList() {
   }, [searchTerm, filterStatus, filterCategory, filterClient, filterDepartment, filterLocation]);
 
   const STATUS_HEADINGS = { '': 'All Jobs', active: 'Active Jobs', closed: 'Closed Jobs', inactive: 'Inactive Jobs' };
-  const moreFiltersActive = Boolean(filterDepartment || filterLocation);
+  const activeFilterCount = [filterStatus !== 'active', filterCategory, filterClient, filterDepartment, filterLocation]
+    .filter(Boolean).length;
+  const filterMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!showMoreFilters) return undefined;
+    const handlePointer = (event) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) setShowMoreFilters(false);
+    };
+    const handleKey = (event) => { if (event.key === 'Escape') setShowMoreFilters(false); };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [showMoreFilters]);
   const clearFilters = () => {
     setSearchTerm('');
     setFilterStatus('active');
@@ -1009,45 +1025,66 @@ function JdList() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </label>
-              <select className="jobs-select" aria-label="Job category" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                <option value="">All Categories</option>
-                {ROLE_CATEGORIES.map(category => (
-                  <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
-                ))}
-              </select>
-              <select className="jobs-select" aria-label="Client" value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
-                <option value="">All Clients</option>
-                {clientOptions.map(client => <option key={client} value={client}>{client}</option>)}
-              </select>
-              <select className="jobs-select" aria-label="Status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="closed">Closed</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <button
-                type="button"
-                className={`jobs-more-btn${showMoreFilters || moreFiltersActive ? ' is-active' : ''}`}
-                aria-expanded={showMoreFilters}
-                onClick={() => setShowMoreFilters(v => !v)}
-              >
-                <i className="fas fa-sliders-h" aria-hidden="true"></i> More Filters
-              </button>
-            </div>
-
-            {showMoreFilters && (
-              <div className="jobs-toolbar jobs-toolbar-more">
-                <select className="jobs-select" aria-label="Department" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
-                  <option value="">All Departments</option>
-                  {departmentOptions.map(value => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <select className="jobs-select" aria-label="Location" value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
-                  <option value="">All Locations</option>
-                  {locationOptions.map(value => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <button type="button" className="jobs-clear-btn" onClick={clearFilters}>Clear filters</button>
+              <div className="jobs-filter" ref={filterMenuRef}>
+                <button
+                  type="button"
+                  className={`jobs-more-btn${showMoreFilters || activeFilterCount ? ' is-active' : ''}`}
+                  aria-expanded={showMoreFilters}
+                  aria-controls="jobs-filter-panel"
+                  onClick={() => setShowMoreFilters(v => !v)}
+                >
+                  <i className="fas fa-sliders-h" aria-hidden="true"></i> Filters
+                  {activeFilterCount > 0 && <span className="jobs-filter-count">{activeFilterCount}</span>}
+                </button>
+                {showMoreFilters && (
+                  <div id="jobs-filter-panel" className="jobs-filter-panel" role="dialog" aria-label="Job filters">
+                    <label className="jobs-filter-field">
+                      <span>Status</span>
+                      <select className="jobs-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="closed">Closed</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </label>
+                    <label className="jobs-filter-field">
+                      <span>Category</span>
+                      <select className="jobs-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                        <option value="">All Categories</option>
+                        {ROLE_CATEGORIES.map(category => (
+                          <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="jobs-filter-field">
+                      <span>Client</span>
+                      <select className="jobs-select" value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
+                        <option value="">All Clients</option>
+                        {clientOptions.map(client => <option key={client} value={client}>{client}</option>)}
+                      </select>
+                    </label>
+                    <label className="jobs-filter-field">
+                      <span>Department</span>
+                      <select className="jobs-select" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
+                        <option value="">All Departments</option>
+                        {departmentOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                      </select>
+                    </label>
+                    <label className="jobs-filter-field">
+                      <span>Location</span>
+                      <select className="jobs-select" value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
+                        <option value="">All Locations</option>
+                        {locationOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                      </select>
+                    </label>
+                    <div className="jobs-filter-actions">
+                      <button type="button" className="jobs-clear-btn" onClick={clearFilters}>Clear filters</button>
+                      <button type="button" className="btn btn-primary jobs-btn" onClick={() => setShowMoreFilters(false)}>Apply</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="jobs-section-head">
               <h2 className="jobs-section-title">{STATUS_HEADINGS[filterStatus] || 'Jobs'}</h2>

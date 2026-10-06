@@ -11,6 +11,8 @@ const activeVenvPython = process.env.VIRTUAL_ENV
   : null;
 
 const candidates = [
+  { command: 'py', args: ['-3.11'], label: 'Python 3.11 launcher' },
+  { command: 'py', args: ['-3.12'], label: 'Python 3.12 launcher' },
   { command: 'py', args: ['-3'], label: 'Python launcher' },
   { command: 'python', args: [], label: 'PATH python' },
 ];
