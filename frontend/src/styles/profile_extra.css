@@ -228,3 +228,7 @@ body.theme-shimento .profile-toggle input:focus-visible + .profile-toggle-slider
 @media (prefers-reduced-motion: reduce) {
     body.theme-shimento :is(.profile-toggle-slider, .profile-toggle-slider::before, .profile-form-btn) { transition: none; }
 }
+
+body.theme-shimento .profile-activity-note { margin: 12px 0 0; font-size: 12px; color: var(--text-secondary); }
+body.theme-shimento .profile-prefs-intro { margin: -4px 0 16px; font-size: 13px; color: var(--text-secondary); }
+body.theme-shimento .profile-toggle input:disabled + .profile-toggle-slider { opacity: .6; cursor: progress; }

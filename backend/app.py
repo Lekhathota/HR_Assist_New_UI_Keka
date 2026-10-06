@@ -25,6 +25,7 @@ if BASE_DIR not in sys.path:
 
 import activity_feed
 import database as db
+from routes.activity_routes import activity_bp
 from routes.audit_routes import audit_bp
 from routes.agentic_routes import agentic_bp
 from routes.assessment_routes import assessment_bp
@@ -88,6 +89,7 @@ app.register_blueprint(assessment_bp)
 app.register_blueprint(vendor_bp)
 app.register_blueprint(workflow_admin_bp)
 app.register_blueprint(notification_bp)
+app.register_blueprint(activity_bp)
 
 
 # Turn this request's Hire-panel actions into notifications, only if it succeeded.

@@ -93,6 +93,9 @@ function isDirectApi(path) {
     apiPath.startsWith('/api/interviews/') ||
     apiPath.startsWith('/api/agentic/') ||
     apiPath === '/api/notifications' ||
+    apiPath === '/api/reports/issue' ||
+    apiPath.startsWith('/api/profile/') ||
+    apiPath.startsWith('/api/meta/') ||
     apiPath.startsWith('/api/notifications/')
   );
 }

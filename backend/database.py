@@ -189,6 +189,9 @@ def _ensure_indexes() -> None:
     db.comparisons.create_index([("id", ASCENDING)], unique=True)
     db.notifications.create_index([("id", ASCENDING)], unique=True)
     db.notifications.create_index([("created_at", DESCENDING)])
+    db.activity_log.create_index([("actor_id", ASCENDING), ("kind", ASCENDING)])
+    db.report_logs.create_index([("id", ASCENDING)], unique=True)
+    db.report_logs.create_index([("user_id", ASCENDING)])
     db.comparisons.create_index([("jd_id", ASCENDING), ("candidate_id", ASCENDING)], unique=True)
     db.comparisons.create_index([("jd_id", ASCENDING), ("selection_status", ASCENDING)])
     db.interviews.create_index([("id", ASCENDING)], unique=True)
@@ -1854,6 +1857,88 @@ def backfill_fulfilled_jd_notifications() -> int:
     return created
 
 
+# Notification types grouped by the preference that controls them.
+NOTIFICATION_CATEGORIES: dict[str, set[str]] = {
+    "notify_jobs": {"jd_created", "jd_updated", "jd_status", "jd_deleted", "jd_vendors_assigned",
+                    "jd_requirement_fulfilled", "report_generated"},
+    "notify_talent": {"resume_uploaded", "candidate_deleted", "candidate_status", "screening"},
+    "notify_pipeline": {"candidate_stage", "candidate_hold", "interview", "assessment"},
+}
+DEFAULT_PREFERENCES = {key: True for key in NOTIFICATION_CATEGORIES}
+
+
+# Purpose: Returns a user's saved preferences merged over the defaults.
+def get_user_preferences(user_id: int) -> dict[str, bool]:
+    row = _database().users.find_one({"id": int(user_id)}, {"preferences": 1}) or {}
+    saved = row.get("preferences") if isinstance(row.get("preferences"), dict) else {}
+    return {key: bool(saved.get(key, default)) for key, default in DEFAULT_PREFERENCES.items()}
+
+
+# Purpose: Saves known preference keys for a user and returns the full set.
+def save_user_preferences(user_id: int, updates: dict) -> dict[str, bool]:
+    clean = {f"preferences.{key}": bool(value) for key, value in (updates or {}).items() if key in DEFAULT_PREFERENCES}
+    if clean:
+        _database().users.update_one({"id": int(user_id)}, {"$set": clean})
+    return get_user_preferences(user_id)
+
+
+def _muted_notification_types(user_id: int) -> list[str]:
+    prefs = get_user_preferences(user_id)
+    return sorted({kind for key, kinds in NOTIFICATION_CATEGORIES.items() if not prefs.get(key, True) for kind in kinds})
+
+
+# Purpose: Stores each raw activity event with its actor (powers per-user activity stats).
+def record_activity_events(events: list[dict], user: Optional[dict], request_id: str) -> None:
+    if not events:
+        return
+    now = _now()
+    actor_id = (user or {}).get("id")
+    rows = [{
+        "kind": event.get("kind"),
+        "actor_id": int(actor_id) if actor_id is not None else None,
+        "actor": (user or {}).get("username") or None,
+        "jd_id": event.get("jd_id"),
+        "candidate_id": event.get("candidate_id"),
+        "request_id": request_id,
+        "created_at": now,
+    } for event in events]
+    _database().activity_log.insert_many(rows)
+
+
+# Purpose: Issues a sequential report ID and logs who generated which report.
+def issue_report(user: Optional[dict], scope: str, report_format: str) -> str:
+    seq = _next_id("report_logs")
+    now = _now()
+    report_id = f"RPT-{now:%Y%m%d}-{seq:04d}"
+    _database().report_logs.insert_one({
+        "id": seq,
+        "report_id": report_id,
+        "scope": scope,
+        "format": report_format,
+        "user_id": (user or {}).get("id"),
+        "username": (user or {}).get("username") or "",
+        "created_at": now,
+    })
+    return report_id
+
+
+# Purpose: Counts the signed-in user's own activity (recorded since activity tracking began).
+def user_activity_stats(user_id: int) -> dict:
+    db = _database()
+    uid = int(user_id)
+    screening_runs = db.activity_log.distinct("request_id", {"actor_id": uid, "kind": "screening"})
+    first = db.activity_log.find_one({}, {"created_at": 1}, sort=[("created_at", ASCENDING)])
+    first_report = db.report_logs.find_one({}, {"created_at": 1}, sort=[("created_at", ASCENDING)])
+    starts = [row["created_at"] for row in (first, first_report) if row and row.get("created_at")]
+    return {
+        "jds_created": db.activity_log.count_documents({"actor_id": uid, "kind": "jd_created"}),
+        "screenings_run": len(screening_runs),
+        "candidates_added": db.activity_log.count_documents({"actor_id": uid, "kind": "resume_uploaded"}),
+        "reports_generated": db.report_logs.count_documents({"user_id": uid}),
+        "tracking_since": _serialize_value(min(starts)) if starts else None,
+    }
+
+
 # Purpose: Lists recent notifications with read state for one user.
 def list_notifications(user_id: int, limit: int = 20) -> dict:
     global _notification_backfill_done
@@ -1866,14 +1951,16 @@ def list_notifications(user_id: int, limit: int = 20) -> dict:
             pass
     db = _database()
     uid = int(user_id)
-    rows = list(db.notifications.find({}).sort("created_at", DESCENDING).limit(max(1, min(int(limit), 100))))
+    muted = _muted_notification_types(uid)
+    visible: dict[str, Any] = {"type": {"$nin": muted}} if muted else {}
+    rows = list(db.notifications.find(visible).sort("created_at", DESCENDING).limit(max(1, min(int(limit), 100))))
     items = []
     for row in rows:
         read_by = row.get("read_by") or []
         item = _serialize_doc({k: v for k, v in row.items() if k != "read_by"}) or {}
         item["read"] = uid in read_by
         items.append(item)
-    unread = db.notifications.count_documents({"read_by": {"$ne": uid}})
+    unread = db.notifications.count_documents({**visible, "read_by": {"$ne": uid}})
     return {"notifications": items, "unread_count": int(unread)}
 
 

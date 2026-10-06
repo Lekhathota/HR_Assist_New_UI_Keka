@@ -477,7 +477,7 @@ function Vendors() {
                     <input type="checkbox" checked={assignedJobIds.includes(Number(job.id))} onChange={() => toggleJobSelection(job.id)} />
                     <span>
                       <strong>{job.title}</strong>
-                      <small>{job.client_name || 'ShimentoX'}{job.location ? ` - ${job.location}` : ''}</small>
+                      <small>{job.client_name || 'No client'}{job.location ? ` - ${job.location}` : ''}</small>
                     </span>
                   </label>
                 ))}

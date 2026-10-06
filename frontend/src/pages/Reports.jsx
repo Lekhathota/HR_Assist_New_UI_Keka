@@ -8,6 +8,7 @@ import { analyticsReport } from '../utils/analytics.js';
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
+import { currentReportId, issueReportId } from '../utils/reportId.js';
 
 function Reports() {
   const state = useAnalytics('/api/reports');
@@ -32,7 +33,7 @@ function Reports() {
     return () => previous?.focus();
   }, [showModal]);
 
-  const buildReportText = () => analyticsReport(data, filters);
+  const buildReportText = () => `Report ID: ${currentReportId()}\n${analyticsReport(data, filters)}`;
 
   // --- DOWNLOAD: PDF ---
   const downloadPDF = (reportText) => {
@@ -308,6 +309,7 @@ function Reports() {
     setIsGenerating(true);
 
     try {
+      await issueReportId('analytics', selectedFormat);
       const reportText = buildReportText();
 
       switch (selectedFormat) {

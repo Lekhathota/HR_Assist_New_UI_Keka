@@ -11,6 +11,7 @@ import '../styles/jobs_module.css';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { currentReportId, issueReportId } from '../utils/reportId.js';
  
 const SLOT_START_HOUR = 9;
 const SLOT_END_HOUR = 18;
@@ -554,7 +555,7 @@ function JdDetails() {
     report += '     INDIVIDUAL JOB REPORT\n';
     report += '='.repeat(60) + '\n\n';
     report += '  Generated on  : ' + dateStr + ' at ' + timeStr + '\n';
-    report += '  Report ID     : RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '\n';
+    report += '  Report ID     : ' + currentReportId() + '\n';
     report += '  Job ID        : JD-' + (jd?.id || 'N/A') + '\n\n';
     
     // JOB DETAILS
@@ -691,7 +692,7 @@ function JdDetails() {
     
     csvContent += '"INDIVIDUAL JOB REPORT"\n';
     csvContent += '"Generated: ' + dateStr + '"\n';
-    csvContent += '"Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '"\n\n';
+    csvContent += '"Report ID: ' + currentReportId() + '"\n\n';
     
     csvContent += '"JOB DETAILS"\n';
     csvContent += '"Field","Value"\n';
@@ -767,7 +768,7 @@ function JdDetails() {
     const jobData = [
       ['INDIVIDUAL JOB REPORT'],
       ['Generated: ' + dateStr],
-      ['Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0')],
+      ['Report ID: ' + currentReportId()],
       [],
       ['JOB DETAILS'],
       ['Field', 'Value'],
@@ -1059,6 +1060,7 @@ const downloadPDF = (reportText) => {
     setIsGenerating(true);
     
     try {
+      await issueReportId('job_details', selectedFormat, { jd_id: jd?.id });
       const reportText = buildJobDetailsReport();
       
       if (selectedFormat === 'pdf') {

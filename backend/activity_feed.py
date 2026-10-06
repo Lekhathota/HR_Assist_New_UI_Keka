@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections import OrderedDict
 from typing import Any, Optional
 
@@ -47,6 +48,10 @@ def flush(user: Optional[dict]) -> int:
     import database as db  # Lazy import: database.py imports this module.
 
     actor = (user or {}).get("username") or ""
+    try:
+        db.record_activity_events(events, user, uuid.uuid4().hex)
+    except Exception:  # Stats are secondary; notifications must still be written.
+        logger.exception("Could not record activity events")
     notes = build_notifications(events, actor, _jd_titles(db, events))
     for note in notes:
         db.create_notification(
@@ -206,6 +211,14 @@ def build_notifications(events: list[dict], actor: str, titles: dict[int, str]) 
         title, template = text
         notes.append({"type": "assessment", "title": title, "jd_id": e.get("jd_id"), "link": "/hiring-pipeline",
                       "message": template.format(name=e.get("name") or "The candidate", jd=jd_suffix(e.get("jd_id")), by=_by(actor))})
+
+    report_labels = {"jobs": "Jobs", "job_details": "Job details", "talent": "Talent", "candidate_profile": "Candidate profile",
+                     "analytics": "Analytics"}
+    for e in unique("report_generated", lambda e: e.get("report_id")):
+        label = report_labels.get(e.get("scope"), "Hiring")
+        fmt = str(e.get("format") or "").upper()
+        notes.append({"type": "report_generated", "title": "Report generated", "jd_id": e.get("jd_id"), "link": None,
+                      "message": f"{label} report {e.get('report_id')}{' (' + fmt + ')' if fmt else ''} was generated{_by(actor)}."})
 
     if not notes and kinds:
         logger.debug("Activity events produced no notifications: %s", sorted(kinds))

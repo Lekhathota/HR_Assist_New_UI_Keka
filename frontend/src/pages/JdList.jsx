@@ -11,19 +11,9 @@ import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { currentReportId, issueReportId } from '../utils/reportId.js';
+import { useRoleCategories } from '../utils/useRoleCategories.js';
 
-const ROLE_CATEGORIES = [
-  'Developer',
-  'Tester',
-  'PMO',
-  'PM',
-  'TL',
-  'Business Analyst',
-  'DevOps / Cloud',
-  'Data',
-  'Support',
-  'Others',
-];
 
 const ROLE_CATEGORY_FILTER_LABELS = {
   Developer: 'All Developers',
@@ -40,6 +30,7 @@ const ROLE_CATEGORY_FILTER_LABELS = {
 
 function JdList() {
   const [jds, setJds] = useState(() => readSessionCache(JD_CACHE_KEY) || []);
+  const roleCategories = useRoleCategories(jds.map(jd => jd.job_category));
   const [loading, setLoading] = useState(() => !readSessionCache(JD_CACHE_KEY));
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -286,7 +277,7 @@ function JdList() {
     report += '     JOBS REPORT\n';
     report += '='.repeat(60) + '\n\n';
     report += 'Generated: ' + dateStr + '\n';
-    report += 'Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '\n\n';
+    report += 'Report ID: ' + currentReportId() + '\n\n';
     
     report += '-'.repeat(60) + '\n';
     report += 'OVERALL JOB STATISTICS\n';
@@ -359,7 +350,7 @@ function JdList() {
     
     csvContent += 'JOBS REPORT\n';
     csvContent += 'Generated: ' + dateStr + '\n';
-    csvContent += 'Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '\n\n';
+    csvContent += 'Report ID: ' + currentReportId() + '\n\n';
     
     csvContent += '========================\n';
     csvContent += 'OVERALL JOB STATISTICS\n';
@@ -411,7 +402,7 @@ function JdList() {
     const overviewData = [
       ['JOBS REPORT'],
       ['Generated: ' + dateStr],
-      ['Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0')],
+      ['Report ID: ' + currentReportId()],
       [],
       ['OVERALL JOB STATISTICS'],
       ['Metric', 'Value'],
@@ -689,6 +680,7 @@ function JdList() {
     setIsGenerating(true);
     
     try {
+      await issueReportId('jobs', selectedFormat);
       const reportText = buildJobsReportText();
       
       if (selectedFormat === 'pdf') {
@@ -1051,7 +1043,7 @@ function JdList() {
                       <span>Category</span>
                       <select className="jobs-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                         <option value="">All Categories</option>
-                        {ROLE_CATEGORIES.map(category => (
+                        {roleCategories.map(category => (
                           <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
                         ))}
                       </select>

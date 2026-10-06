@@ -15,7 +15,7 @@
 
 .stx__steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(var(--stx-cols, 3), minmax(0, 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -58,16 +58,15 @@
   color: #555;
 }
 
-.stx--ok .stx__step:first-child .stx__dot { background: var(--stx-ok); }
-.stx--ok .stx__step:first-child::after { background: var(--stx-ok); }
-.stx--ok .stx__step:nth-child(2) .stx__dot { box-shadow: 0 0 0 5px var(--stx-halo); }
-
-.stx--warn .stx__step:first-child .stx__dot { background: var(--stx-warn); }
-
-.stx--bad .stx__step:first-child .stx__dot { background: var(--stx-bad); }
-.stx--bad .stx__step::after,
-.stx--bad .stx__step:not(:first-child) .stx__dot { background: var(--stx-faded); }
-.stx--bad .stx__step:not(:first-child) .stx__label { opacity: 0.45; }
+/* Per-step state, driven by real candidate data. */
+.stx__step--ok .stx__dot { background: var(--stx-ok); }
+.stx__step--ok::after { background: var(--stx-ok) !important; }
+.stx__step--warn .stx__dot { background: var(--stx-warn); }
+.stx__step--bad .stx__dot { background: var(--stx-bad); }
+.stx__step--current .stx__dot { background: #fff; border: 3px solid var(--stx-ok); box-shadow: 0 0 0 4px var(--stx-halo); }
+.stx__step--current .stx__label { color: #111827; font-weight: 600; }
+.stx__label { overflow: hidden; max-width: 100%; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.stx--bad .stx__step--none .stx__label { opacity: 0.45; }
 
 .stx__status {
   margin-top: 6px;
@@ -92,3 +91,6 @@
   .stx { --stx-w: 150px; }
   .stx__label { display: none; }
 }
+/* Steps not reached yet stay light so completed/current steps stand out. */
+.stx .stx__step--none .stx__dot { background: #e5e7eb; }
+.stx .stx__step::after { background: #e5e7eb; }

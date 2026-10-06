@@ -2,15 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast } from '../components/EnterpriseFeedback.jsx';
-import { apiGet, apiPost } from '../api.js';
+import { apiGet, apiPost, apiPut } from '../api.js';
 import '../styles/profile.css';
 import '../styles/profile_extra.css';
+
+// Each preference controls one group of top-bar notifications (saved per user).
+const PREFERENCES = [
+  ['notify_jobs', 'Jobs & reports', 'New, edited, closed or deleted JDs and exported reports', 'fas fa-briefcase'],
+  ['notify_talent', 'Talent & screening', 'Resume uploads, candidate changes and screening results', 'fas fa-users'],
+  ['notify_pipeline', 'Pipeline & interviews', 'Stage moves, interviews and assessments', 'fas fa-diagram-project'],
+];
 
 function Profile() {
   const location = useLocation();
   const [user, setUser]     = useState({ username: '', email: '', role: '', created_at: '' });
   const [message, setMessage] = useState('');
   const [form, setForm]     = useState({ email: '', current_password: '', new_password: '', confirm_password: '' });
+  const [stats, setStats]   = useState(null);
+  const [prefs, setPrefs]   = useState(null);
+  const [savingPref, setSavingPref] = useState('');
 
   useEffect(() => {
     apiGet('/api/profile').then(data => {
@@ -19,7 +29,26 @@ function Profile() {
     }).catch(() => {
       toast({ type: 'error', message: 'Could not load your profile. Please refresh the page.' });
     });
+    apiGet('/api/profile/activity').then(setStats).catch(() => setStats({ error: true }));
+    apiGet('/api/profile/preferences').then(data => setPrefs(data.preferences || {})).catch(() => setPrefs({ error: true }));
   }, []);
+
+  const togglePreference = async (key) => {
+    const next = !prefs[key];
+    setPrefs(previous => ({ ...previous, [key]: next }));
+    setSavingPref(key);
+    try {
+      const { ok, data } = await apiPut('/api/profile/preferences', { [key]: next });
+      if (!ok) throw new Error(data?.error);
+      setPrefs(data.preferences);
+      toast({ type: 'success', message: 'Notification preferences saved.' });
+    } catch {
+      setPrefs(previous => ({ ...previous, [key]: !next }));
+      toast({ type: 'error', message: 'Could not save your preference. Please try again.' });
+    } finally {
+      setSavingPref('');
+    }
+  };
 
   useEffect(() => {
     if (location.hash !== '#edit-profile') return;
@@ -73,13 +102,18 @@ function Profile() {
             <div className="profile-activity-section">
               <h3 className="profile-activity-title"><i className="fas fa-chart-bar"></i> Your Activity</h3>
               <div className="profile-activity-grid">
-                {[['JDs Created', user.jds_created || 0, 'blue'], ['Screenings Run', user.screenings_run || 0, 'green'], ['Candidates Added', user.candidates_added || 0, 'orange'], ['Reports Generated', user.reports_generated || 0, 'purple']].map(([label, val, color]) => (
+                {[['JDs Created', 'jds_created'], ['Screenings Run', 'screenings_run'], ['Candidates Added', 'candidates_added'], ['Reports Generated', 'reports_generated']].map(([label, key]) => (
                   <div key={label} className="profile-activity-card">
                     <div className="profile-activity-label">{label}</div>
-                    <div className={`profile-activity-value profile-activity-${color}`}>{val}</div>
+                    <div className="profile-activity-value">{stats && !stats.error ? (stats[key] ?? 0) : '—'}</div>
                   </div>
                 ))}
               </div>
+              <p className="profile-activity-note">
+                {stats?.error ? 'Activity could not be loaded.'
+                  : stats?.tracking_since ? `Counted from ${new Date(stats.tracking_since).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}, when activity tracking began.`
+                  : stats ? 'Your actions in Jobs, Talent and Analyze will be counted here.' : 'Loading…'}
+              </p>
             </div>
           </div>
 
@@ -106,18 +140,21 @@ function Profile() {
 
         {/* Preferences */}
         <div className="profile-box profile-prefs-box">
-          <h2 className="profile-box-title"><i className="fas fa-cog"></i> Preferences</h2>
+          <h2 className="profile-box-title"><i className="fas fa-bell"></i> Notification Preferences</h2>
+          <p className="profile-prefs-intro">Choose which activity appears in your notification bell. Changes save automatically.</p>
+          {prefs?.error && <p className="profile-activity-note" role="alert">Preferences could not be loaded. Please refresh the page.</p>}
           <div className="profile-prefs-grid">
-            {[['Email Notifications', 'Get notified when screenings complete', 'fas fa-bell'], ['Auto-screening', 'Automatically screen new resumes', 'fas fa-robot'], ['Weekly Reports', 'Receive weekly recruitment summaries', 'fas fa-chart-bar']].map(pref => (
-              <div key={pref[0]} className="profile-pref-card">
+            {PREFERENCES.map(([key, name, desc, icon]) => (
+              <div key={key} className="profile-pref-card">
                 <div>
                   <div className="profile-pref-name">
-                    <i className={`${pref[2]} profile-pref-icon`}></i>{pref[0]}
+                    <i className={`${icon} profile-pref-icon`}></i>{name}
                   </div>
-                  <div className="profile-pref-desc">{pref[1]}</div>
+                  <div className="profile-pref-desc">{desc}</div>
                 </div>
                 <label className="profile-toggle">
-                  <input type="checkbox" defaultChecked />
+                  <input type="checkbox" aria-label={`${name} notifications`} checked={Boolean(prefs && !prefs.error && prefs[key])}
+                    disabled={!prefs || prefs.error || savingPref === key} onChange={() => togglePreference(key)} />
                   <span className="profile-toggle-slider"></span>
                 </label>
               </div>

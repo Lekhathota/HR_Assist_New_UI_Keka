@@ -10,19 +10,9 @@ import 'jspdf-autotable';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType } from 'docx';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { currentReportId, issueReportId } from '../utils/reportId.js';
+import { useRoleCategories } from '../utils/useRoleCategories.js';
 
-const ROLE_CATEGORIES = [
-  'Developer',
-  'Tester',
-  'PMO',
-  'PM',
-  'TL',
-  'Business Analyst',
-  'DevOps / Cloud',
-  'Data',
-  'Support',
-  'Others',
-];
 
 const ROLE_CATEGORY_FILTER_LABELS = {
   Developer: 'All Developers',
@@ -64,6 +54,7 @@ const EMPTY_FILTERS = { clientId: '', projectId: '', status: '', stageId: '', up
 
 function Candidates() {
   const [candidates, setCandidates] = useState(() => dedupeCandidates(readSessionCache(TALENT_CACHE_KEY) || []));
+  const roleCategories = useRoleCategories(candidates.map(candidate => candidate.primary_category));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
@@ -548,7 +539,7 @@ function Candidates() {
       // --- TITLE ---
       csvContent += 'CANDIDATES REPORT\n';
       csvContent += 'Generated: ' + dateStr + '\n';
-      csvContent += 'Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '\n\n';
+      csvContent += 'Report ID: ' + currentReportId() + '\n\n';
 
       // --- SECTION 1: OVERALL STATISTICS ---
       csvContent += 'OVERALL STATISTICS\n';
@@ -846,7 +837,7 @@ function Candidates() {
       const overviewData = [
         ['CANDIDATES REPORT'],
         ['Generated: ' + dateStr],
-        ['Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0')],
+        ['Report ID: ' + currentReportId()],
         [],
         ['OVERALL STATISTICS'],
         ['Metric', 'Value'],
@@ -1041,6 +1032,7 @@ function Candidates() {
     setIsGenerating(true);
 
     try {
+      await issueReportId('talent', selectedFormat);
       if (selectedFormat === 'pdf') {
         downloadPDF();
       } else if (selectedFormat === 'docx') {
@@ -1360,7 +1352,7 @@ function Candidates() {
                   <label>Role Category
                     <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                       <option value="">All Role Categories</option>
-                      {ROLE_CATEGORIES.map(category => (
+                      {roleCategories.map(category => (
                         <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
                       ))}
                     </select>
@@ -1463,9 +1455,9 @@ function Candidates() {
                           onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.name}`} />
                       </td>
                       <td className="candidates-simple-name">{c.name}</td>
-                      <td className="candidates-simple-client">{c.client_name || 'ShimentoX'}</td>
+                      <td className="candidates-simple-client">{c.client_name || 'No client'}</td>
                       <td className="candidates-simple-stage" data-label="Stage">
-                        <StageTrackerDelivery screeningStatus={c.screening_status ?? null} />
+                        <StageTrackerDelivery screeningStatus={c.screening_status ?? null} steps={c.hiring_process_steps} stageId={c.stage_id} hiringStage={c.hiring_stage} onHold={Boolean(c.on_hold)} />
                       </td>
                       <td className="candidates-simple-actions">
                         <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">

@@ -47,9 +47,15 @@ class FakeNotifications:
         return type("Result", (), {"modified_count": len(hits)})()
 
 
+class FakeUsers:
+    def find_one(self, query, projection=None):
+        return None  # no saved preferences: every category stays on
+
+
 class FakeDb:
     def __init__(self, docs):
         self.notifications = FakeNotifications(docs)
+        self.users = FakeUsers()
 
 
 def _docs():

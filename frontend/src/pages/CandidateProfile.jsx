@@ -12,6 +12,7 @@ import 'jspdf-autotable';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { currentReportId, issueReportId } from '../utils/reportId.js';
 
 function formatJdUploadDateTime(value) {
   if (!value) return { date: '—', time: '' };
@@ -149,7 +150,7 @@ function CandidateProfile() {
     report += '     CANDIDATE EVALUATION REPORT\n';
     report += '='.repeat(60) + '\n\n';
     report += '  Generated on  : ' + dateStr + ' at ' + timeStr + '\n';
-    report += '  Report ID     : RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '\n\n';
+    report += '  Report ID     : ' + currentReportId() + '\n\n';
     
     report += '-'.repeat(60) + '\n';
     report += 'CANDIDATE INFORMATION\n';
@@ -336,7 +337,7 @@ function CandidateProfile() {
 
       csvContent += 'CANDIDATE EVALUATION REPORT\n';
       csvContent += 'Generated: ' + dateStr + ' at ' + timeStr + '\n';
-      csvContent += 'Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0') + '\n\n';
+      csvContent += 'Report ID: ' + currentReportId() + '\n\n';
 
       csvContent += 'CANDIDATE INFORMATION\n';
       csvContent += 'Field,Value\n';
@@ -506,7 +507,7 @@ function CandidateProfile() {
     const detailsData = [
       ['CANDIDATE EVALUATION REPORT'],
       ['Generated: ' + dateStr],
-      ['Report ID: RPT-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(Math.floor(Math.random()*10000)).padStart(4,'0')],
+      ['Report ID: ' + currentReportId()],
       [],
       ['CANDIDATE INFORMATION'],
       ['Field', 'Value'],
@@ -756,6 +757,7 @@ function CandidateProfile() {
     setIsGenerating(true);
 
     try {
+      await issueReportId('candidate_profile', selectedFormat);
       if (selectedFormat === 'pdf') {
         downloadPDF();
       } else if (selectedFormat === 'docx') {
@@ -1078,7 +1080,7 @@ function CandidateProfile() {
               <h1 className="profile-hero-name">{candidate.name}</h1>
               <div className="profile-screening-result">
                 <span>Screening result</span>
-                <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} />
+                <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} steps={candidate.hiring_process_steps} stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} onHold={Boolean(candidate.on_hold)} />
               </div>
             </div>
           </div>
@@ -1090,7 +1092,7 @@ function CandidateProfile() {
         </div>
 
         <div className="profile-info">
-          {[['fas fa-building', 'Client', candidate.client_name || 'ShimentoX'], ['fas fa-envelope', 'Email', candidate.email || 'N/A'], ['fas fa-phone', 'Phone', phoneNumber], ['fas fa-tag', 'Status', candidate.status]].map(([icon, label, val]) => (
+          {[['fas fa-building', 'Client', candidate.client_name || 'No client'], ['fas fa-envelope', 'Email', candidate.email || 'N/A'], ['fas fa-phone', 'Phone', phoneNumber], ['fas fa-tag', 'Status', candidate.status]].map(([icon, label, val]) => (
             <div key={label} className="profile-field">
               <strong><i className={icon}></i> {label}</strong>
               <span>{val}</span>

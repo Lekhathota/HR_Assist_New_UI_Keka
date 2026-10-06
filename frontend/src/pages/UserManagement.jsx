@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPost, apiPut } from '../api.js';
+import { apiGet, apiPost } from '../api.js';
 import Layout from '../components/Layout.jsx';
 import '../styles/user-management.css';
 
