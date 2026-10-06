@@ -4,10 +4,6 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import Navbar from './Navbar.jsx';
 import { AppearanceProvider } from './AppearanceProvider.jsx';
 import { FrontendPolishProvider } from './FrontendPolish.jsx';
-import { apiPost, clearToken } from '../api.js';
-
-jest.mock('../api.js', () => ({ apiPost: jest.fn(), clearToken: jest.fn() }));
-
 let container;
 let root;
 function LocationProbe() {
@@ -51,8 +47,8 @@ test('groups Jobs, Talent, Analyze and Hiring Pipeline under Hire and keeps the 
   ]);
   expect(container.querySelector('[aria-current="page"]').textContent).toBe('Hire');
   expect(container.querySelector('.workspace-brand').getAttribute('href')).toBe('/welcome');
-  expect(container.querySelector('.workspace-account a[href="/profile"]').getAttribute('href')).toBe('/profile');
-  expect(container.querySelector('.workspace-account button').textContent).toBe('Exit');
+  expect(container.querySelector('.workspace-account a[href="/profile"]')).toBeNull();
+  expect(container.querySelector('.workspace-account button')).toBeNull();
 });
 
 test('mobile navigation expands, follows the existing route, and closes after selection', () => {
@@ -102,13 +98,4 @@ test('removes the header and its appearance controls', () => {
   expect(container.querySelector('.workspace-preferences')).toBeNull();
   expect(container.querySelector('[aria-label="Use current blue theme"]')).toBeNull();
   expect(container.querySelector('[aria-label="Disable interface polish"]')).toBeNull();
-});
-
-test.each([false, true])('Exit clears the session and returns to login (API failure: %s)', async failure => {
-  apiPost.mockImplementation(() => failure ? Promise.reject(new Error('Offline')) : Promise.resolve({ ok: true }));
-  renderWorkspace();
-  await act(async () => container.querySelector('.workspace-account button').click());
-  expect(apiPost).toHaveBeenCalledWith('/api/logout', {});
-  expect(clearToken).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('output').textContent).toBe('/login');
 });
