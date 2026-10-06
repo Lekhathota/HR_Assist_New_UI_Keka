@@ -56,7 +56,7 @@ function Navbar() {
         <i className={`fas ${menuOpen ? 'fa-times' : 'fa-bars'}`} aria-hidden="true"></i>
       </button>
       <Link to="/welcome" className="workspace-brand" aria-label="Open home page" onClick={closeMenu}>
-        <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX"
+        <img className="workspace-brand-full" src="/ShimentoX-Logo-Dark.png" alt="ShimentoX"
           onError={(e) => { e.target.style.display = 'none'; }} />
       </Link>
       <aside id="workspace-navigation" className={`workspace-sidebar${menuOpen ? ' workspace-sidebar-open' : ''}`}
