@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPost } from '../api.js';
@@ -6,6 +7,7 @@ import '../styles/profile.css';
 import '../styles/profile_extra.css';
 
 function Profile() {
+  const location = useLocation();
   const [user, setUser]     = useState({ username: '', email: '', role: '', created_at: '' });
   const [message, setMessage] = useState('');
   const [form, setForm]     = useState({ email: '', current_password: '', new_password: '', confirm_password: '' });
@@ -18,6 +20,13 @@ function Profile() {
       toast({ type: 'error', message: 'Could not load your profile. Please refresh the page.' });
     });
   }, []);
+
+  useEffect(() => {
+    if (location.hash !== '#edit-profile') return;
+    const section = document.getElementById('edit-profile');
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('email')?.focus({ preventScroll: true });
+  }, [location.hash]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -75,7 +84,7 @@ function Profile() {
           </div>
 
           {/* Update Profile */}
-          <div className="profile-box">
+          <div className="profile-box" id="edit-profile">
             <h2 className="profile-update-title"><i className="fas fa-edit"></i> Update Profile</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">

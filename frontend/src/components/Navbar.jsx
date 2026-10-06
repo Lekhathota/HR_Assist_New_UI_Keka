@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { apiPost, clearToken } from '../api.js';
+import { Link, useLocation } from 'react-router-dom';
 import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
-import { readUser, displayName, initials } from '../utils/userDisplay.js';
 import { isHirePath, visibleHireTabs } from './HireNav.jsx';
 
 const navigation = [
@@ -14,29 +12,16 @@ const navigation = [
 ];
 
 function Navbar() {
-  const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef(null);
   const role = getCurrentRole();
-  const user = readUser();
-  const userName = displayName(user);
 
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   const closeMenu = () => {
     setMenuOpen(false);
     if (window.matchMedia('(max-width: 820px)').matches) menuButton.current?.focus();
-  };
-
-  const handleLogout = async () => {
-    try {
-      await apiPost('/api/logout', {});
-    } catch {
-      // Clear the local session even if the API is unavailable.
-    }
-    clearToken();
-    navigate('/login');
   };
 
   const isActive = (path) =>
@@ -74,22 +59,7 @@ function Navbar() {
         </nav>
         <div className="workspace-account">
           {roleCanAccess(role, '/admin/users') && <Link to="/admin/users" className={`workspace-nav-link${isActive('/admin/users') ? ' active' : ''}`} aria-current={isActive('/admin/users') ? 'page' : undefined} onClick={closeMenu}><i className="fas fa-user-gear" aria-hidden="true" /><span>Users</span></Link>}
-          {roleCanAccess(role, '/profile') && (
-            <Link to="/profile" className={`workspace-nav-link${isActive('/profile') ? ' active' : ''}`}
-              aria-current={isActive('/profile') ? 'page' : undefined} onClick={closeMenu}>
-              <i className="fas fa-gear" aria-hidden="true"></i><span>Settings</span>
-            </Link>
-          )}
-          <button type="button" onClick={handleLogout} className="workspace-nav-link">
-            <i className="fas fa-sign-out-alt" aria-hidden="true"></i><span>Exit</span>
-          </button>
         </div>
-        {roleCanAccess(role, '/profile') && (
-          <Link to="/profile" className="workspace-sidebar-user" onClick={closeMenu} aria-label={`Open profile for ${userName}`}>
-            <span className="workspace-avatar" aria-hidden="true">{initials(userName)}</span>
-            <span><strong>{userName}</strong><small>{String(user.role || '').replaceAll('_', ' ')}</small></span>
-          </Link>
-        )}
       </aside>
     </>
   );
