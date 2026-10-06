@@ -43,7 +43,7 @@ test('groups Jobs, Talent, Analyze and Hiring Pipeline under Hire and keeps the 
   renderWorkspace('/jobs/123');
   const links = Array.from(container.querySelectorAll('.workspace-links a'));
   expect(links.map(link => [link.textContent, link.getAttribute('href')])).toEqual([
-    ['Home', '/welcome'], ['Hire', '/hire'], ['Clients', '/clients'], ['Vendors', '/vendors'], ['Reports', '/insights'],
+    ['Home', '/welcome'], ['Hire', '/hire'], ['Clients', '/clients'], ['Vendors', '/vendors'], ['Reports', '/insights'], ['Users', '/admin/users'],
   ]);
   expect(container.querySelector('[aria-current="page"]').textContent).toBe('Hire');
   expect(container.querySelector('.workspace-brand').getAttribute('href')).toBe('/welcome');
@@ -79,6 +79,12 @@ test('Escape closes mobile navigation and returns keyboard focus', () => {
 test.each(['/hire', '/talent/5', '/analyze', '/hiring-pipeline', '/job-details.html'])('Hire stays active on %s', path => {
   renderWorkspace(path);
   expect(container.querySelector('.workspace-links [aria-current="page"]').textContent).toBe('Hire');
+});
+
+test('Users is listed after Reports only for admins', () => {
+  localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'recruiter' }));
+  renderWorkspace('/welcome');
+  expect(container.querySelector('a[href="/admin/users"]')).toBeNull();
 });
 
 test('Hire is hidden for roles that cannot open any Hire page', () => {

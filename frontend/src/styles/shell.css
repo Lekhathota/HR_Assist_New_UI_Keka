@@ -456,9 +456,11 @@ body.theme-shimento .app-shell .workspace-brand .workspace-brand-full { display:
   body.theme-shimento .app-shell .workspace-nav-link { min-height: 54px; padding: 6px 4px; gap: 4px; }
   body.theme-shimento .app-shell .workspace-nav-link i { font-size: 16px; }
 }
+/* Very short windows (small laptops, 125–150% display scaling, browser zoom):
+   tighten further but always keep the labels visible; the rail scrolls if needed. */
 @media (min-width: 821px) and (max-height: 600px) {
-  body.theme-shimento .app-shell .workspace-nav-link { min-height: 40px; }
-  body.theme-shimento .app-shell .workspace-nav-link span { display: none; }
+  body.theme-shimento .app-shell .workspace-nav-link { min-height: 46px; padding: 5px 4px; gap: 3px; font-size: 11px; }
+  body.theme-shimento .app-shell .workspace-nav-link i { font-size: 15px; }
 }
 @media (max-width: 820px) {
   body.theme-shimento .app-shell .workspace-brand .workspace-brand-full { width: 112px; max-width: none; }

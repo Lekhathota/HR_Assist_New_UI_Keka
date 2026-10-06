@@ -9,6 +9,7 @@ const navigation = [
   ['/clients', 'Clients', 'fa-building'],
   ['/vendors', 'Vendors', 'fa-handshake'],
   ['/insights', 'Reports', 'fa-chart-line'],
+  ['/admin/users', 'Users', 'fa-user-gear'],
 ];
 
 function Navbar() {
@@ -57,9 +58,6 @@ function Navbar() {
             </Link>
           ))}
         </nav>
-        <div className="workspace-account">
-          {roleCanAccess(role, '/admin/users') && <Link to="/admin/users" className={`workspace-nav-link${isActive('/admin/users') ? ' active' : ''}`} aria-current={isActive('/admin/users') ? 'page' : undefined} onClick={closeMenu}><i className="fas fa-user-gear" aria-hidden="true" /><span>Users</span></Link>}
-        </div>
       </aside>
     </>
   );
