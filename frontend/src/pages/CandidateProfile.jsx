@@ -7,6 +7,7 @@ import { apiGet, apiPost } from '../api.js';
 import { getCurrentRole } from '../roleAccess.js';
 import '../styles/profile.css';
 import '../styles/candidates.css';
+import '../styles/candidate_profile.css';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
@@ -27,20 +28,6 @@ function formatJdUploadDateTime(value) {
   const hours = String(parsed.getHours()).padStart(2, '0');
   const minutes = String(parsed.getMinutes()).padStart(2, '0');
   return { date: `${day}/${month}/${year}`, time: `${hours}:${minutes}` };
-}
-
-function SummaryList({ title, items, emptyText }) {
-  const values = (items || []).filter(Boolean);
-  return (
-    <div>
-      <h4>{title}</h4>
-      {values.length ? (
-        <ul className="profile-ai-bullet-list">
-          {values.map(item => <li key={item}>{item}</li>)}
-        </ul>
-      ) : <em>{emptyText}</em>}
-    </div>
-  );
 }
 
 function CandidateProfile() {
@@ -1050,294 +1037,310 @@ function CandidateProfile() {
   if (!candidate && loadError) {
     return (
       <Layout>
-        <div className="profile-loading">
-          <div className="analyze-submit-error" role="alert">{loadError}</div>
-          <button type="button" onClick={() => navigate('/talent')}>
-            <i className="fas fa-arrow-left"></i> Back to Talent
-          </button>
+        <div className="cp-page">
+          <div className="cp-card cp-state" role="alert">
+            <i className="fas fa-user-slash" aria-hidden="true" />
+            <p>{loadError}</p>
+            <button type="button" className="cp-btn cp-btn-ghost" onClick={() => navigate('/talent')}>
+              <i className="fas fa-arrow-left" aria-hidden="true" /> Back to Talent
+            </button>
+          </div>
         </div>
       </Layout>
     );
   }
-  if (!candidate) return <Layout><div className="profile-loading"><SkeletonBlock variant="profile" count={3} /></div></Layout>;
+  if (!candidate) return <Layout><div className="cp-page"><SkeletonBlock variant="profile" count={3} /></div></Layout>;
 
   const sd = candidate.structured_data || {};
   const totalExperience = Number(sd.total_experience_years || 0);
-  const experienceLabel = totalExperience < 1 ? 'No experience' : `${totalExperience} year${totalExperience === 1 ? '' : 's'}`;
-  const phoneNumber = candidate.phone || sd.phone || 'N/A';
+  const experienceLabel = totalExperience < 1 ? 'Less than a year' : `${totalExperience} year${totalExperience === 1 ? '' : 's'}`;
+  const phoneNumber = candidate.phone || sd.phone || '';
   const aiSummary = candidate.ai_summary || {};
-  const goBack = () => navigate('/talent');
+  const listOf = value => (Array.isArray(value) ? value : String(value || '').split(/\n|,|;/)).map(v => String(v).trim()).filter(Boolean);
+  const matched = listOf(aiSummary.matched_skills || aiSummary.strengths);
+  const missing = listOf(aiSummary.missing_skills || aiSummary.risks);
+  const focus = listOf(aiSummary.interview_focus);
+  const workHistory = Array.isArray(sd.work_experience) ? sd.work_experience : [];
+  const skills = listOf(sd.skills);
+  const steps = candidate.hiring_process_steps || [];
+  const status = String(candidate.status || 'Pending');
+  const statusTone = /select|hired|accept/i.test(status) ? 'good' : /reject/i.test(status) ? 'bad' : 'neutral';
+  const confidence = Math.max(0, Math.min(100, Number(candidate.confidence_score || 0)));
+  const uploadedOn = candidate.uploaded_at ? formatJdUploadDateTime(candidate.uploaded_at).date : '';
+  const initialsOf = name => String(name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+
+  const detailRows = [
+    ['fa-building', 'Client', candidate.client_name || 'No client'],
+    ['fa-envelope', 'Email', candidate.email || 'Not provided'],
+    ['fa-phone', 'Phone', phoneNumber || 'Not provided'],
+    ['fa-briefcase', 'Experience', experienceLabel],
+    ['fa-layer-group', 'Role category', candidate.primary_category || 'Others'],
+    ['fa-user-tag', 'Source', candidate.candidate_source || candidate.source_vendor_name || 'Direct'],
+    ...(uploadedOn ? [['fa-calendar-plus', 'Added on', uploadedOn]] : []),
+  ];
 
   return (
     <Layout>
-      <div className="profile-container profile-max-width">
-        <div className="profile-details-topbar">
-          <div className="profile-hero">
-            <div className="profile-hero-avatar" aria-hidden="true">
-              <i className="fas fa-user"></i>
-            </div>
-            <div className="profile-hero-copy">
-              <h1 className="profile-hero-name">{candidate.name}</h1>
-              <div className="profile-screening-result">
-                <span>Screening result</span>
-                <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} steps={candidate.hiring_process_steps} stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} onHold={Boolean(candidate.on_hold)} />
+      <div className="cp-page">
+        <button type="button" className="cp-back" onClick={() => navigate('/talent')}>
+          <i className="fas fa-arrow-left" aria-hidden="true" /> Talent
+        </button>
+
+        {/* Header */}
+        <section className="cp-card cp-hero">
+          <div className="cp-hero-main">
+            <span className="cp-avatar" aria-hidden="true">{initialsOf(candidate.name)}</span>
+            <div className="cp-hero-copy">
+              <div className="cp-hero-title">
+                <h1>{candidate.name}</h1>
+                <span className={`cp-badge ${statusTone}`}>{status}</span>
+                {candidate.on_hold && <span className="cp-badge warn"><i className="fas fa-circle-pause" aria-hidden="true" /> On hold</span>}
+              </div>
+              <p className="cp-hero-sub">
+                {[candidate.primary_category || 'Others', experienceLabel, candidate.client_name].filter(Boolean).join(' · ')}
+              </p>
+              <div className="cp-contact">
+                {candidate.email && <a href={`mailto:${candidate.email}`}><i className="far fa-envelope" aria-hidden="true" />{candidate.email}</a>}
+                {phoneNumber && <a href={`tel:${phoneNumber}`}><i className="fas fa-phone" aria-hidden="true" />{phoneNumber}</a>}
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button type="button" className="btn btn-secondary profile-back-btn" onClick={goBack}>
-              <i className="fas fa-arrow-left"></i> Back to Talent
+          <div className="cp-hero-actions">
+            <button type="button" className="cp-btn cp-btn-primary" onClick={() => setShowModal(true)}>
+              <i className="fas fa-file-export" aria-hidden="true" /> Generate report
+            </button>
+            <button type="button" className="cp-btn cp-btn-danger" disabled={deleting} onClick={handleRemove}
+              title="Remove this candidate from the repository">
+              {deleting ? <><i className="fas fa-spinner fa-spin" aria-hidden="true" /> Removing…</>
+                : <><i className="fas fa-user-xmark" aria-hidden="true" /> Remove</>}
             </button>
           </div>
-        </div>
+          <div className="cp-hero-stage">
+            <span className="cp-label">Hiring progress</span>
+            <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} steps={steps}
+              stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} onHold={Boolean(candidate.on_hold)} />
+          </div>
+        </section>
 
-        <div className="profile-info">
-          {[['fas fa-building', 'Client', candidate.client_name || 'No client'], ['fas fa-envelope', 'Email', candidate.email || 'N/A'], ['fas fa-phone', 'Phone', phoneNumber], ['fas fa-tag', 'Status', candidate.status]].map(([icon, label, val]) => (
-            <div key={label} className="profile-field">
-              <strong><i className={icon}></i> {label}</strong>
-              <span>{val}</span>
-            </div>
-          ))}
-          <div className="profile-field">
-            <strong><i className="fas fa-tasks"></i> Current Stage</strong>
-            {(candidate.hiring_process_steps || []).length ? (
-              <div className="profile-stage-control">
-                {canEditStage ? (
-                  <select value={candidate.stage_id || ''} onChange={(e) => setStage(e.target.value)}>
-                    <option value="">Not Started</option>
-                    {candidate.hiring_process_steps.map(step => <option key={step.id} value={step.id}>{step.name}</option>)}
-                  </select>
-                ) : <span>{candidate.hiring_stage || 'Not Started'}</span>}
-                {candidate.on_hold && <span className="badge badge-warning profile-hold-badge">On Hold</span>}
-                {canEditStage && (
-                  <div className="profile-stage-actions">
-                    <button type="button" className="btn btn-secondary jd-table-btn" onClick={toggleHold}>
-                      {candidate.on_hold ? 'Clear On Hold' : 'Set On Hold'}
-                    </button>
-                    {candidate.automation_paused && (
-                      <button type="button" className="btn btn-secondary jd-table-btn" onClick={resumeAutomation}>
-                        Resume automatic updates
-                      </button>
-                    )}
-                  </div>
-                )}
+        <div className="cp-layout">
+          {/* Main column */}
+          <div className="cp-main">
+            <section className="cp-card">
+              <header className="cp-card-head"><h2><i className="fas fa-wand-magic-sparkles" aria-hidden="true" /> AI candidate summary</h2></header>
+              <div className="cp-callout">
+                <strong>Recommendation</strong>
+                <p>{aiSummary.recommendation || 'Review the screening evidence below and validate role fit during the interview.'}</p>
               </div>
-            ) : <span>{candidate.hiring_stage || 'N/A'}</span>}
-          </div>
-          <div className="profile-field">
-            <strong><i className="fas fa-layer-group"></i> Role Category</strong>
-            <span>{candidate.primary_category || 'Others'}</span>
-          </div>
-        </div>
-
-        <div className="profile-section-box profile-section-compact">
-          <h2 className="profile-section-title"><i className="fas fa-layer-group"></i> Role Category</h2>
-          <div className="profile-category-panel">
-            <div className="profile-category-summary">
-              <span className="candidate-category-pill">{candidate.primary_category || 'Others'}</span>
-              {(candidate.secondary_categories || []).map(category => (
-                <span key={category} className="candidate-category-pill secondary">{category}</span>
-              ))}
-              <span className="profile-category-confidence">{candidate.confidence_score || 0}% confidence</span>
-            </div>
-            <p>{candidate.category_reason || 'No categorization reason captured.'}</p>
-            <div className="profile-category-meta">
-              <span>Source: {candidate.categorization_source || 'resume'}</span>
-              <span>Matched: {(candidate.matched_keywords || []).slice(0, 8).join(', ') || 'None'}</span>
-              <span>Updated: {(candidate.categorized_date || '').slice(0, 10) || 'N/A'}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="profile-section-box profile-section-compact">
-          <h2 className="profile-section-title"><i className="fas fa-sparkles"></i> AI Candidate Summary</h2>
-          <div className="profile-ai-summary">
-            <div className="profile-ai-recommendation">
-              <strong>Recommendation</strong>
-              <span>{aiSummary.recommendation || 'Review screening evidence and validate role fit during the interview.'}</span>
-            </div>
-            <div className="profile-ai-grid">
-              <SummaryList title="Matched Skills" items={aiSummary.matched_skills || aiSummary.strengths} emptyText="No matched skills captured" />
-              <SummaryList title="Missing Skills" items={aiSummary.missing_skills || aiSummary.risks} emptyText="No missing skills captured" />
-              <SummaryList title="Interview Focus" items={aiSummary.interview_focus} emptyText="Use screening summary" />
-            </div>
-          </div>
-        </div>
-
-        <div className="profile-section-box profile-section-compact">
-          <h2 className="profile-section-title"><i className="fas fa-timeline"></i> Candidate Timeline</h2>
-          <div className="profile-timeline">
-            {timeline.length > 0 ? timeline.map((item, index) => {
-              const stamp = formatJdUploadDateTime(item.date);
-              return (
-                <div key={`${item.type || 'event'}-${index}`} className={`profile-timeline-item profile-timeline-${item.type || 'event'}`}>
-                  <div className="profile-timeline-dot"><i className={item.type === 'interview' ? 'fas fa-calendar-check' : item.type === 'followup' ? 'fas fa-reply' : 'fas fa-clipboard-check'}></i></div>
-                  <div className="profile-timeline-body">
-                    <div className="profile-timeline-head">
-                      <strong>{item.label}</strong>
-                      <span>{stamp.date} {stamp.time}</span>
-                    </div>
-                    <div className="profile-timeline-meta">{item.status}{item.score !== undefined ? ` · ${item.score}%` : ''}</div>
-                    {item.summary && <p>{item.summary}</p>}
+              <div className="cp-summary-grid">
+                {[['Matched skills', matched, 'good', 'No matched skills captured.'],
+                  ['Missing skills', missing, 'gap', 'No missing skills captured.'],
+                  ['Interview focus', focus, 'neutral', 'Use the screening summary.']].map(([title, items, tone, empty]) => (
+                  <div key={title}>
+                    <h3>{title}</h3>
+                    {items.length ? <div className={`cp-chips ${tone}`}>{items.map(item => <span key={item}>{item}</span>)}</div>
+                      : <p className="cp-muted">{empty}</p>}
                   </div>
-                </div>
-              );
-            }) : <div className="profile-screening-empty">No timeline events available</div>}
-          </div>
-        </div>
+                ))}
+              </div>
+            </section>
 
-        <div className="profile-section-box profile-section-compact">
-          <h2 className="profile-section-title"><i className="fas fa-file-pdf"></i> Resume Details</h2>
-          <div className="profile-resume-inner">
-            {candidate.structured_data ? (
-              <>
-                <div className="profile-resume-grid">
-                  <div>
-                    <h4 className="profile-sub-title"><i className="fas fa-graduation-cap"></i> Education</h4>
-                    {sd.education
-                      ? <div className="profile-edu-detail">
-                          <div><strong>{sd.education.degree || 'N/A'}</strong></div>
-                          <div>{sd.education.field || 'N/A'}</div>
-                          <div className="profile-edu-meta">{sd.education.institution || 'N/A'} - {sd.education.graduation_year || 'N/A'}</div>
-                        </div>
-                      : <div className="profile-no-edu">No education info</div>}
-                  </div>
-                  <div>
-                    <h4 className="profile-sub-title"><i className="fas fa-briefcase"></i> Experience</h4>
-                    <div className="profile-edu-detail">
-                      <div><strong>Total: {experienceLabel}</strong></div>
-                      {(sd.work_experience || []).map((exp, i) => (
-                        <div key={i} className="profile-exp-item">
-                          {exp.position || exp.designation || 'N/A'} @ {exp.company || 'N/A'}
-                          <div className="profile-exp-dates">{exp.start_date || ''}{exp.end_date ? ` - ${exp.end_date}` : ''}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="profile-skills-list">
-                  <h4 className="profile-sub-title"><i className="fas fa-code"></i> Skills</h4>
-                  <div className="candidate-roles-badges">
-                    {(sd.skills || []).map(skill => (
-                      <span key={skill} className="profile-skill-badge">{skill}</span>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : <em>Resume details not available</em>}
-          </div>
-        </div>
-
-        <div className="profile-section-box profile-section-compact profile-jd-section-full">
-            <h2 className="profile-section-title"><i className="fas fa-briefcase"></i> Applied Roles</h2>
-            <div className="profile-jd-grid profile-jd-grid-full">
-              {(candidate.jd_history || []).length > 0
-                ? candidate.jd_history.map((jd, i) => {
-                    const uploaded = formatJdUploadDateTime(jd.comparison_date);
+            <section className="cp-card">
+              <header className="cp-card-head">
+                <h2><i className="fas fa-clipboard-check" aria-hidden="true" /> Screening results</h2>
+                <span className="cp-count">{(candidate.screening_summaries || []).length}</span>
+              </header>
+              {candidate.screening_summary && <p className="cp-note">{candidate.screening_summary}</p>}
+              {candidate.rejection_reason && /reject/i.test(status) && (
+                <p className="cp-note bad"><strong>Rejection reason:</strong> {candidate.rejection_reason}</p>
+              )}
+              {(candidate.screening_summaries || []).length ? (
+                <div className="cp-screenings">
+                  {candidate.screening_summaries.map((item, i) => {
+                    const selected = /select/i.test(item.status || '');
+                    const score = Number(item.match_score ?? item.score);
                     return (
-                      <div key={i} className="profile-jd-item">
-                        <div className="profile-jd-item-title"><i className="fas fa-check-circle"></i> {jd.jd_title}</div>
-                        <div className="profile-jd-score">{jd.match_score}%</div>
-                        <div className="profile-jd-date">
-                          <span className="profile-jd-date-day">{uploaded.date}</span>
-                          {uploaded.time && <span className="profile-jd-date-time">{uploaded.time}</span>}
+                      <article key={`${item.jd_title}-${i}`} className={`cp-screening ${selected ? 'good' : 'bad'}`}>
+                        <div className="cp-screening-head">
+                          <strong>{item.jd_title || 'Job'}</strong>
+                          <span className={`cp-badge ${selected ? 'good' : 'bad'}`}>{item.status || 'Reviewed'}</span>
                         </div>
-                      </div>
+                        {Number.isFinite(score) && score > 0 && (
+                          <div className="cp-score"><div><span style={{ width: `${Math.min(score, 100)}%` }} /></div><b>{score}%</b></div>
+                        )}
+                        {item.summary && <p>{item.summary}</p>}
+                        {item.strengths?.length > 0 && <div className="cp-chips good">{item.strengths.map(s => <span key={s}>{s}</span>)}</div>}
+                        {item.gaps?.length > 0 && <div className="cp-chips gap">{item.gaps.map(g => <span key={g}>{g}</span>)}</div>}
+                        {item.rejection_reason && !selected && <p className="cp-note bad">{item.rejection_reason}</p>}
+                        {item.recommendation && <p className="cp-muted"><strong>Recommendation:</strong> {item.recommendation}</p>}
+                      </article>
                     );
-                  })
-                : <div className="profile-jd-empty">No applied roles available</div>}
-            </div>
-        </div>
+                  })}
+                </div>
+              ) : <p className="cp-empty">No screening results yet.</p>}
+            </section>
 
-        <div className="profile-section-box profile-section-box-mb profile-section-compact">
-          <h2 className="profile-section-title"><i className="fas fa-clipboard-check"></i> Screening Summaries</h2>
-          {candidate.screening_summary && (
-            <div className="profile-screening-summary profile-inline-note">
-              {candidate.screening_summary}
-            </div>
-          )}
-          {candidate.rejection_reason && candidate.status === 'Rejected' && (
-            <div className="profile-screening-gaps profile-inline-note">
-              Rejection reason: {candidate.rejection_reason}
-            </div>
-          )}
-          <div className="profile-screening-grid">
-            {(candidate.screening_summaries || []).length > 0
-              ? candidate.screening_summaries.map((item, i) => (
-                  <div key={i} className="profile-screening-item">
-                    <div className="profile-screening-header"><i className="fas fa-info-circle"></i> {item.jd_title}</div>
-                    <div className="profile-screening-summary">{item.summary}</div>
-                    <div className="profile-screening-status">
-                      Status: <span className={item.status === 'Selected' ? 'profile-screening-status-selected' : 'profile-screening-status-rejected'}>{item.status}</span>
-                    </div>
-                    {item.strengths?.length > 0 && <div className="profile-screening-strengths">Strengths: {item.strengths.join(', ')}</div>}
-                    {item.gaps?.length > 0 && <div className="profile-screening-gaps">Gaps: {item.gaps.join(', ')}</div>}
-                    {item.rejection_reason && item.status === 'Rejected' && (
-                      <div className="profile-screening-gaps">Rejection reason: {item.rejection_reason}</div>
-                    )}
-                    {item.recommendation && <div className="profile-screening-strengths">Recommendation: {item.recommendation}</div>}
+            <section className="cp-card">
+              <header className="cp-card-head"><h2><i className="fas fa-file-lines" aria-hidden="true" /> Resume</h2></header>
+              {candidate.structured_data ? (
+                <div className="cp-resume">
+                  <div>
+                    <h3>Experience <span className="cp-muted">· {experienceLabel}</span></h3>
+                    {workHistory.length ? (
+                      <ol className="cp-history">
+                        {workHistory.map((exp, i) => (
+                          <li key={i}>
+                            <strong>{exp.position || exp.designation || 'Role not specified'}</strong>
+                            <span>{exp.company || 'Company not specified'}</span>
+                            {(exp.start_date || exp.end_date) && <small>{[exp.start_date, exp.end_date].filter(Boolean).join(' – ')}</small>}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : <p className="cp-muted">No work history captured.</p>}
                   </div>
-                ))
-              : <div className="profile-screening-empty">No screening summaries available</div>}
+                  <div>
+                    <h3>Education</h3>
+                    {sd.education ? (
+                      <div className="cp-education">
+                        <strong>{sd.education.degree || 'Degree not specified'}</strong>
+                        {sd.education.field && <span>{sd.education.field}</span>}
+                        <small>{[sd.education.institution, sd.education.graduation_year].filter(Boolean).join(' · ') || 'Institution not specified'}</small>
+                      </div>
+                    ) : <p className="cp-muted">No education captured.</p>}
+                  </div>
+                  <div className="cp-resume-skills">
+                    <h3>Skills <span className="cp-muted">· {skills.length}</span></h3>
+                    {skills.length ? <div className="cp-chips">{skills.map(skill => <span key={skill}>{skill}</span>)}</div>
+                      : <p className="cp-muted">No skills captured.</p>}
+                  </div>
+                </div>
+              ) : <p className="cp-empty">Resume details are not available for this candidate.</p>}
+            </section>
           </div>
-        </div>
 
-        <div className="profile-actions-footer">
-          <button
-            type="button"
-            className="btn btn-danger profile-remove-footer-btn"
-            disabled={deleting}
-            onClick={handleRemove}
-            title="Remove this candidate from the repository"
-          >
-            {deleting
-              ? <><i className="fas fa-spinner fa-spin"></i> Removing…</>
-              : <><i className="fas fa-user-times"></i> Remove candidate</>}
-          </button>
-        </div>
+          {/* Sidebar */}
+          <aside className="cp-side">
+            <section className="cp-card">
+              <header className="cp-card-head"><h2><i className="fas fa-diagram-project" aria-hidden="true" /> Hiring stage</h2></header>
+              {steps.length ? (
+                <div className="cp-stage">
+                  {canEditStage ? (
+                    <label>
+                      <span className="cp-label">Current stage</span>
+                      <select value={candidate.stage_id || ''} onChange={(e) => setStage(e.target.value)}>
+                        <option value="">Not started</option>
+                        {steps.map(step => <option key={step.id} value={step.id}>{step.name}</option>)}
+                      </select>
+                    </label>
+                  ) : <p><span className="cp-label">Current stage</span><strong>{candidate.hiring_stage || 'Not started'}</strong></p>}
+                  {canEditStage && (
+                    <div className="cp-stage-actions">
+                      <button type="button" className="cp-btn cp-btn-ghost cp-btn-sm" onClick={toggleHold}>
+                        <i className={`fas ${candidate.on_hold ? 'fa-circle-play' : 'fa-circle-pause'}`} aria-hidden="true" />
+                        {candidate.on_hold ? 'Take off hold' : 'Put on hold'}
+                      </button>
+                      {candidate.automation_paused && (
+                        <button type="button" className="cp-btn cp-btn-ghost cp-btn-sm" onClick={resumeAutomation}>
+                          <i className="fas fa-rotate" aria-hidden="true" /> Resume automatic updates
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {candidate.automation_paused && <p className="cp-muted">Automatic stage updates are paused for this candidate.</p>}
+                </div>
+              ) : (
+                <p className="cp-muted">
+                  {candidate.hiring_stage ? <><strong>{candidate.hiring_stage}</strong><br /></> : null}
+                  This job has no hiring process configured, so stages can't be set here.
+                </p>
+              )}
+            </section>
 
-        {/* Generate Candidate Report Button at Bottom */}
-        <div style={{ 
-          marginTop: '30px', 
-          display: 'flex', 
-          justifyContent: 'center',
-          padding: '20px 0',
-          borderTop: '1px solid #e2e8f0'
-        }}>
-          <button 
-            className="btn btn-primary reports-generate-btn"
-            onClick={() => setShowModal(true)}
-            style={{ 
-              padding: '16px 48px', 
-              fontSize: '18px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              color: 'white',
-              border: 'none',
-              boxShadow: '0 4px 16px rgba(249, 115, 22, 0.35)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              fontWeight: '600'
-            }}
-          >
-            <i className="fas fa-plus-circle"></i> Generate Candidate Report
-          </button>
+            <section className="cp-card">
+              <header className="cp-card-head"><h2><i className="fas fa-id-card" aria-hidden="true" /> Details</h2></header>
+              <dl className="cp-details">
+                {detailRows.map(([icon, label, value]) => (
+                  <div key={label}>
+                    <dt><i className={`fas ${icon}`} aria-hidden="true" />{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="cp-card">
+              <header className="cp-card-head"><h2><i className="fas fa-layer-group" aria-hidden="true" /> Role category</h2></header>
+              <div className="cp-chips accent">
+                <span>{candidate.primary_category || 'Others'}</span>
+                {(candidate.secondary_categories || []).map(category => <span key={category} className="secondary">{category}</span>)}
+              </div>
+              <div className="cp-confidence">
+                <div><span style={{ width: `${confidence}%` }} /></div>
+                <small>{confidence}% confidence</small>
+              </div>
+              <p className="cp-muted">{candidate.category_reason || 'No categorisation reason captured.'}</p>
+              {(candidate.matched_keywords || []).length > 0 && (
+                <div className="cp-chips small">{candidate.matched_keywords.slice(0, 10).map(k => <span key={k}>{k}</span>)}</div>
+              )}
+              <p className="cp-meta">
+                Source: {candidate.categorization_source || 'resume'}
+                {candidate.categorized_date ? ` · Updated ${formatJdUploadDateTime(candidate.categorized_date).date}` : ''}
+              </p>
+            </section>
+
+            <section className="cp-card">
+              <header className="cp-card-head">
+                <h2><i className="fas fa-briefcase" aria-hidden="true" /> Applied roles</h2>
+                <span className="cp-count">{(candidate.jd_history || []).length}</span>
+              </header>
+              {(candidate.jd_history || []).length ? (
+                <ul className="cp-roles">
+                  {candidate.jd_history.map((jd, i) => {
+                    const when = formatJdUploadDateTime(jd.comparison_date);
+                    const score = Number(jd.match_score || 0);
+                    return (
+                      <li key={i}>
+                        <span>
+                          <strong>{jd.jd_title}</strong>
+                          <small>{when.date}{when.time ? ` · ${when.time}` : ''}</small>
+                        </span>
+                        <b className={score >= 70 ? 'good' : score >= 50 ? 'mid' : 'low'}>{score}%</b>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : <p className="cp-muted">Not matched against any job yet.</p>}
+            </section>
+
+            <section className="cp-card">
+              <header className="cp-card-head"><h2><i className="fas fa-clock-rotate-left" aria-hidden="true" /> Activity</h2></header>
+              {timeline.length ? (
+                <ol className="cp-timeline">
+                  {timeline.map((item, index) => {
+                    const stamp = formatJdUploadDateTime(item.date);
+                    return (
+                      <li key={`${item.type || 'event'}-${index}`} className={`cp-timeline-${item.type || 'event'}`}>
+                        <span className="cp-timeline-dot">
+                          <i className={item.type === 'interview' ? 'fas fa-calendar-check' : item.type === 'followup' ? 'fas fa-reply' : 'fas fa-clipboard-check'} aria-hidden="true" />
+                        </span>
+                        <div>
+                          <strong>{item.label}</strong>
+                          <small>{stamp.date} {stamp.time}{item.status ? ` · ${item.status}` : ''}{item.score !== undefined ? ` · ${item.score}%` : ''}</small>
+                          {item.summary && <p>{item.summary}</p>}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : <p className="cp-muted">No activity recorded yet.</p>}
+            </section>
+          </aside>
         </div>
 
         <ReportModal />
-
         <style>{`
           @keyframes slideUp {
-            from {
-              opacity: 0;
-              transform: translateY(30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
           }
         `}</style>
       </div>

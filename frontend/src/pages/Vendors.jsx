@@ -4,6 +4,7 @@ import Layout from '../components/Layout.jsx';
 import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import { apiDelete, apiGet, apiPost, apiPostForm, apiPut, readSessionCache, VENDOR_CACHE_KEY, writeSessionCache } from '../api.js';
 import '../styles/vendors.css';
+import '../styles/vendors_page.css';
 
 const EMPTY_VENDOR_FORM = {
   vendor_name: '',
@@ -338,90 +339,141 @@ function Vendors() {
     return assignJobs.filter(job => `${job.title || ''} ${job.client_name || ''} ${job.location || ''}`.toLowerCase().includes(needle));
   }, [assignJobs, jobSearch]);
 
+  const initialsOf = name => String(name || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+  const categoriesOf = vendor => (Array.isArray(vendor.supported_categories) ? vendor.supported_categories : []).filter(Boolean);
+
   return (
     <Layout>
-      <div className="vendors-page">
-        <div className="vendors-header">
+      <div className="vendors-page vn-page">
+        <header className="vn-header">
           <div>
-            <h1><i className="fas fa-handshake"></i> Vendors</h1>
-            <p>Recruitment partners available for selective JD sharing.</p>
+            <span className="vn-eyebrow">Partners</span>
+            <h1>Vendors</h1>
+            <p>Recruitment partners you share job descriptions with and receive candidates from.</p>
           </div>
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <i className="fas fa-plus"></i> Add Vendor
+          <button type="button" className="vn-btn vn-btn-primary" onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden="true"></i> Add vendor
           </button>
-        </div>
+        </header>
 
-        <section className="vendor-metrics">
-          <div><span>Total Vendors</span><strong>{vendors.length}</strong></div>
-          <div><span>Active Vendors</span><strong>{stats.active}</strong></div>
-          <div><span>Assigned JDs</span><strong>{stats.assigned}</strong></div>
-          <div><span>Candidates Provided</span><strong>{stats.candidates}</strong></div>
+        <section className="vn-stats" aria-label="Vendor summary">
+          {[['Vendors listed', vendors.length, 'fa-handshake'], ['Active', stats.active, 'fa-circle-check'],
+            ['Assigned JDs', stats.assigned, 'fa-briefcase'], ['Candidates provided', stats.candidates, 'fa-users']].map(([label, value, icon]) => (
+            <div key={label} className="vn-stat">
+              <span className="vn-stat-icon"><i className={`fas ${icon}`} aria-hidden="true"></i></span>
+              <div><span>{label}</span><strong>{loading && !vendors.length ? '—' : value}</strong></div>
+            </div>
+          ))}
         </section>
 
-        <section className="vendor-toolbar">
-          <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search vendors..." />
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-            <option value="All">All</option>
-          </select>
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-            <option value="company_name">Company</option>
-            <option value="vendor_name">Vendor</option>
-            <option value="updated_at">Last Updated</option>
-            <option value="created_at">Created Date</option>
-          </select>
-        </section>
-
-        {loading ? (
-          <div className="vendors-empty">Loading vendors...</div>
-        ) : error ? (
-          <div className="vendors-empty">{error}</div>
-        ) : vendors.length === 0 ? (
-          <div className="vendors-empty">No vendors found.</div>
-        ) : (
-          <div className="vendor-table-wrap">
-            <table className="vendor-table">
-              <thead>
-                <tr>
-                  <th>Vendor</th>
-                  <th>Contact</th>
-                  <th>Status</th>
-                  <th>Assigned JDs</th>
-                  <th>Candidates Provided</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendors.map(vendor => (
-                  <tr key={vendor.id}>
-                    <td>
-                      <strong>{vendor.vendor_name || vendor.company_name}</strong>
-                      <span>{vendor.company_name || 'Independent vendor'}</span>
-                    </td>
-                    <td>
-                      <strong>{vendor.contact_person || vendor.email}</strong>
-                      <span>{vendor.email}</span>
-                      {vendor.phone && <small>{vendor.phone}</small>}
-                    </td>
-                    <td><span className={`vendor-status status-${String(vendor.status || 'active').toLowerCase()}`}>{vendor.status}</span></td>
-                    <td>{vendor.assigned_jds_count || 0}</td>
-                    <td>{vendor.candidates_provided_count || 0}</td>
-                    <td>
-                      <div className="vendor-actions">
-                        <button type="button" className="btn btn-success" onClick={() => openAssignJobs(vendor)} disabled={vendor.status !== 'Active'}>
-                          <i className="fas fa-briefcase"></i> Assign JDs
-                        </button>
-                        <button type="button" className="btn btn-secondary" onClick={() => openEdit(vendor)}><i className="fas fa-edit"></i> Edit</button>
-                        <button type="button" className="btn btn-danger" onClick={() => deleteVendor(vendor)}><i className="fas fa-trash-alt"></i> Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className="vn-card">
+          <div className="vn-toolbar">
+            <label className="vn-search">
+              <i className="fas fa-magnifying-glass" aria-hidden="true"></i>
+              <span className="sr-only">Search vendors</span>
+              <input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by name, company or email" />
+            </label>
+            <div className="vn-segment" role="group" aria-label="Filter by status">
+              {[['All', 'All'], ['Active', 'Active'], ['Inactive', 'Inactive']].map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={statusFilter === value} className={statusFilter === value ? 'active' : ''}
+                  onClick={() => setStatusFilter(value)}>{label}</button>
+              ))}
+            </div>
+            <label className="vn-sort">
+              <span>Sort by</span>
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                <option value="company_name">Company</option>
+                <option value="vendor_name">Vendor name</option>
+                <option value="updated_at">Last updated</option>
+                <option value="created_at">Date added</option>
+              </select>
+            </label>
+            <span className="vn-count">{loading ? 'Loading…' : `${vendors.length} ${vendors.length === 1 ? 'vendor' : 'vendors'}`}</span>
           </div>
-        )}
+
+          {error ? (
+            <div className="vn-empty" role="alert">
+              <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+              <p>{error}</p>
+              <button type="button" className="vn-btn vn-btn-ghost" onClick={loadVendors}>Try again</button>
+            </div>
+          ) : loading && !vendors.length ? (
+            <div className="vn-empty"><i className="fas fa-spinner fa-spin" aria-hidden="true"></i><p>Loading vendors…</p></div>
+          ) : vendors.length === 0 ? (
+            <div className="vn-empty">
+              <i className="fas fa-handshake" aria-hidden="true"></i>
+              <p>{searchTerm || statusFilter !== 'All' ? 'No vendors match these filters.' : 'No vendors yet.'}</p>
+              {searchTerm || statusFilter !== 'All'
+                ? <button type="button" className="vn-btn vn-btn-ghost" onClick={() => { setSearchTerm(''); setStatusFilter('All'); }}>Clear filters</button>
+                : <button type="button" className="vn-btn vn-btn-primary" onClick={openCreate}><i className="fas fa-plus" aria-hidden="true"></i> Add your first vendor</button>}
+            </div>
+          ) : (
+            <div className="vn-table-wrap">
+              <table className="vn-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Vendor</th>
+                    <th scope="col">Contact</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="vn-num">Assigned JDs</th>
+                    <th scope="col" className="vn-num">Candidates</th>
+                    <th scope="col"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendors.map(vendor => {
+                    const name = vendor.vendor_name || vendor.company_name || vendor.email;
+                    const active = vendor.status === 'Active';
+                    const categories = categoriesOf(vendor);
+                    return (
+                      <tr key={vendor.id} className={active ? '' : 'vn-row-inactive'}>
+                        <td>
+                          <div className="vn-vendor">
+                            <span className="vn-avatar" aria-hidden="true">{initialsOf(name)}</span>
+                            <span>
+                              <strong>{name}</strong>
+                              <small>{vendor.company_name && vendor.company_name !== name ? vendor.company_name : 'Independent vendor'}</small>
+                              {categories.length > 0 && (
+                                <span className="vn-tags">
+                                  {categories.slice(0, 3).map(category => <em key={category}>{category}</em>)}
+                                  {categories.length > 3 && <em>+{categories.length - 3}</em>}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="vn-contact">
+                            {vendor.contact_person && <strong>{vendor.contact_person}</strong>}
+                            {vendor.email && <a href={`mailto:${vendor.email}`}>{vendor.email}</a>}
+                            {vendor.phone && <a href={`tel:${vendor.phone}`}>{vendor.phone}</a>}
+                          </div>
+                        </td>
+                        <td><span className={`vn-status ${active ? 'active' : 'inactive'}`}>{vendor.status || 'Active'}</span></td>
+                        <td className="vn-num" data-label="Assigned JDs">{vendor.assigned_jds_count || 0}</td>
+                        <td className="vn-num" data-label="Candidates">{vendor.candidates_provided_count || 0}</td>
+                        <td>
+                          <div className="vn-actions">
+                            <button type="button" className="vn-btn vn-btn-soft vn-btn-sm" onClick={() => openAssignJobs(vendor)} disabled={!active}
+                              title={active ? 'Share job descriptions with this vendor' : 'Reactivate this vendor to assign JDs'}>
+                              <i className="fas fa-briefcase" aria-hidden="true"></i> Assign JDs
+                            </button>
+                            <button type="button" className="vn-icon-btn" onClick={() => openEdit(vendor)} aria-label={`Edit ${name}`} title="Edit vendor">
+                              <i className="fas fa-pen" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" className="vn-icon-btn danger" onClick={() => deleteVendor(vendor)} aria-label={`Delete ${name}`} title="Delete vendor">
+                              <i className="fas fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         {modalOpen && (
           <div className="vendor-modal-backdrop" role="presentation" onMouseDown={closeModal}>

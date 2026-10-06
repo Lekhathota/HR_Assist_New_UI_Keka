@@ -1,0 +1,106 @@
+/* Cross-page responsive rules. Loaded last so pages keep their laptop layout on
+   every screen: content is capped and centred on very large monitors, and dense
+   tables and summary cards reflow cleanly on tablets and phones. */
+
+/* ---------- Large monitors: keep the laptop layout, centred ---------- */
+body.theme-shimento {
+  --content-max: 1680px;
+}
+body.theme-shimento .app-shell .workspace-content > .main-container {
+  max-width: var(--content-max);
+  margin-inline: auto;
+}
+/* Hire tab bar spans the full width, but its tabs line up with the page content. */
+@media (min-width: 821px) {
+  body.theme-shimento .hire-tabs {
+    padding-inline: max(clamp(20px, 2.4vw, 32px), calc((100% - var(--content-max)) / 2 + clamp(20px, 2.4vw, 32px)));
+  }
+}
+
+/* ---------- Home ---------- */
+@media (max-width: 640px) {
+  /* Quick actions: even two-column grid instead of ragged pills. */
+  body.theme-shimento .home-quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  body.theme-shimento .home-quick-actions a { justify-content: space-between; min-width: 0; padding: 10px 12px; font-size: 12.5px; }
+  body.theme-shimento .home-quick-actions a span { margin-left: auto; }
+
+  /* KPI cards: two per row, icon above the number. */
+  body.theme-shimento .insight-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+  body.theme-shimento .insight-kpi { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 0; padding: 14px; }
+  body.theme-shimento .insight-kpi-icon,
+  body.theme-shimento .insight-kpi-icon:is(.tone-0, .tone-1, .tone-2, .tone-3) { width: 34px; height: 34px; flex-basis: 34px; font-size: 15px; border-radius: 9px; }
+  body.theme-shimento .insight-kpi h2 { font-size: 12.5px; }
+  body.theme-shimento .insight-kpi strong { font-size: 24px; }
+  body.theme-shimento .insight-kpi small { margin-top: 4px; font-size: 11.5px; }
+}
+
+/* ---------- Profile activity cards: two per row on phones ---------- */
+@media (max-width: 640px) {
+  body.theme-shimento .profile-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+
+/* ---------- Talent list: stacked cards on phones ---------- */
+@media (max-width: 720px) {
+  body.theme-shimento .candidates-simple-table { min-width: 0 !important; width: 100%; }
+  body.theme-shimento .candidates-simple-table tbody { display: grid; gap: 10px; }
+  body.theme-shimento .candidates-simple-table tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 12px;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid #eceef1;
+    border-radius: 12px;
+    background: #fff;
+  }
+  body.theme-shimento .candidates-simple-table td { display: block; width: auto; min-width: 0; padding: 0; border: 0; }
+  body.theme-shimento .candidates-simple-table .candidates-select-col { grid-row: 1; grid-column: 1; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-name { grid-row: 1; grid-column: 2; font-size: 15px; font-weight: 700; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-client { grid-column: 2; color: #6b7280; font-size: 13px; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-stage { grid-column: 1 / -1; padding-top: 6px; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-stage::before { display: none; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-stage .stx { --stx-w: 100%; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-stage .stx__label { display: block; font-size: 11px; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-actions { grid-column: 1 / -1; }
+  body.theme-shimento .candidates-simple-table .candidates-simple-btn { width: 100%; justify-content: center; }
+}
+
+/* ---------- Users table: one card per user on phones ---------- */
+@media (max-width: 640px) {
+  body.theme-shimento .um-page .um-table { min-width: 0; }
+  body.theme-shimento .um-page .um-table thead { display: none; }
+  body.theme-shimento .um-page .um-table tbody { display: grid; gap: 10px; padding: 12px; }
+  body.theme-shimento .um-page .um-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid #eceef1;
+    border-radius: 12px;
+  }
+  body.theme-shimento .um-page .um-table tbody tr:hover td { background: transparent; }
+  body.theme-shimento .um-page .um-table td { display: block; padding: 0; border: 0; }
+  body.theme-shimento .um-page .um-table td:nth-child(1) { grid-column: 1; }
+  body.theme-shimento .um-page .um-table td:nth-child(3) { grid-column: 2; grid-row: 1; justify-self: end; }
+  body.theme-shimento .um-page .um-table td:nth-child(2) { grid-column: 1 / -1; }
+  body.theme-shimento .um-page .um-role-select { width: 100%; min-width: 0; }
+  body.theme-shimento .um-page .um-table td.um-date { grid-column: 1; font-size: 12px; }
+  body.theme-shimento .um-page .um-table td.um-date::before { content: 'Member since '; }
+  body.theme-shimento .um-page .um-table td.um-actions { grid-column: 2; text-align: right; }
+  body.theme-shimento .um-page .um-table tr.um-skeleton,
+  body.theme-shimento .um-page .um-table tr:has(.um-empty) { display: block; }
+  body.theme-shimento .um-page .um-toolbar { padding: 14px; }
+  body.theme-shimento .um-page .um-toolbar > label,
+  body.theme-shimento .um-page .um-toolbar > .um-search { flex: 1 1 100%; max-width: none; }
+  body.theme-shimento .um-page .um-toolbar select,
+  body.theme-shimento .um-page .um-segment { width: 100%; }
+  body.theme-shimento .um-page .um-segment button { flex: 1; }
+}
+
+/* ---------- Very small phones (≤ 360px) ---------- */
+@media (max-width: 360px) {
+  body.theme-shimento .app-shell .workspace-content > .main-container { padding-inline: 12px; }
+  body.theme-shimento .home-quick-actions { grid-template-columns: minmax(0, 1fr); }
+  body.theme-shimento h1 { font-size: 22px; }
+}

@@ -7,6 +7,7 @@ import { AppearanceProvider } from './components/AppearanceProvider.jsx';
 import './styles/reference-theme.css';
 import './styles/analytics.css';
 import './styles/shell.css';
+import './styles/responsive.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<AppearanceProvider><App /></AppearanceProvider>);

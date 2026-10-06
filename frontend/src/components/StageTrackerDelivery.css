@@ -78,15 +78,6 @@
 .stx--warn .stx__status { color: var(--stx-warn); }
 .stx--bad .stx__status { color: var(--stx-bad); }
 
-@media (prefers-color-scheme: dark) {
-  .stx {
-    --stx-idle: #4a4a4a;
-    --stx-faded: #333;
-    --stx-halo: #1d4a3a;
-  }
-  .stx__label { color: #bbb; }
-}
-
 @media (max-width: 900px) {
   .stx { --stx-w: 150px; }
   .stx__label { display: none; }

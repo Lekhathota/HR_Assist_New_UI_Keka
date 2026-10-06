@@ -42,9 +42,10 @@ test('Home renders real cohort charts, activity and interviews without duplicati
 test('Home quick actions retain role restrictions', async () => {
   localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'finance' }));
   await act(async () => root.render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Welcome /></MemoryRouter>));
-  expect(container.querySelector('.home-quick-actions a[href="/insights"]')).not.toBeNull();
+  // Finance can only open Reports, which is no longer a quick action, so the row is hidden.
+  expect(container.querySelector('.home-quick-actions')).toBeNull();
   expect(container.querySelector('a[href="/talent/7"]')).toBeNull();
-  expect(container.querySelector('.home-quick-actions a[href="/jobs/create"]')).toBeNull();
+  expect(container.querySelector('a[href="/insights"]')).toBeNull();
 });
 
 test('all report tabs work with keyboard navigation and expose real/unavailable data', () => {

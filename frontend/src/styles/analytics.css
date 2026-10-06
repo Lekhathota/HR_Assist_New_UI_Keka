@@ -58,7 +58,7 @@ body.theme-shimento .insights-heading h1 { font-size: 25px; margin: 0 0 4px; }
 .home-charts .insight-panel { padding: 16px; }
 .home-charts .chart-legend { gap: 8px 12px; }
 .home-charts .insight-chart-donut .chart-legend li { width: 100%; }
-body.theme-shimento .home-quick-actions { margin: 18px 0; }
+body.theme-shimento .home-quick-actions { margin: 4px 0 20px; }
 body.theme-shimento .home-quick-actions a { padding: 10px 12px; }
 @media (max-width: 1150px) { .reports-toolbar { flex-wrap: wrap; } .reports-toolbar .analytics-filters { margin-left: auto; } }
 @media (max-width: 1024px) { body.theme-shimento .app-shell { grid-template-columns: 185px minmax(0, 1fr); } .workspace-header-account { gap: 16px; } .insights-heading { flex-wrap: wrap; } .insights-heading .analytics-filters { margin-left: auto; } }
@@ -241,8 +241,9 @@ body.theme-shimento .insight-kpi { gap: 16px; padding: 20px 22px; border: 1px so
 body.theme-shimento .insight-kpi h2 { color: #374151; font-weight: 500; }
 body.theme-shimento .insight-kpi strong { color: #111827; font-weight: 700; }
 body.theme-shimento .insight-kpi small { color: var(--text-secondary); }
-body.theme-shimento .insight-kpi-icon { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 12px; font-size: 20px; background: #f3f4f6; color: #374151; }
-body.theme-shimento .insight-kpi-icon.tone-0 { background: #fff1e8; color: #f97316; }
+/* Every KPI icon uses the same orange accent tile. */
+body.theme-shimento .insight-kpi-icon,
+body.theme-shimento .insight-kpi-icon:is(.tone-0, .tone-1, .tone-2, .tone-3) { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 12px; font-size: 20px; background: #fff1e8; color: #f97316; }
 body.theme-shimento .insight-grid { gap: 20px; margin: 20px 0; }
 body.theme-shimento .insight-panel { border: 1px solid #eceef1; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
 body.theme-shimento .insight-panel-heading h2 { font-size: 16px; font-weight: 700; color: #111827; }

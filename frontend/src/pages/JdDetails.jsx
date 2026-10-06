@@ -8,6 +8,7 @@ import { formatJdDate, parseJdSections } from '../utils/jdSections.js';
 import JdHiringProcessEditor from '../components/JdHiringProcessEditor.jsx';
 import '../styles/jd_details_extra.css';
 import '../styles/jobs_module.css';
+import '../styles/job_details.css';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -109,6 +110,8 @@ function JdDetails() {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [showFullJd, setShowFullJd] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [candidateView, setCandidateView] = useState('selected');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -1541,338 +1544,393 @@ const downloadPDF = (reportText) => {
     ['Location', jd.location],
   ].filter(([, value]) => value !== undefined && value !== null && value !== '');
 
+  const requiredPosts = Number(jd.required_candidate_count || 0);
+  const selectedCount = Number(jd.selected_count || 0);
+  const totalResumes = Number(jd.total_resumes || 0);
+  const fillPercent = requiredPosts ? Math.min(100, Math.round((selectedCount / requiredPosts) * 100)) : 0;
+  const screenPercent = totalResumes ? Math.round((screenedCount / totalResumes) * 100) : 0;
+  const statusTone = jd.status === 'Active' ? 'good' : jd.status === 'Closed' ? 'neutral' : 'warn';
+  const tabs = [
+    ['overview', 'Overview', null],
+    ['candidates', 'Candidates', selected.length + rejected.length],
+    ['vendors', 'Vendors', assignedVendors.length],
+    ['process', 'Hiring process', null],
+    ['activity', 'Activity', fulfilmentTimeline.length],
+  ];
+
   return (
     <Layout>
-      <div className="jd-details-container">
-        <div className="jdd-topbar">
-          <Link to="/jobs" className="jdd-back"><i className="fas fa-arrow-left"></i> Back to Jobs</Link>
-          <div className="jdd-topbar-actions">
-            <button type="button" className="btn btn-secondary jdd-topbar-btn" onClick={openEditModal}>
-              <i className="fas fa-pen"></i> Edit JD
-            </button>
-            <button type="button" className="btn btn-secondary jdd-topbar-btn" onClick={() => setShowModal(true)}>
-              <i className="fas fa-file-export"></i> Generate Report
-            </button>
-          </div>
-        </div>
+      <div className="jd-details-container jx-page">
+        <Link to="/jobs" className="jx-back"><i className="fas fa-arrow-left" aria-hidden="true"></i> Jobs</Link>
 
-        <div className="jdd-page">
-          <header className="jdd-header">
-            <div className="jdd-title-row">
-              <h1 className="jdd-title">{jd.title}</h1>
-              <span className={`badge ${jd.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{jd.status}</span>
+        <section className="jx-card jx-hero">
+          <div className="jx-hero-main">
+            <span className="jx-hero-icon" aria-hidden="true"><i className="fas fa-briefcase"></i></span>
+            <div className="jx-hero-copy">
+              <div className="jx-hero-title">
+                <h1 className="jdd-title">{jd.title}</h1>
+                <span className={`jx-badge ${statusTone}`}>{jd.status}</span>
+                {jd.job_code && <span className="jx-badge code">{jd.job_code}</span>}
+              </div>
+              <p className="jx-hero-sub">
+                {[jd.job_category, jd.client_name, jd.location, postedDate && `Posted ${postedDate}`].filter(Boolean).join(' · ')}
+              </p>
             </div>
-            <div className="jdd-subtitle">
-              {[jd.job_category, jd.client_name, postedDate && `Posted ${postedDate}`].filter(Boolean).join(' · ')}
-            </div>
-          </header>
-
-          <div className="jdd-top-row">
-            <section className="jdd-section">
-              <h2 className="jdd-section-title">Job Information</h2>
-              <dl className="jdd-info-list">
-                {jobInfo.map(([label, value]) => (
-                  <div key={label} className="jdd-info-pair">
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            {highlightResponsibilities.length > 0 && (
-              <section className="jdd-section">
-                <h2 className="jdd-section-title">Key Responsibilities</h2>
-                <ul className="jdd-bullets">
-                  {highlightResponsibilities.map((item, i) => <li key={i}>{item}</li>)}
-                </ul>
-              </section>
-            )}
           </div>
+          <div className="jx-hero-actions">
+            <button type="button" className="jx-btn jx-btn-ghost" onClick={openEditModal}><i className="fas fa-pen" aria-hidden="true"></i> Edit JD</button>
+            <button type="button" className="jx-btn jx-btn-ghost" onClick={() => setShowModal(true)}><i className="fas fa-file-export" aria-hidden="true"></i> Generate report</button>
+            <button type="button" className="jx-btn jx-btn-primary" onClick={openAssignVendors}><i className="fas fa-handshake" aria-hidden="true"></i> Assign vendors</button>
+          </div>
+        </section>
 
-          {(jdSummary || highlightSkills.length > 0 || highlightGoodToHave.length > 0) && (
-            <section className="jdd-section">
-              <h2 className="jdd-section-title">Summary</h2>
-              {jdSummary && <p className="jdd-summary-text">{jdSummary}</p>}
-              {(highlightSkills.length > 0 || highlightGoodToHave.length > 0) && (
-                <div className="jdd-highlights-grid">
+        <section className="jx-stats" aria-label="Job summary">
+          <div className="jx-stat">
+            <span className="jx-stat-icon"><i className="fas fa-user-plus" aria-hidden="true"></i></span>
+            <div><span>Posts required</span><strong>{requiredPosts || '—'}</strong></div>
+          </div>
+          <div className="jx-stat">
+            <span className="jx-stat-icon"><i className="fas fa-file-lines" aria-hidden="true"></i></span>
+            <div><span>Resumes received</span><strong>{totalResumes}</strong></div>
+          </div>
+          <div className="jx-stat">
+            <span className="jx-stat-icon"><i className="fas fa-circle-check" aria-hidden="true"></i></span>
+            <div>
+              <span>Selected</span><strong>{selectedCount}</strong>
+              {requiredPosts > 0 && (
+                <div className="jx-mini-progress" title={`${selectedCount} of ${requiredPosts} posts filled`}>
+                  <i style={{ width: `${fillPercent}%` }} /><small>{selectedCount} of {requiredPosts} filled</small>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="jx-stat">
+            <span className="jx-stat-icon"><i className="fas fa-circle-xmark" aria-hidden="true"></i></span>
+            <div><span>Rejected</span><strong>{jd.rejected_count ?? 0}</strong></div>
+          </div>
+        </section>
+
+        <nav className="jx-tabs" role="tablist" aria-label="Job sections">
+          {tabs.map(([key, label, count]) => (
+            <button key={key} type="button" role="tab" aria-selected={activeTab === key}
+              className={activeTab === key ? 'active' : ''} onClick={() => setActiveTab(key)}>
+              {label}{count !== null && <span>{count}</span>}
+            </button>
+          ))}
+        </nav>
+
+        {activeTab === 'overview' && (
+          <div className="jx-overview" role="tabpanel">
+            <div className="jx-main">
+              {(jdSummary || highlightSkills.length > 0 || highlightGoodToHave.length > 0) && (
+                <section className="jx-card">
+                  <h2 className="jx-card-title"><i className="fas fa-align-left" aria-hidden="true"></i> Summary</h2>
+                  {jdSummary && <p className="jx-text">{jdSummary}</p>}
                   {highlightSkills.length > 0 && (
-                    <div className="jdd-highlight-block">
-                      <h3 className="jdd-subheading">Required Skills</h3>
-                      <div className="jdd-chip-row">
-                        {highlightSkills.map((skill, i) => <span key={`${skill}-${i}`} className="jdd-chip">{skill}</span>)}
-                      </div>
+                    <div className="jx-block">
+                      <h3>Required skills</h3>
+                      <div className="jx-chips">{highlightSkills.map((skill, i) => <span key={`${skill}-${i}`}>{skill}</span>)}</div>
                     </div>
                   )}
                   {highlightGoodToHave.length > 0 && (
-                    <div className="jdd-highlight-block">
-                      <h3 className="jdd-subheading">Good to Have Skills</h3>
-                      <div className="jdd-chip-row">
-                        {highlightGoodToHave.map((skill, i) => <span key={`${skill}-${i}`} className="jdd-chip">{skill}</span>)}
-                      </div>
+                    <div className="jx-block">
+                      <h3>Good to have</h3>
+                      <div className="jx-chips soft">{highlightGoodToHave.map((skill, i) => <span key={`${skill}-${i}`}>{skill}</span>)}</div>
                     </div>
                   )}
-                </div>
+                </section>
               )}
-            </section>
-          )}
 
-          {jdGroups.length > 0 && (
-            <section className="jdd-section">
-              <div className="jdd-section-title-row">
-                <h2 className="jdd-section-title">Full Job Description</h2>
-                <button type="button" className="btn btn-secondary jdd-toggle-full-btn" onClick={() => setShowFullJd(v => !v)}>
-                  {showFullJd
-                    ? <><i className="fas fa-chevron-up"></i> Hide</>
-                    : <><i className="fas fa-chevron-down"></i> View Full Description</>}
-                </button>
-              </div>
-            </section>
-          )}
+              {highlightResponsibilities.length > 0 && (
+                <section className="jx-card">
+                  <h2 className="jx-card-title"><i className="fas fa-list-check" aria-hidden="true"></i> Key responsibilities</h2>
+                  <ul className="jx-checklist">
+                    {highlightResponsibilities.map((item, i) => <li key={i}><i className="fas fa-check" aria-hidden="true"></i>{item}</li>)}
+                  </ul>
+                </section>
+              )}
 
-          {showFullJd && jdGroups.map((group, gi) => (group.kind === 'intro' ? (
-            <section key={`g${gi}`} className="jdd-section">
-              <h2 className="jdd-section-title">{gi === 0 ? 'Job Description' : group.title}</h2>
-              {gi === 0 && group.title && <p className="jdd-doc-title">{group.title}</p>}
-              {group.fields.length > 0 && (
-                <dl className="jdd-stacked-fields">
-                  {group.fields.map((field, fi) => (
-                    <div key={`${field.label}-${fi}`} className="jdd-stacked-field">
-                      <dt>{field.label}</dt>
-                      <dd>{field.value}</dd>
+              {jdGroups.length > 0 && (
+                <section className="jx-card">
+                  <div className="jx-card-head">
+                    <h2 className="jx-card-title"><i className="fas fa-file-lines" aria-hidden="true"></i> Full job description</h2>
+                    <button type="button" className="jx-btn jx-btn-ghost jx-btn-sm" onClick={() => setShowFullJd(v => !v)} aria-expanded={showFullJd}>
+                      <i className={`fas ${showFullJd ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i> {showFullJd ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  {showFullJd && (
+                    <div className="jx-fulltext">
+                      {jdGroups.map((group, gi) => (group.kind === 'intro' ? (
+                        <div key={`g${gi}`} className="jx-fulltext-group">
+                          {gi === 0 && group.title && <p className="jdd-doc-title">{group.title}</p>}
+                          {gi !== 0 && group.title && <h3>{group.title}</h3>}
+                          {group.fields.length > 0 && (
+                            <dl className="jdd-stacked-fields">
+                              {group.fields.map((field, fi) => (
+                                <div key={`${field.label}-${fi}`} className="jdd-stacked-field"><dt>{field.label}</dt><dd>{field.value}</dd></div>
+                              ))}
+                            </dl>
+                          )}
+                          {group.blocks.map((block, bi) => (
+                            <div key={`b${bi}`} className="jdd-subsection">
+                              {block.heading && <h4>{block.heading}</h4>}
+                              <JdSectionBody paragraphs={block.paragraphs} items={block.items} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div key={`g${gi}`} className="jx-fulltext-group">
+                          <h3>{group.heading}</h3>
+                          <JdSectionBody paragraphs={group.paragraphs} items={group.items} />
+                        </div>
+                      )))}
                     </div>
+                  )}
+                </section>
+              )}
+            </div>
+
+            <aside className="jx-side">
+              <section className="jx-card">
+                <h2 className="jx-card-title"><i className="fas fa-circle-info" aria-hidden="true"></i> Job information</h2>
+                <dl className="jx-info">
+                  {jobInfo.map(([label, value]) => (
+                    <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
                   ))}
                 </dl>
-              )}
-              {group.blocks.map((block, bi) => (
-                <div key={`b${bi}`} className="jdd-subsection">
-                  {block.heading && <h3 className="jdd-subheading">{block.heading}</h3>}
-                  <JdSectionBody paragraphs={block.paragraphs} items={block.items} />
-                </div>
-              ))}
-            </section>
-          ) : (
-            <section key={`g${gi}`} className="jdd-section">
-              <h2 className="jdd-section-title">{group.heading}</h2>
-              <JdSectionBody paragraphs={group.paragraphs} items={group.items} />
-            </section>
-          )))}
+              </section>
+              <section className="jx-card">
+                <h2 className="jx-card-title"><i className="fas fa-chart-simple" aria-hidden="true"></i> Screening progress</h2>
+                {totalResumes > 0 ? (
+                  <>
+                    <div className="jx-progress"><i style={{ width: `${screenPercent}%` }} /></div>
+                    <p className="jx-muted">{screenedCount} of {totalResumes} resumes screened ({screenPercent}%)</p>
+                    <div className="jx-split">
+                      <span className="good"><b>{selectedCount}</b> selected</span>
+                      <span className="bad"><b>{jd.rejected_count ?? 0}</b> rejected</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="jx-muted">No resumes yet. <Link to="/analyze">Analyze resumes</Link> for this job to see progress.</p>
+                )}
+              </section>
+            </aside>
+          </div>
+        )}
 
-          <section className="jdd-section">
-            <h2 className="jdd-section-title">Resume Statistics</h2>
-            <dl className="jdd-info-row jdd-stats-row">
-              {[['Total Resumes', jd.total_resumes, ''], ['Selected', jd.selected_count, 'jdd-green'], ['Rejected', jd.rejected_count, 'jdd-red']].map(([label, value, tone]) => (
-                <div key={label} className="jdd-info-item">
-                  <dt>{label}</dt>
-                  <dd className={tone}>{value ?? 0}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-
-          {jd.total_resumes > 0 && (
-            <section className="jdd-section">
-              <h2 className="jdd-section-title">Screening Progress</h2>
-              <div className="progress jdd-progress">
-                <div className="progress-bar" style={{ width: `${Math.round((screenedCount / jd.total_resumes) * 100)}%` }}></div>
+        {activeTab === 'candidates' && (
+          <section className="jx-card jx-tab-card" role="tabpanel">
+            <div className="jx-card-head">
+              <h2 className="jx-card-title"><i className="fas fa-users" aria-hidden="true"></i> Candidates</h2>
+              <div className="jx-segment" role="group" aria-label="Candidate group">
+                <button type="button" aria-pressed={candidateView === 'selected'} className={candidateView === 'selected' ? 'active' : ''}
+                  onClick={() => setCandidateView('selected')}>Selected <span>{selected.length}</span></button>
+                <button type="button" aria-pressed={candidateView === 'rejected'} className={candidateView === 'rejected' ? 'active' : ''}
+                  onClick={() => setCandidateView('rejected')}>Rejected <span>{rejected.length}</span></button>
               </div>
-              <div className="jdd-progress-label">{screenedCount} of {jd.total_resumes} completed</div>
-            </section>
-          )}
-
-          <section className="jdd-section jdd-actions">
-            <button type="button" className="btn btn-primary jd-table-btn" onClick={openAssignVendors}>
-              <i className="fas fa-handshake"></i> Assign Vendors
-            </button>
-          </section>
-        </div>
-
-        <div className="white-card jd-fulfilment-timeline-card">
-          <h2 className="white-card-title"><i className="fas fa-timeline"></i> Fulfilment Timeline</h2>
-          {fulfilmentTimeline.length > 0 ? (
-            <div className="jd-fulfilment-timeline">
-              {fulfilmentTimeline.slice(0, 8).map(event => (
-                <article key={event.id || `${event.action}-${event.timestamp}`} className="jd-fulfilment-event">
-                  <span>{event.action || 'Workflow Event'}</span>
-                  <p>{event.details || event.outcome || 'No details recorded.'}</p>
-                  <small>{event.timestamp ? String(event.timestamp).slice(0, 19).replace('T', ' ') : ''} {event.username ? `| ${event.username}` : ''}</small>
-                </article>
-              ))}
             </div>
-          ) : (
-            <div className="jd-empty-card jd-compact-empty"><p className="jd-empty-text">No workflow timeline events yet</p></div>
-          )}
-        </div>
- 
-        <h2 className="jd-section-heading"><i className="fas fa-handshake"></i> Assigned Vendors</h2>
-        {assignedVendors.length > 0 ? (
-          <div className="table-container jd-vendor-table-section">
-            <table>
-              <thead><tr><th>Vendor</th><th>Email</th><th>Assigned</th><th>Email Status</th><th>Last Email Sent</th><th>Actions</th></tr></thead>
-              <tbody>
-                {assignedVendors.map(vendor => (
-                  <tr key={`${vendor.assignment_id}-${vendor.id}`}>
-                    <td>
-                      <strong>{vendor.vendor_name || vendor.company_name}</strong>
-                      <span>{vendor.company_name || 'Independent vendor'}</span>
-                    </td>
-                    <td>{vendor.email}</td>
-                    <td>{vendor.assigned_at ? String(vendor.assigned_at).slice(0, 10) : '-'}</td>
-                    <td><span className={`badge ${vendor.email_status === 'sent' ? 'badge-success' : vendor.email_status === 'failed' ? 'badge-danger' : 'badge-primary'}`}>{vendor.email_status || 'not_sent'}</span></td>
-                    <td>{vendor.last_email_sent_at ? String(vendor.last_email_sent_at).slice(0, 10) : 'Never'}</td>
-                    <td>
-                      <div className="jd-vendor-actions">
-                        <button type="button" className="btn btn-secondary jd-table-btn" onClick={() => openVendorHistory(vendor)}>
-                          <i className="fas fa-users"></i> History
-                        </button>
-                        <button type="button" className="btn btn-danger jd-table-btn" onClick={() => removeAssignedVendor(vendor)}>
-                          <i className="fas fa-link-slash"></i> Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="jd-empty-card">
-            <i className="fas fa-handshake jd-empty-icon"></i>
-            <p className="jd-empty-text">No vendors assigned to this JD</p>
+            {candidateView === 'selected' && (<>
+              {selected.length > 0 ? (
+                <div className="table-container jd-table-section">
+                  <table>
+                    <thead><tr><th>Candidate Name</th><th>Email</th><th>Match Score</th><th>Current Stage</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {selected.map(c => {
+                        const assessment = resolveAssessmentRow(c, assessmentMap);
+                        return (
+                          <tr key={c.id}>
+                            <td><strong>{c.name}</strong></td>
+                            <td>{c.email}</td>
+                            <td><span className="jd-table-score-green">{c.match_score}%</span></td>
+                            <td><span className="badge badge-success">{c.hiring_stage}</span></td>
+                            <td>
+                              <div className="jd-candidate-actions">
+                                <Link to={`/talent/${c.id}`} className="btn btn-primary jd-table-btn"><i className="fas fa-eye"></i> View</Link>
+                                {c.candidate_source === 'bench' && (
+                                  <>
+                                    <button type="button" className="btn btn-secondary jd-table-btn" onClick={() => overrideBenchCandidate(c, 'waitlisted_bench')}>
+                                      <i className="fas fa-list"></i> Waitlist
+                                    </button>
+                                    <button type="button" className="btn btn-danger jd-table-btn" onClick={() => markBenchUnavailable(c)}>
+                                      <i className="fas fa-user-slash"></i> Unavailable
+                                    </button>
+                                  </>
+                                )}
+
+                                {assessment.status === 'NOT_CREATED' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary jd-table-btn"
+                                    disabled={generatingAssessment === c.id}
+                                    onClick={() => handleGenerateAssessment(c)}
+                                  >
+                                    <i className={`fas ${generatingAssessment === c.id ? 'fa-spinner fa-spin' : 'fa-clipboard-list'}`}></i>
+                                    {generatingAssessment === c.id ? 'Preparing...' : 'Schedule Assessment'}
+                                  </button>
+                                )}
+
+                                {assessment.status === 'DRAFT' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary jd-table-btn"
+                                    onClick={() => openAssessmentBuilder(c)}
+                                  >
+                                    <i className="fas fa-edit"></i> Review Assessment
+                                  </button>
+                                )}
+
+                                {assessment.status === 'SENT' && (
+                                  <div className="jd-assessment-status-note">
+                                    <span><i className="fas fa-hourglass-half"></i> Waiting for Candidate</span>
+                                  </div>
+                                )}
+
+                                {assessment.status === 'IN_PROGRESS' && (
+                                  <div className="jd-assessment-status-note">
+                                    <span><i className="fas fa-spinner fa-spin"></i> In Progress</span>
+                                  </div>
+                                )}
+
+                                {assessment.status === 'FAILED' && (
+                                  <div className="jd-assessment-status-note">
+                                    <span><i className="fas fa-circle-xmark"></i> Assessment Failed</span>
+                                  </div>
+                                )}
+
+                                {assessment.eligibleForInterview && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-success jd-table-btn"
+                                    onClick={() => openScheduleModal(c)}
+                                  >
+                                    <i className="fas fa-calendar-check"></i> Schedule Interview
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="jd-empty-card">
+                  <i className="fas fa-inbox jd-empty-icon"></i>
+                  <p className="jd-empty-text">No selected candidates yet</p>
+                </div>
+              )}
+            </>)}
+            {candidateView === 'rejected' && (<>
+              {rejected.length > 0 ? (
+                <div className="table-container">
+                  <table>
+                    <thead><tr><th>Candidate Name</th><th>Email</th><th>Match Score</th><th>Rejection Reason</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {rejected.map(c => (
+                        <tr key={c.id}>
+                          <td><strong>{c.name}</strong></td>
+                          <td>{c.email}</td>
+                          <td><span className="jd-table-score-red">{c.match_score}%</span></td>
+                          <td className="jd-table-summary">{c.rejection_reason}</td>
+                          <td>
+                            <div className="jd-candidate-actions">
+                              <Link to={`/talent/${c.id}`} className="btn btn-primary jd-table-btn"><i className="fas fa-eye"></i> View</Link>
+                              {c.candidate_source === 'bench' && (
+                                <>
+                                  <button type="button" className="btn btn-success jd-table-btn" onClick={() => overrideBenchCandidate(c, 'selected_bench')}>
+                                    <i className="fas fa-check"></i> Select
+                                  </button>
+                                  <button type="button" className="btn btn-secondary jd-table-btn" onClick={() => overrideBenchCandidate(c, 'waitlisted_bench')}>
+                                    <i className="fas fa-list"></i> Waitlist
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="jd-empty-card">
+                  <i className="fas fa-inbox jd-empty-icon"></i>
+                  <p className="jd-empty-text">No rejected candidates yet</p>
+                </div>
+              )}
+            </>)}
+          </section>
+        )}
+
+        {activeTab === 'vendors' && (
+          <section className="jx-card jx-tab-card" role="tabpanel">
+            <div className="jx-card-head">
+              <h2 className="jx-card-title"><i className="fas fa-handshake" aria-hidden="true"></i> Assigned vendors</h2>
+              <button type="button" className="jx-btn jx-btn-primary jx-btn-sm" onClick={openAssignVendors}><i className="fas fa-plus" aria-hidden="true"></i> Assign vendors</button>
+            </div>
+            {assignedVendors.length > 0 ? (
+              <div className="table-container jd-vendor-table-section">
+                <table>
+                  <thead><tr><th>Vendor</th><th>Email</th><th>Assigned</th><th>Email Status</th><th>Last Email Sent</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {assignedVendors.map(vendor => (
+                      <tr key={`${vendor.assignment_id}-${vendor.id}`}>
+                        <td>
+                          <strong>{vendor.vendor_name || vendor.company_name}</strong>
+                          <span>{vendor.company_name || 'Independent vendor'}</span>
+                        </td>
+                        <td>{vendor.email}</td>
+                        <td>{vendor.assigned_at ? String(vendor.assigned_at).slice(0, 10) : '-'}</td>
+                        <td><span className={`badge ${vendor.email_status === 'sent' ? 'badge-success' : vendor.email_status === 'failed' ? 'badge-danger' : 'badge-primary'}`}>{vendor.email_status || 'not_sent'}</span></td>
+                        <td>{vendor.last_email_sent_at ? String(vendor.last_email_sent_at).slice(0, 10) : 'Never'}</td>
+                        <td>
+                          <div className="jd-vendor-actions">
+                            <button type="button" className="btn btn-secondary jd-table-btn" onClick={() => openVendorHistory(vendor)}>
+                              <i className="fas fa-users"></i> History
+                            </button>
+                            <button type="button" className="btn btn-danger jd-table-btn" onClick={() => removeAssignedVendor(vendor)}>
+                              <i className="fas fa-link-slash"></i> Remove
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="jd-empty-card">
+                <i className="fas fa-handshake jd-empty-icon"></i>
+                <p className="jd-empty-text">No vendors assigned to this JD</p>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === 'process' && (
+          <div className="jx-process" role="tabpanel">
+            <JdHiringProcessEditor jdId={jdId} hiringProcess={jd.hiring_process} />
           </div>
         )}
- 
-        <JdHiringProcessEditor jdId={jdId} hiringProcess={jd.hiring_process} />
 
-        <h2 className="jd-section-heading"><i className="fas fa-check-circle"></i> Selected Candidates</h2>
-        {selected.length > 0 ? (
-          <div className="table-container jd-table-section">
-            <table>
-              <thead><tr><th>Candidate Name</th><th>Email</th><th>Match Score</th><th>Current Stage</th><th>Actions</th></tr></thead>
-              <tbody>
-                {selected.map(c => {
-                  const assessment = resolveAssessmentRow(c, assessmentMap);
-                  return (
-                    <tr key={c.id}>
-                      <td><strong>{c.name}</strong></td>
-                      <td>{c.email}</td>
-                      <td><span className="jd-table-score-green">{c.match_score}%</span></td>
-                      <td><span className="badge badge-success">{c.hiring_stage}</span></td>
-                      <td>
-                        <div className="jd-candidate-actions">
-                          <Link to={`/talent/${c.id}`} className="btn btn-primary jd-table-btn"><i className="fas fa-eye"></i> View</Link>
-                          {c.candidate_source === 'bench' && (
-                            <>
-                              <button type="button" className="btn btn-secondary jd-table-btn" onClick={() => overrideBenchCandidate(c, 'waitlisted_bench')}>
-                                <i className="fas fa-list"></i> Waitlist
-                              </button>
-                              <button type="button" className="btn btn-danger jd-table-btn" onClick={() => markBenchUnavailable(c)}>
-                                <i className="fas fa-user-slash"></i> Unavailable
-                              </button>
-                            </>
-                          )}
-
-                          {assessment.status === 'NOT_CREATED' && (
-                            <button
-                              type="button"
-                              className="btn btn-primary jd-table-btn"
-                              disabled={generatingAssessment === c.id}
-                              onClick={() => handleGenerateAssessment(c)}
-                            >
-                              <i className={`fas ${generatingAssessment === c.id ? 'fa-spinner fa-spin' : 'fa-clipboard-list'}`}></i>
-                              {generatingAssessment === c.id ? 'Preparing...' : 'Schedule Assessment'}
-                            </button>
-                          )}
-
-                          {assessment.status === 'DRAFT' && (
-                            <button
-                              type="button"
-                              className="btn btn-secondary jd-table-btn"
-                              onClick={() => openAssessmentBuilder(c)}
-                            >
-                              <i className="fas fa-edit"></i> Review Assessment
-                            </button>
-                          )}
-
-                          {assessment.status === 'SENT' && (
-                            <div className="jd-assessment-status-note">
-                              <span><i className="fas fa-hourglass-half"></i> Waiting for Candidate</span>
-                            </div>
-                          )}
-
-                          {assessment.status === 'IN_PROGRESS' && (
-                            <div className="jd-assessment-status-note">
-                              <span><i className="fas fa-spinner fa-spin"></i> In Progress</span>
-                            </div>
-                          )}
-
-                          {assessment.status === 'FAILED' && (
-                            <div className="jd-assessment-status-note">
-                              <span><i className="fas fa-circle-xmark"></i> Assessment Failed</span>
-                            </div>
-                          )}
-
-                          {assessment.eligibleForInterview && (
-                            <button
-                              type="button"
-                              className="btn btn-success jd-table-btn"
-                              onClick={() => openScheduleModal(c)}
-                            >
-                              <i className="fas fa-calendar-check"></i> Schedule Interview
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="jd-empty-card">
-            <i className="fas fa-inbox jd-empty-icon"></i>
-            <p className="jd-empty-text">No selected candidates yet</p>
-          </div>
-        )}
- 
-        <h2 className="jd-section-heading"><i className="fas fa-times-circle"></i> Rejected Candidates</h2>
-        {rejected.length > 0 ? (
-          <div className="table-container">
-            <table>
-              <thead><tr><th>Candidate Name</th><th>Email</th><th>Match Score</th><th>Rejection Reason</th><th>Actions</th></tr></thead>
-              <tbody>
-                {rejected.map(c => (
-                  <tr key={c.id}>
-                    <td><strong>{c.name}</strong></td>
-                    <td>{c.email}</td>
-                    <td><span className="jd-table-score-red">{c.match_score}%</span></td>
-                    <td className="jd-table-summary">{c.rejection_reason}</td>
-                    <td>
-                      <div className="jd-candidate-actions">
-                        <Link to={`/talent/${c.id}`} className="btn btn-primary jd-table-btn"><i className="fas fa-eye"></i> View</Link>
-                        {c.candidate_source === 'bench' && (
-                          <>
-                            <button type="button" className="btn btn-success jd-table-btn" onClick={() => overrideBenchCandidate(c, 'selected_bench')}>
-                              <i className="fas fa-check"></i> Select
-                            </button>
-                            <button type="button" className="btn btn-secondary jd-table-btn" onClick={() => overrideBenchCandidate(c, 'waitlisted_bench')}>
-                              <i className="fas fa-list"></i> Waitlist
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+        {activeTab === 'activity' && (
+          <section className="jx-card jx-tab-card" role="tabpanel">
+            <h2 className="jx-card-title"><i className="fas fa-clock-rotate-left" aria-hidden="true"></i> Fulfilment timeline</h2>
+            {fulfilmentTimeline.length > 0 ? (
+              <div className="jd-fulfilment-timeline">
+                {fulfilmentTimeline.slice(0, 8).map(event => (
+                  <article key={event.id || `${event.action}-${event.timestamp}`} className="jd-fulfilment-event">
+                    <span>{event.action || 'Workflow Event'}</span>
+                    <p>{event.details || event.outcome || 'No details recorded.'}</p>
+                    <small>{event.timestamp ? String(event.timestamp).slice(0, 19).replace('T', ' ') : ''} {event.username ? `| ${event.username}` : ''}</small>
+                  </article>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="jd-empty-card">
-            <i className="fas fa-inbox jd-empty-icon"></i>
-            <p className="jd-empty-text">No rejected candidates yet</p>
-          </div>
+              </div>
+            ) : (
+              <div className="jd-empty-card jd-compact-empty"><p className="jd-empty-text">No workflow timeline events yet</p></div>
+            )}
+          </section>
         )}
 
         {assignVendorsOpen && (
@@ -2286,19 +2344,19 @@ const downloadPDF = (reportText) => {
           </div>
         )}
 
-        <div className="jd-details-actions-footer">
-          <button
-            type="button"
-            className="btn btn-danger jd-remove-footer-btn"
-            disabled={deleting}
-            onClick={handleRemove}
-            title="Remove this job description"
-          >
-            {deleting
-              ? <><i className="fas fa-spinner fa-spin"></i> Removing…</>
-              : <><i className="fas fa-trash-alt"></i> Remove job description</>}
-          </button>
-        </div>
+        {activeTab === 'overview' && (
+          <section className="jx-card jx-danger">
+            <div>
+              <strong>Remove this job</strong>
+              <p className="jx-muted">Deletes the job description and its screening results. This can't be undone.</p>
+            </div>
+            <button type="button" className="jx-btn jx-btn-danger" disabled={deleting} onClick={handleRemove}>
+              {deleting
+                ? <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Removing…</>
+                : <><i className="fas fa-trash-can" aria-hidden="true"></i> Remove job</>}
+            </button>
+          </section>
+        )}
 
         <ReportModal />
 
