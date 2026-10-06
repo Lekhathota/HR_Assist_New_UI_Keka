@@ -23,6 +23,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+import activity_feed
 import database as db
 from routes.audit_routes import audit_bp
 from routes.agentic_routes import agentic_bp
@@ -34,6 +35,7 @@ from routes.dashboard_routes import dashboard_bp
 from routes.interview_routes import interview_bp
 from routes.jd_routes import jd_bp
 from routes.matching_routes import matching_bp
+from routes.notification_routes import notification_bp
 from routes.profile_routes import profile_bp
 from routes.report_routes import report_bp
 from database import init_db, seed_data
@@ -85,6 +87,20 @@ app.register_blueprint(agentic_bp)
 app.register_blueprint(assessment_bp)
 app.register_blueprint(vendor_bp)
 app.register_blueprint(workflow_admin_bp)
+app.register_blueprint(notification_bp)
+
+
+# Turn this request's Hire-panel actions into notifications, only if it succeeded.
+@app.after_request
+def _flush_activity_notifications(response):
+    try:
+        if response.status_code < 400:
+            activity_feed.flush(current_user())
+        else:
+            activity_feed.discard()
+    except Exception:
+        app.logger.exception("Could not record activity notifications")
+    return response
 
 
 # Purpose: Implements the alias endpoint backend behavior.

@@ -3,6 +3,7 @@ import Navbar from './Navbar.jsx';
 import FloatingRecruiterChat from './FloatingRecruiterChat.jsx';
 import { HireTabs } from './HireNav.jsx';
 import UserMenu from './UserMenu.jsx';
+import NotificationBell from './NotificationBell.jsx';
 
 
 function Layout({ children }) {
@@ -19,7 +20,7 @@ function Layout({ children }) {
         <button className="workspace-search" type="button" onClick={() => window.dispatchEvent(new Event('open-command-palette'))}>
           <i className="fas fa-search" aria-hidden="true" /><span>Search pages and actions…</span><kbd>Ctrl K</kbd>
         </button>
-        <div className="workspace-header-account"><span className="workspace-notification" role="img" aria-label="Notifications are not configured" title="Notifications are not configured"><i className="far fa-bell" aria-hidden="true" /></span>
+        <div className="workspace-header-account"><NotificationBell />
         <UserMenu /></div>
       </header>
       <Navbar />

@@ -15,6 +15,7 @@ from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+import activity_feed
 from pymongo import ASCENDING, DESCENDING, MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError, OperationFailure
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -186,6 +187,8 @@ def _ensure_indexes() -> None:
     db.candidates.create_index([("primary_category", ASCENDING)])
     db.candidates.create_index([("worker_type", ASCENDING), ("bench_status", ASCENDING), ("availability_status", ASCENDING), ("primary_category", ASCENDING)])
     db.comparisons.create_index([("id", ASCENDING)], unique=True)
+    db.notifications.create_index([("id", ASCENDING)], unique=True)
+    db.notifications.create_index([("created_at", DESCENDING)])
     db.comparisons.create_index([("jd_id", ASCENDING), ("candidate_id", ASCENDING)], unique=True)
     db.comparisons.create_index([("jd_id", ASCENDING), ("selection_status", ASCENDING)])
     db.interviews.create_index([("id", ASCENDING)], unique=True)
@@ -960,7 +963,16 @@ def create_jd(data: dict) -> int:
     }
     _database().job_descriptions.insert_one(doc)
     refresh_dashboard_metrics()
+    activity_feed.emit("jd_created", jd_id=new_id, jd_title=doc["title"])
     return new_id
+
+
+# JD fields a person edits; system bookkeeping (workflow, bench counts,
+# categorisation) changes these JDs too but should not raise notifications.
+_JD_USER_FIELDS = {
+    "title", "job_code", "department", "location", "experience_required", "skills", "responsibilities",
+    "raw_text", "file_name", "required_candidate_count", "hiring_process", "client_id", "project_id",
+}
 
 
 # Purpose: Updates jd records or payloads.
@@ -1031,18 +1043,27 @@ def update_jd(jd_id: int, data: dict) -> bool:
         patch[col] = value
     if not patch:
         return False
+    watched = [col for col in patch if col == "status" or col in _JD_USER_FIELDS]
+    before = _database().job_descriptions.find_one({"id": int(jd_id)}, {col: 1 for col in watched}) if watched else None
     patch["updated_at"] = _now()
     result = _database().job_descriptions.update_one({"id": int(jd_id)}, {"$set": patch})
     if result.modified_count:
         refresh_dashboard_metrics()
+        if before is not None:
+            if "status" in patch and before.get("status") != patch["status"]:
+                activity_feed.emit("jd_status", jd_id=int(jd_id), old=before.get("status"), new=patch["status"])
+            if any(col != "status" and before.get(col) != patch[col] for col in watched):
+                activity_feed.emit("jd_updated", jd_id=int(jd_id))
     return result.modified_count > 0
 
 
 # Purpose: Deletes jd records or payloads.
 def delete_jd(jd_id: int) -> bool:
     db = _database()
+    existing = db.job_descriptions.find_one({"id": int(jd_id)}, {"title": 1})
     result = db.job_descriptions.delete_one({"id": int(jd_id)})
     if result.deleted_count:
+        activity_feed.emit("jd_deleted", jd_id=int(jd_id), jd_title=(existing or {}).get("title") or "")
         db.comparisons.delete_many({"jd_id": int(jd_id)})
         db.candidates.update_many({"jd_id": int(jd_id)}, {"$set": {"jd_id": None}})
         db.audit_logs.update_many({"jd_id": int(jd_id)}, {"$set": {"jd_id": None}})
@@ -1246,6 +1267,8 @@ def assign_vendors_to_jd(jd_id: int, vendor_ids: list[int], assigned_by: Optiona
             {"$set": {"status": "Removed", "removed_at": now, "updated_at": now}},
         )
 
+    if wanted - active_ids:
+        activity_feed.emit("jd_vendors_assigned", jd_id=jd_id, count=len(wanted - active_ids))
     for vendor_id in wanted - active_ids:
         assignment_id = _next_id("jd_vendor_assignments")
         doc = {
@@ -1544,6 +1567,7 @@ def create_candidate(data: dict) -> int:
     }
     _database().candidates.insert_one(doc)
     refresh_dashboard_metrics()
+    activity_feed.emit("resume_uploaded", candidate_id=new_id, jd_id=doc["jd_id"], name=doc["name"])
     return new_id
 
 
@@ -1604,17 +1628,41 @@ def update_candidate(candidate_id: int, data: dict) -> bool:
         patch[col] = value
     if not patch:
         return False
+    watched = {"status", "stage_id", "on_hold"} & set(patch)
+    before = _database().candidates.find_one(
+        {"id": int(candidate_id)}, {"name": 1, "jd_id": 1, "status": 1, "stage_id": 1, "on_hold": 1}
+    ) if watched else None
     result = _database().candidates.update_one({"id": int(candidate_id)}, {"$set": patch})
     if result.modified_count:
         refresh_dashboard_metrics()
+        if before is not None:
+            _emit_candidate_changes(int(candidate_id), before, patch)
     return result.modified_count > 0
+
+
+def _emit_candidate_changes(candidate_id: int, before: dict, patch: dict) -> None:
+    name = patch.get("name") or before.get("name") or ""
+    jd_id = patch.get("jd_id", before.get("jd_id"))
+    if "status" in patch and before.get("status") != patch["status"] and patch["status"]:
+        activity_feed.emit("candidate_status", candidate_id=candidate_id, jd_id=jd_id, name=name, new=patch["status"])
+    if "stage_id" in patch and before.get("stage_id") != patch["stage_id"] and patch["stage_id"]:
+        stage = ""
+        if jd_id:
+            jd = _database().job_descriptions.find_one({"id": int(jd_id)}, {"hiring_process": 1}) or {}
+            steps = ((jd.get("hiring_process") or {}).get("steps")) or []
+            stage = next((step.get("name") for step in steps if isinstance(step, dict) and step.get("id") == patch["stage_id"]), "")
+        activity_feed.emit("candidate_stage", candidate_id=candidate_id, jd_id=jd_id, name=name, stage=stage)
+    if "on_hold" in patch and bool(before.get("on_hold")) != bool(patch["on_hold"]):
+        activity_feed.emit("candidate_hold", candidate_id=candidate_id, jd_id=jd_id, name=name, on_hold=bool(patch["on_hold"]))
 
 
 # Purpose: Deletes candidate records or payloads.
 def delete_candidate(candidate_id: int) -> bool:
     db = _database()
+    existing = db.candidates.find_one({"id": int(candidate_id)}, {"name": 1})
     result = db.candidates.delete_one({"id": int(candidate_id)})
     if result.deleted_count:
+        activity_feed.emit("candidate_deleted", candidate_id=int(candidate_id), name=(existing or {}).get("name") or "")
         db.comparisons.delete_many({"candidate_id": int(candidate_id)})
         refresh_dashboard_metrics()
     return result.deleted_count > 0
@@ -1715,7 +1763,7 @@ def get_comparisons(jd_id: Optional[int] = None, candidate_id: Optional[int] = N
 # Purpose: Closes a JD automatically once enough candidates have been selected for it.
 def _close_jd_if_fulfilled(jd_id: int) -> None:
     db = _database()
-    jd = db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1, "required_candidate_count": 1})
+    jd = db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1, "required_candidate_count": 1, "title": 1})
     if not jd or jd.get("status") != "Active":
         return
     required = jd.get("required_candidate_count")
@@ -1723,10 +1771,119 @@ def _close_jd_if_fulfilled(jd_id: int) -> None:
         return
     selected = db.comparisons.count_documents({"jd_id": int(jd_id), "status": "Selected"})
     if selected >= int(required):
-        db.job_descriptions.update_one(
-            {"id": int(jd_id)},
+        # Filter on the Active status so only the request that actually closes
+        # the JD records the notification (concurrent selections can't duplicate it).
+        result = db.job_descriptions.update_one(
+            {"id": int(jd_id), "status": "Active"},
             {"$set": {"status": "Closed", "updated_at": _now()}},
         )
+        if getattr(result, "modified_count", 1):
+            title = jd.get("title") or f"JD #{int(jd_id)}"
+            create_notification(
+                "jd_requirement_fulfilled",
+                "Requirement fulfilled",
+                _fulfilment_message(title, selected, int(required)),
+                jd_id=int(jd_id),
+            )
+
+
+# Notifications
+
+
+# Purpose: Records an in-app notification shown in the top-bar bell.
+def create_notification(
+    kind: str,
+    title: str,
+    message: str,
+    *,
+    jd_id: Optional[int] = None,
+    link: Optional[str] = None,
+    actor: Optional[str] = None,
+) -> int:
+    notification_id = _next_id("notifications")
+    _database().notifications.insert_one({
+        "id": notification_id,
+        "type": kind,
+        "title": title,
+        "message": message,
+        "jd_id": int(jd_id) if jd_id is not None else None,
+        "link": link or (f"/jobs/{int(jd_id)}" if jd_id is not None else None),
+        "actor": actor or None,
+        "read_by": [],
+        "created_at": _now(),
+    })
+    return notification_id
+
+
+_notification_backfill_done = False
+
+
+def _fulfilment_message(title: str, selected: int, required: int) -> str:
+    return f"{title} has {selected} of {required} required candidates selected, so the JD has been closed."
+
+
+# Purpose: Creates the missing notification for JDs that were already closed because
+# their requirement was met (e.g. closed before notifications existed). Idempotent.
+def backfill_fulfilled_jd_notifications() -> int:
+    db = _database()
+    created = 0
+    for jd in db.job_descriptions.find({"status": "Closed"}, {"id": 1, "title": 1, "required_candidate_count": 1, "updated_at": 1}):
+        required = jd.get("required_candidate_count")
+        try:
+            required = int(required)
+        except (TypeError, ValueError):
+            continue
+        if required <= 0:
+            continue
+        jd_id = int(jd["id"])
+        if db.notifications.find_one({"type": "jd_requirement_fulfilled", "jd_id": jd_id}):
+            continue
+        selected = db.comparisons.count_documents({"jd_id": jd_id, "status": "Selected"})
+        if selected < required:
+            continue
+        db.notifications.insert_one({
+            "id": _next_id("notifications"),
+            "type": "jd_requirement_fulfilled",
+            "title": "Requirement fulfilled",
+            "message": _fulfilment_message(jd.get("title") or f"JD #{jd_id}", selected, required),
+            "jd_id": jd_id,
+            "read_by": [],
+            "created_at": jd.get("updated_at") or _now(),
+        })
+        created += 1
+    return created
+
+
+# Purpose: Lists recent notifications with read state for one user.
+def list_notifications(user_id: int, limit: int = 20) -> dict:
+    global _notification_backfill_done
+    if not _notification_backfill_done:
+        # Run once per process; a failure must never block the notification list.
+        try:
+            backfill_fulfilled_jd_notifications()
+            _notification_backfill_done = True
+        except Exception:
+            pass
+    db = _database()
+    uid = int(user_id)
+    rows = list(db.notifications.find({}).sort("created_at", DESCENDING).limit(max(1, min(int(limit), 100))))
+    items = []
+    for row in rows:
+        read_by = row.get("read_by") or []
+        item = _serialize_doc({k: v for k, v in row.items() if k != "read_by"}) or {}
+        item["read"] = uid in read_by
+        items.append(item)
+    unread = db.notifications.count_documents({"read_by": {"$ne": uid}})
+    return {"notifications": items, "unread_count": int(unread)}
+
+
+# Purpose: Marks the given notifications (or all of them) as read for one user.
+def mark_notifications_read(user_id: int, ids: Optional[list] = None) -> int:
+    query: dict[str, Any] = {"read_by": {"$ne": int(user_id)}}
+    if ids is not None:
+        query["id"] = {"$in": [int(i) for i in ids]}
+    result = _database().notifications.update_many(query, {"$addToSet": {"read_by": int(user_id)}})
+    return int(getattr(result, "modified_count", 0))
 
 
 # Purpose: Implements the upsert comparison backend behavior.
@@ -1767,6 +1924,7 @@ def upsert_comparison(data: dict) -> int:
         {"$set": doc},
         upsert=True,
     )
+    activity_feed.emit("screening", jd_id=jd_id, candidate_id=candidate_id, status=status)
     if status == "Selected":
         _close_jd_if_fulfilled(jd_id)
     refresh_dashboard_metrics()
@@ -1932,11 +2090,29 @@ def update_interview(interview_id: int, data: dict) -> bool:
     patch = {key: value for key, value in (data or {}).items() if key in allowed}
     if not patch:
         return False
+    before = _database().interviews.find_one(
+        {"id": int(interview_id)}, {"status": 1, "candidate_id": 1, "candidate_name": 1, "jd_id": 1, "interview_start": 1}
+    ) if "status" in patch else None
     patch["updated_at"] = _now()
     result = _database().interviews.update_one({"id": int(interview_id)}, {"$set": patch})
     if result.modified_count:
         refresh_dashboard_metrics()
+        if before is not None and before.get("status") != patch["status"]:
+            activity_feed.emit("interview", candidate_id=before.get("candidate_id"), jd_id=before.get("jd_id"),
+                               name=before.get("candidate_name") or "", status=patch["status"],
+                               when=_interview_when(patch.get("interview_start") or before.get("interview_start")))
     return result.modified_count > 0
+
+
+def _interview_when(value: Any) -> str:
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return ""
+    if not isinstance(value, datetime):
+        return ""
+    return value.strftime("%d %b %Y, %H:%M")
 
 
 # Purpose: Implements the recruiter slot is available backend behavior.
@@ -2001,6 +2177,8 @@ def create_interview(data: dict) -> int:
     }
     _database().interviews.insert_one(doc)
     refresh_dashboard_metrics()
+    activity_feed.emit("interview", candidate_id=doc["candidate_id"], jd_id=doc["jd_id"], name=doc["candidate_name"],
+                       status=doc["status"], when=_interview_when(doc["interview_start"]))
     return interview_id
 
 

@@ -12,6 +12,7 @@ from typing import Any, Optional
 from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import OperationFailure
 
+import activity_feed
 import database as db
 from assessment.models import AssessmentStatus
 from assessment.utilities import utc_now
@@ -112,6 +113,8 @@ def create_assessment(data: dict[str, Any]) -> int:
     if data.get("token_expires_at") is not None:
         doc["token_expires_at"] = data.get("token_expires_at")
     _database().assessments.insert_one(doc)
+    activity_feed.emit("assessment", assessment_id=assessment_id, jd_id=doc["jd_id"], name=doc["candidate_name"],
+                       status="CREATED" if doc["status"] in (AssessmentStatus.DRAFT, AssessmentStatus.DRAFT.value) else str(getattr(doc["status"], "value", doc["status"])))
     return assessment_id
 
 
@@ -203,6 +206,9 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
         return False
     update_doc["updated_at"] = _now()
     mongo = _database()
+    before = mongo.assessments.find_one(
+        {"id": int(assessment_id)}, {"status": 1, "jd_id": 1, "candidate_name": 1}
+    ) if "status" in update_doc else None
     if update_doc and unset_doc:
         result = mongo.assessments.update_one(
             {"id": int(assessment_id)},
@@ -212,6 +218,11 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
         result = mongo.assessments.update_one({"id": int(assessment_id)}, {"$unset": unset_doc, "$set": update_doc})
     else:
         result = mongo.assessments.update_one({"id": int(assessment_id)}, {"$set": update_doc})
+    if result.modified_count and before is not None:
+        new_status = str(getattr(update_doc["status"], "value", update_doc["status"]))
+        if str(getattr(before.get("status"), "value", before.get("status"))) != new_status:
+            activity_feed.emit("assessment", assessment_id=int(assessment_id), jd_id=before.get("jd_id"),
+                               name=before.get("candidate_name") or "", status=new_status)
     return result.modified_count > 0
 
 
