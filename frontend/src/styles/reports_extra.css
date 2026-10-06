@@ -51,7 +51,7 @@
 
 .reports-funnel-table thead,
 .reports-insights-heading {
-    background: #242b50;
+    background: #1f2937;
 }
 
 .reports-funnel-count {
@@ -218,7 +218,7 @@
 }
 
 .modal-header h2 i {
-    color: #4f46e5;
+    color: #f97316;
 }
 
 .modal-close {
@@ -273,15 +273,15 @@
 }
 
 .format-option:hover {
-    border-color: #4f46e5;
+    border-color: #f97316;
     background: #f1f5f9;
     transform: translateY(-2px);
 }
 
 .format-option.active {
-    border-color: #4f46e5;
-    background: #eef2ff;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+    border-color: #f97316;
+    background: #fff4ed;
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.2);
     transform: translateY(-2px);
 }
 
@@ -291,7 +291,7 @@
 }
 
 .format-option.active i {
-    color: #4f46e5;
+    color: #f97316;
 }
 
 .format-option span {
@@ -301,7 +301,7 @@
 }
 
 .format-option.active span {
-    color: #4f46e5;
+    color: #f97316;
 }
 
 /* Individual format colors when active */
@@ -352,7 +352,7 @@
 
 .email-input label i {
     margin-right: 8px;
-    color: #4f46e5;
+    color: #f97316;
 }
 
 .email-input input {
@@ -369,8 +369,8 @@
 
 .email-input input:focus {
     outline: none;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+    border-color: #f97316;
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
 }
 
 .email-input input::placeholder {
@@ -398,7 +398,7 @@
 }
 
 .report-preview i {
-    color: #4f46e5;
+    color: #f97316;
     font-size: 18px;
 }
 
@@ -437,19 +437,19 @@
     font-weight: 700;
     border: none;
     cursor: pointer;
-    background: #4f46e5;
+    background: #f97316;
     color: white;
     transition: all 0.25s ease;
     display: flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    box-shadow: 0 4px 14px rgba(249, 115, 22, 0.4);
 }
 
 .modal-footer .btn-primary:hover:not(:disabled) {
-    background: #4338ca;
+    background: #ea580c;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
 }
 
 .modal-footer .btn-primary:disabled {

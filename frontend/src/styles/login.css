@@ -76,7 +76,7 @@ body:has(.login-page) {
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    text-shadow: 0 0 18px rgba(239, 122, 45, 0.26);
+    text-shadow: 0 0 18px rgba(249, 115, 22, 0.26);
     animation: login-left-brand-enter 0.72s ease both;
 }
 
@@ -84,7 +84,7 @@ body:has(.login-page) {
     width: clamp(170px, 22vw, 320px);
     height: auto;
     opacity: 0.9;
-    filter: drop-shadow(0 0 20px rgba(239, 122, 45, 0.52));
+    filter: drop-shadow(0 0 20px rgba(249, 115, 22, 0.52));
     animation: login-left-logo-float 5.2s ease-in-out infinite;
 }
 
@@ -101,10 +101,10 @@ body:has(.login-page) {
     width: 100%;
     max-width: 460px;
     background: linear-gradient(135deg, rgba(26,31,58,0.97), rgba(45,53,97,0.97));
-    border: 2px solid rgba(239, 122, 45, 0.35);
+    border: 2px solid rgba(249, 115, 22, 0.35);
     border-radius: 20px;
     padding: 3rem 2.5rem;
-    box-shadow: 0 0 50px rgba(239, 122, 45, 0.2), inset 0 0 30px rgba(239, 122, 45, 0.05);
+    box-shadow: 0 0 50px rgba(249, 115, 22, 0.2), inset 0 0 30px rgba(249, 115, 22, 0.05);
     backdrop-filter: blur(12px);
     position: relative;
     z-index: 10;
@@ -144,16 +144,16 @@ body:has(.login-page) {
     height: auto;
     position: relative;
     z-index: 2;
-    filter: drop-shadow(0 0 16px rgba(239, 122, 45, 0.72));
+    filter: drop-shadow(0 0 16px rgba(249, 115, 22, 0.72));
     animation: login-startup-logo-boot 1.65s ease-in-out both;
 }
 
 .login-startup-ring {
     position: absolute;
     inset: 10%;
-    border: 1px solid rgba(239, 122, 45, 0.34);
+    border: 1px solid rgba(249, 115, 22, 0.34);
     border-radius: 50%;
-    box-shadow: 0 0 34px rgba(239, 122, 45, 0.18), inset 0 0 26px rgba(239, 122, 45, 0.08);
+    box-shadow: 0 0 34px rgba(249, 115, 22, 0.18), inset 0 0 26px rgba(249, 115, 22, 0.08);
     animation: login-startup-ring 1.7s ease-in-out both;
 }
 
@@ -168,7 +168,7 @@ body:has(.login-page) {
 
 .login-startup-ring::after {
     inset: -8%;
-    border-color: rgba(239, 122, 45, 0.16);
+    border-color: rgba(249, 115, 22, 0.16);
 }
 
 .login-startup-scan {
@@ -180,7 +180,7 @@ body:has(.login-page) {
     height: 2px;
     border-radius: 999px;
     background: linear-gradient(90deg, transparent, rgba(245, 165, 54, 0.95), transparent);
-    box-shadow: 0 0 18px rgba(239, 122, 45, 0.72);
+    box-shadow: 0 0 18px rgba(249, 115, 22, 0.72);
     transform: translateY(-50%);
     animation: login-startup-scan 1.25s ease-in-out both;
 }
@@ -213,7 +213,7 @@ body:has(.login-page) {
 .login-startup-skip {
     min-height: 36px;
     padding: 0.45rem 0.85rem;
-    border: 1px solid rgba(239, 122, 45, 0.32);
+    border: 1px solid rgba(249, 115, 22, 0.32);
     border-radius: 8px;
     color: rgba(255, 255, 255, 0.84);
     background: rgba(15, 20, 40, 0.54);
@@ -229,8 +229,8 @@ body:has(.login-page) {
 .login-startup-skip:hover,
 .login-startup-skip:focus-visible {
     transform: translateY(-1px);
-    border-color: rgba(239, 122, 45, 0.62);
-    background: rgba(239, 122, 45, 0.14);
+    border-color: rgba(249, 115, 22, 0.62);
+    background: rgba(249, 115, 22, 0.14);
 }
 
 .login-header {
@@ -242,7 +242,7 @@ body:has(.login-page) {
     height: 64px;
     width: auto;
     margin-bottom: 1.2rem;
-    filter: drop-shadow(0 0 12px rgba(239, 122, 45, 0.7));
+    filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.7));
     animation: login-logo-glow 4.6s ease-in-out infinite;
 }
 
@@ -262,7 +262,7 @@ body:has(.login-page) {
 }
 
 .login-container label {
-    color: #ef7a2d;
+    color: #f97316;
     font-weight: 600;
     font-size: 0.88rem;
     text-transform: uppercase;
@@ -273,7 +273,7 @@ body:has(.login-page) {
 .login-container input[type="password"] {
     padding: 0.95rem 1rem;
     background: rgba(15, 20, 40, 0.5);
-    border: 1.5px solid rgba(239, 122, 45, 0.3);
+    border: 1.5px solid rgba(249, 115, 22, 0.3);
     border-radius: 8px;
     color: #ffffff;
     font-family: 'Inter', sans-serif;
@@ -285,15 +285,15 @@ body:has(.login-page) {
 .login-container input:focus {
     outline: none;
     background: rgba(15, 20, 40, 0.7);
-    border-color: #ef7a2d;
-    box-shadow: 0 0 15px rgba(239, 122, 45, 0.3);
+    border-color: #f97316;
+    box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
     color: #ffffff;
 }
 
 .login-container button[type="submit"] {
     width: 100%;
     padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, #ef7a2d 0%, #0088cc 100%);
+    background: linear-gradient(135deg, #f97316 0%, #0088cc 100%);
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -303,7 +303,7 @@ body:has(.login-page) {
     text-transform: uppercase;
     letter-spacing: 1px;
     transition: all 0.3s ease;
-    box-shadow: 0 0 20px rgba(239, 122, 45, 0.3);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
     margin-top: 0.5rem;
     display: flex;
     align-items: center;
@@ -324,7 +324,7 @@ body:has(.login-page) {
 
 .login-container button[type="submit"]:hover {
     transform: translateY(-2px);
-    box-shadow: 0 0 35px rgba(239, 122, 45, 0.5), 0 8px 20px rgba(239, 122, 45, 0.2);
+    box-shadow: 0 0 35px rgba(249, 115, 22, 0.5), 0 8px 20px rgba(249, 115, 22, 0.2);
 }
 
 .login-container button[type="submit"]:hover::before {
@@ -365,11 +365,11 @@ body:has(.login-page) {
 @keyframes login-left-logo-float {
     0%, 100% {
         transform: translateY(0);
-        filter: drop-shadow(0 0 18px rgba(239, 122, 45, 0.45));
+        filter: drop-shadow(0 0 18px rgba(249, 115, 22, 0.45));
     }
     50% {
         transform: translateY(-6px);
-        filter: drop-shadow(0 0 28px rgba(239, 122, 45, 0.66));
+        filter: drop-shadow(0 0 28px rgba(249, 115, 22, 0.66));
     }
 }
 
@@ -388,16 +388,16 @@ body:has(.login-page) {
     0% {
         opacity: 0;
         transform: scale(0.92);
-        filter: drop-shadow(0 0 4px rgba(239, 122, 45, 0.32));
+        filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.32));
     }
     36%, 100% {
         opacity: 1;
         transform: scale(1);
-        filter: drop-shadow(0 0 16px rgba(239, 122, 45, 0.72));
+        filter: drop-shadow(0 0 16px rgba(249, 115, 22, 0.72));
     }
     62% {
         transform: scale(1.035);
-        filter: drop-shadow(0 0 28px rgba(239, 122, 45, 0.96));
+        filter: drop-shadow(0 0 28px rgba(249, 115, 22, 0.96));
     }
 }
 
@@ -438,10 +438,10 @@ body:has(.login-page) {
 
 @keyframes login-logo-glow {
     0%, 100% {
-        filter: drop-shadow(0 0 12px rgba(239, 122, 45, 0.62));
+        filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.62));
     }
     50% {
-        filter: drop-shadow(0 0 24px rgba(239, 122, 45, 0.95)) drop-shadow(0 0 26px rgba(255, 107, 53, 0.42));
+        filter: drop-shadow(0 0 24px rgba(249, 115, 22, 0.95)) drop-shadow(0 0 26px rgba(255, 107, 53, 0.42));
     }
 }
 

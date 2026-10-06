@@ -23,7 +23,7 @@
         border-radius: 12px;
         padding: 1.5rem;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid var(--accent-color, #ef7a2d);
+        border-left: 4px solid var(--accent-color, #f97316);
         transition: all 0.3s ease;
     }
 
@@ -77,9 +77,9 @@
         max-width: 100%;
         padding: 0.3rem 0.55rem;
         border-radius: 999px;
-        border: 1px solid rgba(239, 122, 45, 0.35);
-        background: rgba(239, 122, 45, 0.1);
-        color: #ef7a2d;
+        border: 1px solid rgba(249, 115, 22, 0.35);
+        background: rgba(249, 115, 22, 0.1);
+        color: #f97316;
         font-size: 0.76rem;
         font-weight: 800;
         line-height: 1.2;

@@ -68,7 +68,7 @@
 
 .jd-create-field > label i,
 .jd-create-hint i {
-    color: var(--accent-color, #ef7a2d);
+    color: var(--accent-color, #f97316);
 }
 
 .jd-create-field > input,
@@ -84,7 +84,7 @@
 .jd-create-page .jd-create-select,
 .jd-create-page .jd-create-select:focus,
 .jd-create-page .jd-create-select:active {
-    border: 1px solid rgba(239, 122, 45, 0.55);
+    border: 1px solid rgba(249, 115, 22, 0.55);
     border-radius: 8px;
     color-scheme: light;
 }
@@ -96,7 +96,7 @@
 
 .jd-create-page .jd-create-select option:checked,
 .jd-create-page .jd-create-select option:hover {
-    background: #ef7a2d;
+    background: #f97316;
     color: #071427;
 }
 
@@ -121,14 +121,14 @@
     height: 120px;
     padding: 20px;
     background: #fff;
-    border: 2px dashed rgba(239, 122, 45, 0.55);
+    border: 2px dashed rgba(249, 115, 22, 0.55);
     color: var(--text-secondary);
 }
 
 .jd-create-page .drop-zone--over {
     border-style: solid;
-    border-color: var(--accent-color, #ef7a2d);
-    background: rgba(239, 122, 45, 0.08);
+    border-color: var(--accent-color, #f97316);
+    background: rgba(249, 115, 22, 0.08);
 }
 
 .jd-create-page .drop-zone__input {
@@ -148,7 +148,7 @@
 
 .jd-create-page .jd-create-file-icon {
     margin-right: 10px;
-    color: var(--accent-color, #ef7a2d);
+    color: var(--accent-color, #f97316);
 }
 
 .jd-create-page .jd-create-error {
@@ -171,7 +171,7 @@
     padding: 0 32px;
     border: 0;
     border-radius: 8px;
-    background: var(--accent-color, #ef7a2d);
+    background: var(--accent-color, #f97316);
     color: #fff;
     font-weight: 700;
     text-transform: none;
@@ -179,7 +179,7 @@
 }
 
 .jd-create-page .jd-create-submit:hover:not(:disabled) {
-    background: var(--accent-dark, #a64716);
+    background: var(--accent-dark, #c2410c);
     box-shadow: none;
     transform: none;
 }
@@ -194,13 +194,13 @@ body.theme-shimento .jd-create-container.client-create-page.jd-create-page .form
 
 body.theme-shimento .jd-create-container.client-create-page.jd-create-page .form-container select.jd-create-select {
     background: #fff;
-    border-color: rgba(239, 122, 45, 0.55);
+    border-color: rgba(249, 115, 22, 0.55);
     color: var(--text-primary);
 }
 
 body.theme-shimento .jd-create-page .drop-zone {
     background: #fff;
-    border-color: rgba(239, 122, 45, 0.55);
+    border-color: rgba(249, 115, 22, 0.55);
     color: var(--text-secondary);
 }
 

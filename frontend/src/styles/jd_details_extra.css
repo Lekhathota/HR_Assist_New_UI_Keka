@@ -107,8 +107,8 @@
     max-width: 100%;
     padding: 0.3rem 0.55rem;
     border-radius: 999px;
-    border: 1px solid rgba(239, 122, 45, 0.35);
-    background: rgba(239, 122, 45, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.35);
+    background: rgba(249, 115, 22, 0.1);
     color: #007da0;
     font-size: 0.76rem;
     font-weight: 800;
@@ -178,7 +178,7 @@
 /* Pipeline section */
 .jd-pipeline-title {
     margin-bottom: 1.5rem;
-    color: #ef7a2d;
+    color: #f97316;
 }
 
 .jd-pipeline-card {
@@ -215,7 +215,7 @@
 /* Candidate section headings */
 .jd-section-heading {
     margin-bottom: 1.5rem;
-    color: #ef7a2d;
+    color: #f97316;
 }
 
 /* Table */
@@ -789,7 +789,7 @@
 }
 
 .app-shell .jdd-back:hover,
-.app-shell .jdd-back:focus-visible { color: var(--accent-dark, #a64716); }
+.app-shell .jdd-back:focus-visible { color: var(--accent-dark, #c2410c); }
 
 .app-shell .jd-details-container .btn.jdd-topbar-btn {
     min-height: 2.25rem;
@@ -978,7 +978,7 @@
     color: var(--text-primary, #141416);
 }
 
-.app-shell .jdd-bullets li::marker { color: var(--accent-color, #ef7a2d); }
+.app-shell .jdd-bullets li::marker { color: var(--accent-color, #f97316); }
 
 .app-shell .jd-details-container p.jdd-summary-text {
     margin: 0 0 0.9rem;
@@ -1007,7 +1007,7 @@
     padding: 0.2rem 0.6rem;
     border-radius: 999px;
     background: var(--ui-soft, #fff4eb);
-    color: var(--accent-dark, #a64716);
+    color: var(--accent-dark, #c2410c);
     font-size: 0.75rem;
     font-weight: 600;
 }
@@ -1186,7 +1186,7 @@
 /* Timeline entries: a thin accent rule instead of tinted boxes. */
 .app-shell .jd-details-container .jd-fulfilment-event {
     padding: 0.2rem 0 0.2rem 0.75rem;
-    border-left: 2px solid var(--accent-color, #ef7a2d);
+    border-left: 2px solid var(--accent-color, #f97316);
     border-radius: 0;
     background: transparent;
 }

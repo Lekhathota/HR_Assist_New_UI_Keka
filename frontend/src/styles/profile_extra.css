@@ -11,14 +11,14 @@
 /* Profile section box */
 .profile-box {
     background: linear-gradient(135deg, rgba(26, 31, 58, 0.9), rgba(45, 53, 97, 0.9));
-    border: 1px solid rgba(239, 122, 45, 0.3);
+    border: 1px solid rgba(249, 115, 22, 0.3);
     border-radius: 12px;
     padding: 2rem;
-    box-shadow: 0 0 20px rgba(239, 122, 45, 0.1);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.1);
 }
 
 .profile-box-title {
-    color: #ef7a2d;
+    color: #f97316;
     margin-top: 0;
     margin-bottom: 1.5rem;
 }
@@ -29,7 +29,7 @@
 }
 
 .profile-activity-title {
-    color: #ef7a2d;
+    color: #f97316;
     margin-bottom: 1rem;
 }
 
@@ -40,11 +40,11 @@
 }
 
 .profile-activity-card {
-    background: rgba(239, 122, 45, 0.05);
+    background: rgba(249, 115, 22, 0.05);
     padding: 1rem;
     border-radius: 8px;
     text-align: center;
-    border: 1px solid rgba(239, 122, 45, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.1);
 }
 
 .profile-activity-label {
@@ -66,7 +66,7 @@
 
 /* Update form */
 .profile-update-title {
-    color: #ef7a2d;
+    color: #f97316;
     margin-top: 0;
     margin-bottom: 1.5rem;
 }
@@ -76,12 +76,12 @@
 }
 
 .profile-hr {
-    border-color: rgba(239, 122, 45, 0.2);
+    border-color: rgba(249, 115, 22, 0.2);
     margin: 1.5rem 0;
 }
 
 .profile-password-title {
-    color: #ef7a2d;
+    color: #f97316;
     margin-bottom: 1rem;
     font-size: 1rem;
 }
@@ -98,13 +98,13 @@
 }
 
 .profile-pref-card {
-    background: rgba(239, 122, 45, 0.05);
+    background: rgba(249, 115, 22, 0.05);
     padding: 1.2rem;
     border-radius: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid rgba(239, 122, 45, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.1);
 }
 
 .profile-pref-name {
@@ -115,7 +115,7 @@
 
 .profile-pref-icon {
     margin-right: 0.5rem;
-    color: #ef7a2d;
+    color: #f97316;
 }
 
 .profile-pref-desc {
@@ -145,14 +145,14 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: #ef7a2d;
+    background: #f97316;
     border-radius: 26px;
     transition: 0.3s;
 }
 
 /* JdCreate extra */
 .jd-create-label-color {
-    color: #ef7a2d;
+    color: #f97316;
 }
 
 .jd-create-file-icon {
@@ -165,4 +165,66 @@
     padding: 0.8rem;
     background: #fadbd8;
     border-radius: 6px;
+}
+
+/* Reference theme: neutral headings, one primary action, real switch states. */
+body.theme-shimento :is(.profile-box-title, .profile-update-title, .profile-activity-title) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+body.theme-shimento .profile-activity-title { border-bottom: 0; padding-bottom: 0; font-size: 16px; }
+body.theme-shimento :is(.profile-box-title, .profile-update-title, .profile-activity-title, .profile-password-title) i { color: var(--accent-color); font-size: 16px; }
+body.theme-shimento .profile-password-title { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 600; }
+body.theme-shimento .profile-hr { border: 0; border-top: 1px solid var(--border-color); }
+body.theme-shimento .form-group label i { color: var(--text-secondary); margin-right: 4px; }
+body.theme-shimento .profile-activity-value { color: var(--text-primary); font-weight: 700; }
+body.theme-shimento .profile-activity-label { color: var(--text-secondary); font-size: 12px; letter-spacing: .04em; }
+body.theme-shimento .profile-form-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: auto;
+    min-width: 160px;
+    min-height: 42px;
+    margin-top: 8px;
+    padding: 10px 20px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent-color);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+body.theme-shimento .profile-form-btn:hover { background: var(--accent-dark); }
+body.theme-shimento .profile-pref-card { background: var(--ui-inset); border: 1px solid var(--border-color); border-radius: 12px; gap: 16px; }
+body.theme-shimento .profile-pref-name { color: var(--text-primary); }
+body.theme-shimento .profile-pref-desc { color: var(--text-secondary); }
+body.theme-shimento .profile-toggle { flex: 0 0 44px; width: 44px; height: 24px; }
+body.theme-shimento .profile-toggle-slider { background: #d1d5db; border-radius: 999px; transition: background .2s ease; }
+body.theme-shimento .profile-toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .2);
+    transition: transform .2s ease;
+}
+body.theme-shimento .profile-toggle input:checked + .profile-toggle-slider { background: var(--accent-color); }
+body.theme-shimento .profile-toggle input:checked + .profile-toggle-slider::before { transform: translateX(20px); }
+body.theme-shimento .profile-toggle input:focus-visible + .profile-toggle-slider { outline: 2px solid var(--accent-light); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+    body.theme-shimento :is(.profile-toggle-slider, .profile-toggle-slider::before, .profile-form-btn) { transition: none; }
 }

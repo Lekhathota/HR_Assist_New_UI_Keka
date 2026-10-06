@@ -1,137 +1,197 @@
-/* Application shell: full-height dark sidebar (logo cell on top, icon above
-   label) beside a purple top bar. The sidebar always fits the viewport, so
-   it never scrolls. Loaded after every other stylesheet. */
+/* Application shell: white sidebar (logo on top, icon + label rows, orange
+   active pill) beside a light top bar holding search, notifications and the
+   avatar. Loaded after every other stylesheet. */
 body.theme-shimento {
-  --shell-rail-bg: #101b29;
-  --shell-rail-hover: #18273a;
-  --shell-rail-active: #1e2f45;
-  --shell-rail-line: rgba(255, 255, 255, 0.07);
-  --shell-rail-text: #9aa6b8;
-  --shell-bar-bg: #5145bd;
-  --shell-brand-bg: #4035a2;
-  --shell-rail: 112px;
-  --shell-bar: 60px;
+  --shell-side: 224px;
+  --shell-bar: 72px;
+  --shell-side-bg: #ffffff;
+  --shell-side-line: #eceef1;
+  --shell-link: #374151;
+  --shell-link-icon: #4b5563;
+  --shell-link-hover: #f7f8fa;
+  --shell-link-active-bg: #fff1e8;
+  --shell-link-active: #f97316;
 }
 
 body.theme-shimento .app-shell {
-  grid-template-columns: var(--shell-rail) minmax(0, 1fr);
+  grid-template-columns: var(--shell-side) minmax(0, 1fr);
   grid-template-rows: var(--shell-bar) minmax(0, 1fr);
-  background: var(--shell-rail-bg);
+  background: var(--light-bg);
 }
 
-/* Logo cell: top of the sidebar column. */
+/* Logo cell: top of the sidebar column, visually part of the sidebar. */
 body.theme-shimento .app-shell .workspace-brand {
   grid-column: 1;
   grid-row: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   width: auto;
   height: var(--shell-bar);
   min-height: 0;
   margin: 0;
-  padding: 0 10px;
+  padding: 0 24px;
   border-radius: 0;
-  background: var(--shell-brand-bg);
+  background: var(--shell-side-bg);
+  border-right: 1px solid var(--shell-side-line);
 }
-body.theme-shimento .app-shell .workspace-brand img { width: 96px; max-width: 100%; margin: 0; }
+body.theme-shimento .app-shell .workspace-brand img { width: 136px; max-width: 100%; height: auto; margin: 0; }
 
-/* Purple top bar */
+/* Top bar */
 body.theme-shimento .app-shell .workspace-topbar {
   grid-column: 2;
   grid-row: 1;
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   min-height: var(--shell-bar);
-  padding: 0 24px;
+  padding: 0 clamp(20px, 2.4vw, 32px);
   gap: 20px;
-  background: var(--shell-bar-bg);
-  border-bottom: 0;
-  color: #fff;
+  background: var(--shell-side-bg);
+  border-bottom: 1px solid var(--shell-side-line);
+  color: var(--text-primary);
 }
 body.theme-shimento .app-shell .workspace-search {
-  width: min(740px, 62%);
+  display: flex;
+  align-items: center;
+  width: min(560px, 60%);
   height: 42px;
-  padding: 0 6px 0 18px;
-  gap: 12px;
-  border: 0;
-  border-radius: 999px;
+  padding: 0 8px 0 14px;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
   background: #fff;
-  color: #8a90a6;
+  color: #9ca3af;
   font-size: 14px;
-  box-shadow: 0 1px 2px rgba(20, 16, 60, 0.12);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-body.theme-shimento .app-shell .workspace-search > i { color: #8a90a6; }
+body.theme-shimento .app-shell .workspace-search:hover { border-color: #d1d5db; }
+body.theme-shimento .app-shell .workspace-search > i { color: #9ca3af; font-size: 14px; }
 body.theme-shimento .app-shell .workspace-search kbd {
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: #111;
-  color: #fff;
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #6b7280;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
-body.theme-shimento .app-shell .workspace-header-account { gap: 22px; }
-body.theme-shimento .app-shell .workspace-notification { color: #fff; font-size: 20px; }
-body.theme-shimento .app-shell .workspace-user { color: #fff; padding: 4px 6px; border-radius: 999px; }
-body.theme-shimento .app-shell .workspace-user:hover { background: rgba(255, 255, 255, 0.12); text-decoration: none; }
-body.theme-shimento .app-shell .workspace-user strong { color: #fff; font-size: 13px; }
-body.theme-shimento .app-shell .workspace-user small { color: rgba(255, 255, 255, 0.75); text-transform: capitalize; }
-body.theme-shimento .app-shell .workspace-user > i { color: #fff; font-size: 11px; }
+body.theme-shimento .app-shell .workspace-header-account { display: flex; align-items: center; gap: 20px; }
+body.theme-shimento .app-shell .workspace-notification {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #374151;
+  font-size: 18px;
+}
+/* The reference shows only the avatar in the top bar; the name lives in the sidebar card. */
+body.theme-shimento .app-shell .workspace-user { padding: 0; border-radius: 50%; color: var(--text-primary); }
+body.theme-shimento .app-shell .workspace-user:hover { text-decoration: none; }
+body.theme-shimento .app-shell .workspace-user > span:not(.workspace-avatar),
+body.theme-shimento .app-shell .workspace-user > i { display: none; }
 body.theme-shimento .app-shell .workspace-avatar {
   width: 38px;
   height: 38px;
-  background: #3cb4a4;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: #1f2937;
+  color: #fff;
+  border: 0;
+  font-size: 13px;
   font-weight: 600;
 }
+body.theme-shimento .app-shell .workspace-user:hover .workspace-avatar { box-shadow: 0 0 0 3px #fed7aa; }
 
-/* Sidebar: every entry shares the available height, so nothing scrolls. */
+/* Sidebar */
 body.theme-shimento .app-shell .workspace-sidebar {
   grid-column: 1;
   grid-row: 2;
-  padding: 0;
-  overflow: hidden;
-  background: var(--shell-rail-bg);
-  border-right: 0;
-}
-/* Both groups flatten into one evenly spaced list: Users, Settings and Exit
-   look and size exactly like the main links. */
-body.theme-shimento .app-shell .workspace-links,
-body.theme-shimento .app-shell .workspace-account { display: contents; }
-body.theme-shimento .app-shell .workspace-nav-link {
-  flex: 1 1 0;
-  min-height: 0;
-  max-height: 76px;
+  display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: 0;
-  font-size: 12px;
+  padding: 12px 14px 16px;
+  overflow-y: auto;
+  background: var(--shell-side-bg);
+  border-right: 1px solid var(--shell-side-line);
+  color: var(--shell-link);
+}
+body.theme-shimento .app-shell .workspace-links {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  overflow: visible;
+}
+body.theme-shimento .app-shell .workspace-account {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 0;
+}
+body.theme-shimento .app-shell .workspace-nav-link {
+  display: flex;
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  width: 100%;
+  min-height: 44px;
+  max-height: none;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.2;
-  text-align: center;
-  color: var(--shell-rail-text);
+  text-align: left;
+  color: var(--shell-link);
   background: transparent;
   box-shadow: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
-body.theme-shimento .app-shell .workspace-nav-link i { width: auto; font-size: 17px; color: var(--shell-rail-text); }
-body.theme-shimento .app-shell .workspace-nav-link:hover { background: var(--shell-rail-hover); color: #fff; }
-body.theme-shimento .app-shell .workspace-nav-link:hover i { color: #fff; }
-body.theme-shimento .app-shell .workspace-nav-link.active { background: var(--shell-rail-active); color: #fff; font-weight: 600; box-shadow: none; }
-body.theme-shimento .app-shell .workspace-nav-link.active i { color: #fff; }
-body.theme-shimento .app-shell .workspace-sidebar :focus-visible { outline: 2px solid #a99cff; outline-offset: -2px; }
-
-/* Short screens: tighter entries so all items still fit. */
-@media (max-height: 680px) and (min-width: 821px) {
-  body.theme-shimento .app-shell .workspace-nav-link { gap: 3px; font-size: 11px; }
-  body.theme-shimento .app-shell .workspace-nav-link i { font-size: 14px; }
+body.theme-shimento .app-shell .workspace-nav-link i { width: 20px; flex: 0 0 20px; text-align: center; font-size: 16px; color: var(--shell-link-icon); }
+body.theme-shimento .app-shell .workspace-nav-link:hover { background: var(--shell-link-hover); color: var(--text-primary); text-decoration: none; }
+body.theme-shimento .app-shell .workspace-nav-link.active {
+  background: var(--shell-link-active-bg);
+  color: var(--shell-link-active);
+  font-weight: 600;
+  box-shadow: none;
 }
-@media (max-height: 520px) and (min-width: 821px) {
-  body.theme-shimento .app-shell .workspace-nav-link span { display: none; }
+body.theme-shimento .app-shell .workspace-nav-link.active i { color: var(--shell-link-active); }
+body.theme-shimento .app-shell .workspace-sidebar :focus-visible { outline: 2px solid #fb923c; outline-offset: -2px; }
+
+/* Signed-in user card at the foot of the sidebar. */
+body.theme-shimento .app-shell .workspace-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 6px 0;
+  border-top: 1px solid var(--shell-side-line);
+  color: var(--text-primary);
+  text-decoration: none;
+  min-width: 0;
+}
+body.theme-shimento .app-shell .workspace-sidebar-user:hover { text-decoration: none; }
+body.theme-shimento .app-shell .workspace-sidebar-user .workspace-avatar { flex: 0 0 38px; display: grid; place-items: center; border-radius: 50%; }
+body.theme-shimento .app-shell .workspace-sidebar-user > span:last-child { display: grid; min-width: 0; }
+body.theme-shimento .app-shell .workspace-sidebar-user strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.theme-shimento .app-shell .workspace-sidebar-user small { font-size: 12px; color: var(--text-secondary); text-transform: capitalize; }
+
+/* Short screens: tighter rows so everything fits without scrolling. */
+@media (max-height: 760px) and (min-width: 821px) {
+  body.theme-shimento .app-shell .workspace-nav-link { min-height: 38px; padding: 8px 14px; }
+  body.theme-shimento .app-shell .workspace-links,
+  body.theme-shimento .app-shell .workspace-account { gap: 2px; }
 }
 
 body.theme-shimento .app-shell .workspace-content {
@@ -140,59 +200,105 @@ body.theme-shimento .app-shell .workspace-content {
   background: var(--light-bg);
   border-radius: 0;
 }
+body.theme-shimento .app-shell .workspace-content > .main-container { padding: 28px clamp(20px, 2.4vw, 32px) 36px; }
+body.theme-shimento .app-footer { background: transparent; border-top: 1px solid var(--shell-side-line); }
+
+@media (max-width: 1024px) {
+  body.theme-shimento { --shell-side: 200px; }
+  body.theme-shimento .app-shell .workspace-brand { padding: 0 18px; }
+}
 
 @media (max-width: 820px) {
+  body.theme-shimento { --shell-bar: 64px; }
   body.theme-shimento .app-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--shell-bar) minmax(0, 1fr); }
   body.theme-shimento .app-shell .workspace-menu-toggle {
-    top: 10px;
-    left: 10px;
-    border: 0;
-    background: rgba(255, 255, 255, 0.14);
-    color: #fff;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 400;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #374151;
   }
   body.theme-shimento .app-shell .workspace-brand {
     grid-column: 1;
     z-index: 2;
     justify-self: start;
-    padding: 0 0 0 62px;
+    padding: 0 0 0 64px;
     background: transparent;
+    border-right: 0;
   }
-  body.theme-shimento .app-shell .workspace-brand img { width: 96px; }
-  body.theme-shimento .app-shell .workspace-topbar { grid-column: 1; padding: 0 12px 0 172px; gap: 10px; }
+  body.theme-shimento .app-shell .workspace-brand img { width: 112px; }
+  body.theme-shimento .app-shell .workspace-topbar { grid-column: 1; padding: 0 12px 0 192px; gap: 10px; }
   body.theme-shimento .app-shell .workspace-search { width: auto; flex: 1; min-width: 0; }
   body.theme-shimento .app-shell .workspace-search span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.theme-shimento .app-shell .workspace-search kbd { display: none; }
   body.theme-shimento .app-shell .workspace-content { grid-column: 1; }
+  body.theme-shimento .app-shell .workspace-content > .main-container { padding: 20px 16px 28px; }
   body.theme-shimento .app-shell .workspace-sidebar {
     position: fixed;
     top: var(--shell-bar);
     bottom: 0;
     left: 0;
-    width: 240px;
+    width: 248px;
     height: calc(100dvh - var(--shell-bar));
-    overflow-y: auto;
     z-index: 300;
-    box-shadow: 8px 0 24px rgba(10, 14, 30, 0.3);
+    box-shadow: 8px 0 24px rgba(16, 24, 40, 0.12);
   }
-  body.theme-shimento .app-shell .workspace-nav-link {
-    flex: none;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 12px;
-    min-height: 46px;
-    max-height: none;
-    padding: 10px 16px;
-    font-size: 13px;
-    text-align: left;
-  }
-  body.theme-shimento .app-shell .workspace-nav-link i { width: 18px; font-size: 16px; }
+  body.theme-shimento .app-shell .workspace-sidebar:not(.workspace-sidebar-open) { display: none; }
 }
 
 @media (max-width: 480px) {
-  body.theme-shimento .app-shell .workspace-topbar { padding-left: 62px; }
+  body.theme-shimento .app-shell .workspace-topbar { padding-left: 64px; }
   body.theme-shimento .app-shell .workspace-brand { display: none; }
-  body.theme-shimento .app-shell .workspace-header-account { gap: 10px; }
+  body.theme-shimento .app-shell .workspace-header-account { gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body.theme-shimento .app-shell .workspace-nav-link { transition: none; }
+  body.theme-shimento .app-shell .workspace-nav-link,
+  body.theme-shimento .app-shell .workspace-search { transition: none; }
+}
+
+/* Page rhythm: one heading scale for every module, matching the reference
+   (plain bold titles, muted subtitle directly below, no inline title icons). */
+body.theme-shimento .main-container h1:not(.profile-hero-name):not(.jdd-title) {
+  display: block;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+body.theme-shimento .main-container h1:not(.profile-hero-name):not(.jdd-title) > i,
+body.theme-shimento .main-container h1 > .client-create-icon { display: none; }
+body.theme-shimento .main-container h1 + p,
+body.theme-shimento .main-container :is(.candidates-subtitle, .comparison-subtitle, .jobs-head-subtitle) {
+  margin-top: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+body.theme-shimento .empty-state-title { border: 0; padding: 0; margin: 12px 0 6px; font-size: 18px; }
+
+/* KPI cards: icon and label share a top edge so titles line up across the row. */
+body.theme-shimento .insight-kpi { align-items: flex-start; }
+body.theme-shimento .insight-kpi small { margin-top: 6px; }
+
+/* Filter controls share one height, type size and weight. */
+body.theme-shimento .analytics-filter-bar select,
+body.theme-shimento .analytics-filter-bar .date-filter summary { min-height: 42px; font-size: 13px; font-weight: 500; padding: 8px 12px; }
+
+/* Phones: filters sit in a tidy two-column grid instead of clipping. */
+@media (max-width: 480px) {
+  body.theme-shimento .insights-heading .analytics-filter-bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  body.theme-shimento .analytics-filter-bar > *,
+  body.theme-shimento .analytics-filter-bar select { width: 100%; max-width: none; min-width: 0; }
 }

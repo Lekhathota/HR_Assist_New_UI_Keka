@@ -80,7 +80,7 @@ export function Panel({ title, children, action }) {
 
 export function Empty({ children = 'No data for this period.' }) { return <p className="insight-empty">{children}</p>; }
 
-const colors = ['#5145bd', '#8a80dc', '#b1a9ee', '#ef9466', '#f5c58f', '#657394'];
+const colors = ['#f97316', '#4b5563', '#fdba74', '#9ca3af', '#fb923c', '#d1d5db'];
 export function Chart({ rows = [], kind = 'bar', label }) {
   const valid = rows.filter(r => r.count != null);
   const total = valid.reduce((s, r) => s + r.count, 0);
@@ -94,21 +94,21 @@ export function Chart({ rows = [], kind = 'bar', label }) {
     return <div className="insight-chart insight-chart-histogram">
       <svg viewBox="0 0 420 230" role="img" aria-label={label}>
         <title>{label}</title><desc>{valid.map(r => `${r.name}: ${r.count} candidates`).join('; ')}</desc>
-        <text x="48" y="16" fontSize="12" fill="#60698a">Candidates</text>
-        {ticks.map(tick => { const y = 178 - tick / ceiling * 135; return <g key={tick}><line x1="48" x2="390" y1={y} y2={y} stroke="#e8ebf5" /><text x="36" y={y + 4} textAnchor="end" fontSize="12" fill="#60698a">{tick}</text></g>; })}
+        <text x="48" y="16" fontSize="12" fill="#6b7280">Candidates</text>
+        {ticks.map(tick => { const y = 178 - tick / ceiling * 135; return <g key={tick}><line x1="48" x2="390" y1={y} y2={y} stroke="#f0f1f4" /><text x="36" y={y + 4} textAnchor="end" fontSize="12" fill="#6b7280">{tick}</text></g>; })}
         {valid.map((row, i) => { const x = 54 + i * slot; const height = row.count / ceiling * 135; return <g key={row.name}>
           <title>{row.name}: {row.count} candidates</title>
-          <rect x={x + 8} y={178 - height} width={slot - 16} height={height} rx="4" fill="#6255c8" />
+          <rect x={x + 8} y={178 - height} width={slot - 16} height={height} rx="4" fill="#f97316" />
           {row.count > 0 && <text x={x + slot / 2} y={168 - height} textAnchor="middle" fontSize="13" fontWeight="600">{row.count}</text>}
           <text x={x + slot / 2} y="199" textAnchor="middle" fontSize="12">{row.name}</text>
         </g>; })}
-        <text x="219" y="223" textAnchor="middle" fontSize="12" fill="#60698a">Match score (%)</text>
+        <text x="219" y="223" textAnchor="middle" fontSize="12" fill="#6b7280">Match score (%)</text>
       </svg>
       <p className="histogram-summary"><strong>{total}</strong> {total === 1 ? 'candidate with a recorded score' : 'candidates with recorded scores'}</p>
     </div>;
   }
   if (kind === 'horizontal' || kind === 'funnel') return <div className="insight-chart chart-bars" role="img" aria-label={`${label}: ${valid.map(r => `${r.name}: ${r.count}`).join('; ')}`}>
-    {valid.map((r, i) => <div key={`${r.name}-${i}`}><div className="chart-bar-heading"><span>{r.name}</span><strong>{r.count}</strong></div><svg className="chart-bar-track" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="10" rx="3" fill="#f0f1f8" /><rect width={r.count / max * 100} height="10" rx="3" fill={colors[i % colors.length]} /></svg></div>)}
+    {valid.map((r, i) => <div key={`${r.name}-${i}`}><div className="chart-bar-heading"><span>{r.name}</span><strong>{r.count}</strong></div><svg className="chart-bar-track" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="10" rx="3" fill="#f3f4f6" /><rect width={r.count / max * 100} height="10" rx="3" fill={colors[i % colors.length]} /></svg></div>)}
   </div>;
   let offset = 0;
   return <div className={`insight-chart insight-chart-${kind}`}>
@@ -123,9 +123,9 @@ export function Chart({ rows = [], kind = 'bar', label }) {
         <text x={150 + r.count / max * 235} y={18 + i * 180 / valid.length} fontSize="10">{r.count}</text>
       </g>)}</> : kind === 'funnel' ? <>{valid.map((r, i) => {
         const width = r.count / max * 340; const next = Math.max(width * .85, 6); const y = 10 + i * 180 / valid.length; const height = Math.min(35, 160 / valid.length);
-        return <g key={r.name}><path d={`M${210 - width / 2},${y} h${width} L${210 + next / 2},${y + height} h${-next} Z`} fill={colors[i % colors.length]} /><text x="210" y={y + height / 2 + 4} textAnchor="middle" fill={i < 2 ? '#fff' : '#242443'} fontSize="12">{r.count}</text></g>;
+        return <g key={r.name}><path d={`M${210 - width / 2},${y} h${width} L${210 + next / 2},${y + height} h${-next} Z`} fill={colors[i % colors.length]} /><text x="210" y={y + height / 2 + 4} textAnchor="middle" fill={i < 2 ? '#fff' : '#1f2937'} fontSize="12">{r.count}</text></g>;
       })}</> : <>
-        {[0, 1, 2, 3].map(i => <line key={i} x1="20" x2="405" y1={170 - i * 50} y2={170 - i * 50} stroke="#ebedf7" />)}
+        {[0, 1, 2, 3].map(i => <line key={i} x1="20" x2="405" y1={170 - i * 50} y2={170 - i * 50} stroke="#f1f2f4" />)}
         {kind === 'line' && valid.length > 1 && <polyline fill="none" stroke={colors[0]} strokeWidth="3" points={valid.map((r, i) => `${(valid.length === 1 ? 210 : 40 + i * 340 / (valid.length - 1))},${170 - r.count / max * 135}`).join(' ')} />}
         {valid.map((r, i) => { const width = 370 / valid.length; const x = kind === 'line' ? (valid.length === 1 ? 210 : 40 + i * 340 / (valid.length - 1)) : 25 + i * width; const y = 170 - r.count / max * 135; return <g key={`${r.name}-${i}`}>
           {kind === 'line' ? <circle cx={x} cy={y} r="4" fill={colors[0]} /> : <rect x={x} y={y} width={width * .65} height={170 - y} rx="3" fill={colors[i % colors.length]} />}

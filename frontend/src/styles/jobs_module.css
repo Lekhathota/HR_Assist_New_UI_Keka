@@ -124,8 +124,8 @@
 .app-shell .jobs-page .jobs-search input:focus,
 .app-shell .jobs-page select.jobs-select:focus {
     outline: none;
-    border-color: var(--accent-color, #ef7a2d);
-    box-shadow: 0 0 0 3px rgba(239, 122, 45, 0.15);
+    border-color: var(--accent-color, #f97316);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 .app-shell .jobs-more-btn,
@@ -148,8 +148,8 @@
 .app-shell .jobs-more-btn.is-active,
 .app-shell .jobs-more-btn:hover,
 .app-shell .jobs-clear-btn:hover {
-    border-color: var(--accent-color, #ef7a2d);
-    color: var(--accent-dark, #a64716);
+    border-color: var(--accent-color, #f97316);
+    color: var(--accent-dark, #c2410c);
 }
 
 .app-shell .jobs-clear-btn {
@@ -168,7 +168,7 @@
     height: 1.15rem;
     padding: 0 0.3rem;
     border-radius: 999px;
-    background: var(--accent-color, #5145bd);
+    background: var(--accent-color, #f97316);
     color: #fff;
     font-size: 0.6875rem;
     font-weight: 700;
@@ -183,7 +183,7 @@
     gap: 0.75rem;
     padding: 1rem;
     background: var(--ui-surface, #fff);
-    border: 1px solid var(--border-color, #e1e5f3);
+    border: 1px solid var(--border-color, #eceef1);
     border-radius: 0.75rem;
     box-shadow: 0 12px 32px rgba(37, 32, 87, 0.14);
 }
@@ -195,7 +195,7 @@
 .app-shell .jobs-filter-field > span {
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--text-secondary, #60698a);
+    color: var(--text-secondary, #6b7280);
 }
 .app-shell .jobs-page .jobs-filter-panel select.jobs-select {
     width: 100%;
@@ -208,7 +208,7 @@
     align-items: center;
     gap: 0.5rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--border-color, #e1e5f3);
+    border-top: 1px solid var(--border-color, #eceef1);
 }
 
 /* Section heading */
@@ -238,7 +238,7 @@
     font-size: 0.6875rem;
     font-weight: 700;
     text-align: center;
-    color: var(--accent-dark, #a64716);
+    color: var(--accent-dark, #c2410c);
 }
 
 .app-shell .jobs-select-col {
@@ -329,7 +329,7 @@
 
 .app-shell .jobs-page .jobs-title-link:hover,
 .app-shell .jobs-page .jobs-title-link:focus-visible {
-    color: var(--accent-dark, #a64716);
+    color: var(--accent-dark, #c2410c);
     text-decoration: underline;
 }
 
@@ -363,7 +363,7 @@
     background: var(--ui-soft, #fff4eb);
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--accent-dark, #a64716);
+    color: var(--accent-dark, #c2410c);
 }
 
 .app-shell .jobs-status {
@@ -398,8 +398,8 @@
 
 .app-shell .jobs-page .jobs-view-link:hover,
 .app-shell .jobs-page .jobs-view-link:focus-visible {
-    border-color: var(--accent-color, #ef7a2d);
-    color: var(--accent-dark, #a64716);
+    border-color: var(--accent-color, #f97316);
+    color: var(--accent-dark, #c2410c);
 }
 
 /* Footer + pager */
@@ -433,10 +433,10 @@
 }
 
 .app-shell .jobs-pager button.is-current {
-    border-color: var(--accent-color, #ef7a2d);
+    border-color: var(--accent-color, #f97316);
     background: var(--ui-soft, #fff4eb);
     font-weight: 700;
-    color: var(--accent-dark, #a64716);
+    color: var(--accent-dark, #c2410c);
 }
 
 .app-shell .jobs-pager button:disabled {

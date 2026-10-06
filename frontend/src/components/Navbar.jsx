@@ -2,16 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiPost, clearToken } from '../api.js';
 import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
+import { readUser, displayName, initials } from '../utils/userDisplay.js';
 
 const navigation = [
   ['/welcome', 'Home', 'fa-house'],
   ['/jobs', 'Jobs', 'fa-briefcase'],
   ['/talent', 'Talent', 'fa-users'],
-  ['/analyze', 'Analyze', 'fa-code-compare'],
-  ['/hiring-pipeline', 'Hiring Pipeline', 'fa-route'],
+  ['/analyze', 'Analyze', 'fa-wand-magic-sparkles'],
+  ['/hiring-pipeline', 'Hiring Pipeline', 'fa-diagram-project'],
   ['/clients', 'Clients', 'fa-building'],
   ['/vendors', 'Vendors', 'fa-handshake'],
-  ['/insights', 'Reports', 'fa-chart-bar'],
+  ['/insights', 'Reports', 'fa-chart-line'],
 ];
 
 function Navbar() {
@@ -20,6 +21,8 @@ function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef(null);
   const role = getCurrentRole();
+  const user = readUser();
+  const userName = displayName(user);
 
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
@@ -53,7 +56,7 @@ function Navbar() {
         <i className={`fas ${menuOpen ? 'fa-times' : 'fa-bars'}`} aria-hidden="true"></i>
       </button>
       <Link to="/welcome" className="workspace-brand" aria-label="Open home page" onClick={closeMenu}>
-        <img src="/ShimentoX-Light-Logo.webp" alt="ShimentoX"
+        <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX"
           onError={(e) => { e.target.style.display = 'none'; }} />
       </Link>
       <aside id="workspace-navigation" className={`workspace-sidebar${menuOpen ? ' workspace-sidebar-open' : ''}`}
@@ -81,6 +84,12 @@ function Navbar() {
             <i className="fas fa-sign-out-alt" aria-hidden="true"></i><span>Exit</span>
           </button>
         </div>
+        {roleCanAccess(role, '/profile') && (
+          <Link to="/profile" className="workspace-sidebar-user" onClick={closeMenu} aria-label={`Open profile for ${userName}`}>
+            <span className="workspace-avatar" aria-hidden="true">{initials(userName)}</span>
+            <span><strong>{userName}</strong><small>{String(user.role || '').replaceAll('_', ' ')}</small></span>
+          </Link>
+        )}
       </aside>
     </>
   );

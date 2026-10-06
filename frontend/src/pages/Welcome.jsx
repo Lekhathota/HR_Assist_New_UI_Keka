@@ -33,6 +33,6 @@ export default function Welcome() {
       </div>
       <Coverage notes={a.notes} />
     </>}
-    <nav className="home-quick-actions" aria-label="Recruiting quick actions">{actions.filter(([, path]) => can(path)).map(([label, path, icon]) => <Link key={path} to={path}><i className={`fas ${icon}`} aria-hidden="true" />{label}<span aria-hidden="true">?</span></Link>)}</nav>
+    <nav className="home-quick-actions" aria-label="Recruiting quick actions">{actions.filter(([, path]) => can(path)).map(([label, path, icon]) => <Link key={path} to={path}><i className={`fas ${icon}`} aria-hidden="true" />{label}<span aria-hidden="true">&rarr;</span></Link>)}</nav>
   </div></Layout>;
 }

@@ -3,8 +3,8 @@
    Uses the project's --accent-color / --primary-color tokens with safe fallbacks. */
 
 .um-page {
-  --um-accent: var(--accent-color, #ef7a2d);
-  --um-accent-dark: var(--accent-dark, #a64716);
+  --um-accent: var(--accent-color, #f97316);
+  --um-accent-dark: var(--accent-dark, #c2410c);
   --um-ink: #141416;
   --um-muted: #6b7280;
   --um-border: #e7e3dc;
@@ -67,8 +67,8 @@
   min-height: 36px;
   padding: 0.45rem 0.85rem;
   color: #8a3e14;
-  background: rgba(239, 122, 45, 0.12);
-  border: 1px solid rgba(239, 122, 45, 0.28);
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.28);
   border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 750;
@@ -149,7 +149,7 @@
 .um-page select:focus {
   outline: none;
   border-color: var(--um-accent);
-  box-shadow: 0 0 0 3px rgba(239, 122, 45, 0.16);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
 }
 
 .um-page button {

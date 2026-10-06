@@ -67,7 +67,7 @@
     height: 20px;
     padding: 0 0.35rem;
     border-radius: 999px;
-    background: #ef7a2d;
+    background: #f97316;
     color: #fff;
     font-size: 0.72rem;
     font-weight: 700;
@@ -249,7 +249,7 @@
 }
 
 .candidates-simple-client {
-    color: #ef7a2d;
+    color: #f97316;
     font-weight: 600;
 }
 
@@ -327,9 +327,9 @@
     max-width: 100%;
     padding: 0.3rem 0.55rem;
     border-radius: 999px;
-    border: 1px solid rgba(239, 122, 45, 0.35);
-    background: rgba(239, 122, 45, 0.1);
-    color: #ef7a2d;
+    border: 1px solid rgba(249, 115, 22, 0.35);
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
     font-size: 0.76rem;
     font-weight: 800;
     line-height: 1.2;
@@ -398,11 +398,11 @@
 
 .profile-section-box {
     background: linear-gradient(135deg, rgba(26, 31, 58, 0.9), rgba(45, 53, 97, 0.9));
-    border: 1px solid rgba(239, 122, 45, 0.3);
+    border: 1px solid rgba(249, 115, 22, 0.3);
     border-radius: 12px;
     padding: 2rem;
     margin-top: 2rem;
-    box-shadow: 0 0 20px rgba(239, 122, 45, 0.1);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.1);
 }
 
 .profile-section-compact {
@@ -431,7 +431,7 @@
 }
 
 .profile-section-title {
-    color: #ef7a2d;
+    color: #f97316;
     margin-top: 0;
     margin-bottom: 0.75rem;
     font-size: 1.1rem;
@@ -442,7 +442,7 @@
     background: rgba(0, 0, 0, 0.2);
     padding: 1rem;
     border-radius: 8px;
-    border-left: 4px solid #ef7a2d;
+    border-left: 4px solid #f97316;
 }
 
 .profile-resume-grid {
@@ -452,7 +452,7 @@
 }
 
 .profile-sub-title {
-    color: #ef7a2d;
+    color: #f97316;
     margin-bottom: 0.8rem;
 }
 
@@ -519,9 +519,9 @@
 .profile-jd-item {
     color: #fff;
     padding: 0.65rem 0.75rem;
-    background: rgba(239, 122, 45, 0.05);
+    background: rgba(249, 115, 22, 0.05);
     border-radius: 6px;
-    border-left: 3px solid #ef7a2d;
+    border-left: 3px solid #f97316;
 }
 
 .profile-jd-item-title {
@@ -552,7 +552,7 @@
 }
 
 .profile-jd-date-time {
-    color: #ef7a2d;
+    color: #f97316;
     font-weight: 600;
     letter-spacing: 0.02em;
 }
@@ -574,15 +574,15 @@
     gap: 0.5rem;
     color: #fff;
     padding: 0.7rem 0.85rem;
-    background: rgba(239, 122, 45, 0.08);
+    background: rgba(249, 115, 22, 0.08);
     border-radius: 6px;
-    border-left: 3px solid #ef7a2d;
+    border-left: 3px solid #f97316;
     font-size: 0.85rem;
     line-height: 1.35;
 }
 
 .profile-applied-role-item i {
-    color: #ef7a2d;
+    color: #f97316;
     margin-top: 0.15rem;
     flex-shrink: 0;
 }
@@ -610,7 +610,7 @@
 .profile-screening-item {
     color: #fff;
     padding: 0.75rem 0.9rem;
-    background: rgba(239, 122, 45, 0.05);
+    background: rgba(249, 115, 22, 0.05);
     border-radius: 6px;
     border-left: 3px solid #ffa500;
     height: 100%;
