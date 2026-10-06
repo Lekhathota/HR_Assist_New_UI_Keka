@@ -272,6 +272,7 @@ body.theme-shimento .app-footer { background: transparent; border-top: 1px solid
     top: 12px;
     left: 12px;
     z-index: 400;
+    margin: 0; /* reference-theme.css adds a 15px left margin that pushed it into the logo */
     width: 40px;
     height: 40px;
     border: 1px solid #e5e7eb;
@@ -426,12 +427,24 @@ body.theme-shimento .hire-tab:focus-visible { outline: 2px solid var(--accent-li
 /* Compact rail (desktop): a narrow column with each icon stacked above its
    label, centred, like the reference. Colours are unchanged. Phones keep the
    wider slide-out drawer with icon-and-label rows. */
-/* The full logo is scaled down to fit the rail's width. */
-body.theme-shimento .app-shell .workspace-brand .workspace-brand-full { display: block; width: 100%; max-width: 88px; height: auto; }
+body.theme-shimento .app-shell .workspace-brand .workspace-brand-full { display: block; width: 148px; max-width: none; height: auto; }
 
 @media (min-width: 821px) {
   body.theme-shimento { --shell-side: 104px; }
-  body.theme-shimento .app-shell .workspace-brand { justify-content: center; padding: 0 8px; }
+  /* The top bar spans the full width with the logo at its left at a readable
+     size; the rail starts below it and carries only the navigation. */
+  body.theme-shimento .app-shell .workspace-topbar { grid-column: 1 / -1; padding-left: 208px; }
+  body.theme-shimento .app-shell .workspace-brand {
+    grid-column: 1 / -1;
+    position: relative;
+    justify-self: start;
+    align-self: center;
+    z-index: 70; /* above the top bar (60), which it sits on */
+    height: auto;
+    padding: 6px 0 6px 28px;
+    background: transparent;
+    border-right: 0;
+  }
   body.theme-shimento .app-shell .workspace-sidebar { padding: 10px 8px 14px; overflow-x: hidden; }
   body.theme-shimento .app-shell .workspace-links,
   body.theme-shimento .app-shell .workspace-account { gap: 4px; }

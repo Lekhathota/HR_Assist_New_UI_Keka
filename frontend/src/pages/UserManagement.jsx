@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPost, apiPut } from '../api.js';
+import Layout from '../components/Layout.jsx';
 import '../styles/user-management.css';
 
 const ROLES = [
@@ -40,8 +41,8 @@ export default function UserManagement() {
       setNotice('User updated.'); setReload(v => v + 1);
     } catch (e) { setError(e.message || 'Update failed.'); }
   };
-  if (!canManageUsers) return <main className="um-page"><section className="um-card"><h1>Administrator access required</h1><p>This page is available only to Admin users.</p></section></main>;
-  return <main className="um-page">
+  if (!canManageUsers) return <Layout><div className="um-page"><section className="um-card"><h1>Administrator access required</h1><p>This page is available only to Admin users.</p></section></div></Layout>;
+  return <Layout><div className="um-page">
     <header className="um-header"><div><p className="um-eyebrow">ACCESS CONTROL</p><h1>User Management</h1><p>Create accounts, assign roles, and manage access to ShimentoX.</p></div><span className="um-count">{users.length} users</span></header>
     {error && <div className="um-alert error" role="alert">{error}</div>}{notice && <div className="um-alert success" role="status">{notice}</div>}
     <section className="um-card"><h2><span>＋</span> Create user</h2><p className="um-muted">New users sign in with the credentials you provide.</p>
@@ -59,5 +60,5 @@ export default function UserManagement() {
       {!users.length && <tr><td colSpan="5" className="um-empty">No users found.</td></tr>}
       </tbody></table></div>
     </section>
-  </main>;
+  </div></Layout>;
 }
