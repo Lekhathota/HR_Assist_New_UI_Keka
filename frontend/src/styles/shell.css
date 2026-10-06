@@ -302,3 +302,63 @@ body.theme-shimento .analytics-filter-bar .date-filter summary { min-height: 42p
   body.theme-shimento .analytics-filter-bar > *,
   body.theme-shimento .analytics-filter-bar select { width: 100%; max-width: none; min-width: 0; }
 }
+
+/* Hire module tab bar (Jobs · Talent · Analyze · Hiring Pipeline). Sticks to
+   the top of the scrolling content, like the reference's module navigation. */
+body.theme-shimento .hire-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: stretch;
+  gap: 28px;
+  min-height: 52px;
+  padding: 0 clamp(20px, 2.4vw, 32px);
+  background: #fff;
+  border-bottom: 1px solid var(--shell-side-line);
+}
+body.theme-shimento .hire-tabs-title {
+  display: flex;
+  align-items: center;
+  padding-right: 28px;
+  border-right: 1px solid var(--shell-side-line);
+  margin: 12px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+body.theme-shimento .hire-tabs-list { display: flex; align-items: stretch; gap: 32px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+body.theme-shimento .hire-tabs-list::-webkit-scrollbar { display: none; }
+body.theme-shimento .hire-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #4b5563;
+  transition: color .15s ease;
+}
+body.theme-shimento .hire-tab:hover { color: var(--text-primary); text-decoration: none; }
+body.theme-shimento .hire-tab.active { color: var(--text-primary); font-weight: 700; }
+/* Caret under the active tab, pointing up into it. */
+body.theme-shimento .hire-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--accent-color);
+}
+body.theme-shimento .hire-tab:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; border-radius: 4px; }
+
+@media (max-width: 820px) {
+  body.theme-shimento .hire-tabs { gap: 16px; padding: 0 16px; }
+  body.theme-shimento .hire-tabs-title { display: none; }
+  body.theme-shimento .hire-tabs-list { gap: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { body.theme-shimento .hire-tab { transition: none; } }

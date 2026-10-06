@@ -22,6 +22,7 @@ import { getToken } from './api.js';
 import { getCurrentRole, roleCanAccess } from './roleAccess.js';
 import { ConfirmProvider, ToastHost } from './components/EnterpriseFeedback.jsx';
 import { CommandPalette, FrontendPolishProvider } from './components/FrontendPolish.jsx';
+import { HireRedirect } from './components/HireNav.jsx';
 import './styles/style.css';
 
 
@@ -52,6 +53,7 @@ function App() {
         <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Navigate to="/welcome" replace /></ProtectedRoute>} />
 
+        <Route path="/hire" element={<ProtectedRoute><HireRedirect /></ProtectedRoute>} />
         <Route path="/jobs" element={<ProtectedRoute><JdList /></ProtectedRoute>} />
         <Route path="/jobs/create" element={<ProtectedRoute><JdCreate /></ProtectedRoute>} />
         <Route path="/job-details.html" element={<ProtectedRoute><JdDetails /></ProtectedRoute>} />

@@ -3,13 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiPost, clearToken } from '../api.js';
 import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
 import { readUser, displayName, initials } from '../utils/userDisplay.js';
+import { isHirePath, visibleHireTabs } from './HireNav.jsx';
 
 const navigation = [
   ['/welcome', 'Home', 'fa-house'],
-  ['/jobs', 'Jobs', 'fa-briefcase'],
-  ['/talent', 'Talent', 'fa-users'],
-  ['/analyze', 'Analyze', 'fa-wand-magic-sparkles'],
-  ['/hiring-pipeline', 'Hiring Pipeline', 'fa-diagram-project'],
+  ['/hire', 'Hire', 'fa-briefcase'],
   ['/clients', 'Clients', 'fa-building'],
   ['/vendors', 'Vendors', 'fa-handshake'],
   ['/insights', 'Reports', 'fa-chart-line'],
@@ -42,10 +40,12 @@ function Navbar() {
   };
 
   const isActive = (path) =>
-    location.pathname === path || location.pathname.startsWith(path + '/')
-    || (path === '/jobs' && location.pathname === '/job-details.html');
+    path === '/hire' ? isHirePath(location.pathname)
+      : location.pathname === path || location.pathname.startsWith(path + '/');
 
-  const visibleNavigation = navigation.filter(([path]) => roleCanAccess(role, path));
+  // Hire is shown when the role can open at least one of its pages.
+  const visibleNavigation = navigation.filter(([path]) =>
+    path === '/hire' ? visibleHireTabs(role).length > 0 : roleCanAccess(role, path));
 
   return (
     <>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar.jsx';
 import FloatingRecruiterChat from './FloatingRecruiterChat.jsx';
+import { HireTabs } from './HireNav.jsx';
 import { readUser, displayName, initials } from '../utils/userDisplay.js';
 
 
@@ -25,6 +26,7 @@ function Layout({ children }) {
       </header>
       <Navbar />
       <div className="workspace-content">
+      <HireTabs />
       <main className="main-container">
         {children}
       </main>

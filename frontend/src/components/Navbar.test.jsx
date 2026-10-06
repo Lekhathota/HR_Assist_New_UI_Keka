@@ -43,14 +43,13 @@ afterEach(() => {
   container.remove();
 });
 
-test('keeps all existing navigation labels, order, destinations, and the welcome logo link', () => {
+test('groups Jobs, Talent, Analyze and Hiring Pipeline under Hire and keeps the other links', () => {
   renderWorkspace('/jobs/123');
   const links = Array.from(container.querySelectorAll('.workspace-links a'));
   expect(links.map(link => [link.textContent, link.getAttribute('href')])).toEqual([
-    ['Home', '/welcome'], ['Jobs', '/jobs'], ['Talent', '/talent'], ['Analyze', '/analyze'],
-    ['Hiring Pipeline', '/hiring-pipeline'], ['Clients', '/clients'], ['Vendors', '/vendors'], ['Reports', '/insights'],
+    ['Home', '/welcome'], ['Hire', '/hire'], ['Clients', '/clients'], ['Vendors', '/vendors'], ['Reports', '/insights'],
   ]);
-  expect(container.querySelector('[aria-current="page"]').textContent).toBe('Jobs');
+  expect(container.querySelector('[aria-current="page"]').textContent).toBe('Hire');
   expect(container.querySelector('.workspace-brand').getAttribute('href')).toBe('/welcome');
   expect(container.querySelector('.workspace-account a[href="/profile"]').getAttribute('href')).toBe('/profile');
   expect(container.querySelector('.workspace-account button').textContent).toBe('Exit');
@@ -63,8 +62,8 @@ test('mobile navigation expands, follows the existing route, and closes after se
   click(toggle);
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
   expect(container.querySelector('#workspace-navigation').classList.contains('workspace-sidebar-open')).toBe(true);
-  click(container.querySelector('a[href="/talent"]'));
-  expect(container.querySelector('output').textContent).toBe('/talent');
+  click(container.querySelector('a[href="/clients"]'));
+  expect(container.querySelector('output').textContent).toBe('/clients');
   expect(container.querySelector('.workspace-topbar')).toBeNull();
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(document.activeElement).toBe(toggle);
@@ -74,11 +73,22 @@ test('Escape closes mobile navigation and returns keyboard focus', () => {
   renderWorkspace();
   const toggle = container.querySelector('.workspace-menu-toggle');
   click(toggle);
-  const link = container.querySelector('a[href="/jobs"]');
+  const link = container.querySelector('a[href="/hire"]');
   link.focus();
   act(() => link.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(document.activeElement).toBe(toggle);
+});
+
+test.each(['/hire', '/talent/5', '/analyze', '/hiring-pipeline', '/job-details.html'])('Hire stays active on %s', path => {
+  renderWorkspace(path);
+  expect(container.querySelector('.workspace-links [aria-current="page"]').textContent).toBe('Hire');
+});
+
+test('Hire is hidden for roles that cannot open any Hire page', () => {
+  localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'finance' }));
+  renderWorkspace('/insights');
+  expect(container.querySelector('a[href="/hire"]')).toBeNull();
 });
 
 test('fresh public pages receive the shared palette without navigation', () => {
