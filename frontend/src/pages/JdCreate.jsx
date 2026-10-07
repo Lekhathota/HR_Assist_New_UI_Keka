@@ -15,7 +15,6 @@ function JdCreate() {
   const [clientId, setClientId]   = useState('');
   const [clientsError, setClientsError] = useState('');
   const [requiredCount, setRequiredCount] = useState('');
-  const [jobCode, setJobCode] = useState('');
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -120,18 +119,14 @@ function JdCreate() {
                 </div>
 
                 <div className="form-group jd-create-field">
-                  <label htmlFor="job_code">
-                    <i className="fas fa-hashtag"></i> Job ID <span className="jd-create-optional">(optional)</span>
+                  <label id="job-id-label">
+                    <i className="fas fa-hashtag"></i> Job ID
                   </label>
-                  <input
-                    id="job_code"
-                    name="job_code"
-                    type="text"
-                    value={jobCode}
-                    onChange={(event) => setJobCode(event.target.value)}
-                    placeholder="e.g. REQ-1023"
-                  />
-                  <div className="jd-create-hint">Enter your own job reference/requisition ID, if you have one.</div>
+                  <div className="jd-create-auto-id" aria-labelledby="job-id-label">
+                    <i className="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    <span>Taken from the JD document if it has a Job / Requisition ID, otherwise generated from the job title</span>
+                  </div>
+                  <div className="jd-create-hint">e.g. <strong>Job ID: REQ-1023</strong> in the PDF is kept as is; with no ID, <strong>Senior AI Engineer → SAE-0001</strong>.</div>
                 </div>
 
                 <div className="form-group jd-create-field">

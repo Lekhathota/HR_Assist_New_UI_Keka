@@ -73,6 +73,14 @@ def init_pool() -> None:
         _migrate_legacy_user_passwords()
         _seed_default_users()
         ensure_default_client_and_backfill()
+        try:
+            backfill_missing_job_codes()
+        except Exception:  # Job IDs are cosmetic for old JDs; never block startup.
+            pass
+        try:
+            migrate_auto_closed_jds()
+        except Exception:
+            pass
         refresh_dashboard_metrics()
     except Exception:
         candidate_client.close()
@@ -1370,6 +1378,47 @@ def get_jd_by_id(jd_id: int, include_raw_text: bool = False) -> Optional[dict]:
     return _serialize_doc(row)
 
 
+# Job IDs: initials of the job title plus a running number per prefix, e.g.
+# "Senior AI Engineer" -> "SAE-0001". Generated whenever a JD has no Job ID.
+_JOB_CODE_STOPWORDS = {"a", "an", "and", "the", "of", "for", "in", "on", "at", "to", "with", "or", "&"}
+
+
+def job_code_prefix(title: str) -> str:
+    words = [w for w in re.findall(r"[A-Za-z0-9]+", str(title or "")) if w.lower() not in _JOB_CODE_STOPWORDS]
+    if not words:
+        return "JD"
+    if len(words) == 1:
+        letters = re.sub(r"[^A-Za-z]", "", words[0])
+        return (letters[:3] or words[0][:3]).upper()
+    return "".join(w[0] for w in words)[:4].upper()
+
+
+def generate_job_code(title: str) -> str:
+    prefix = job_code_prefix(title)
+    jds = _database().job_descriptions
+    while True:
+        code = f"{prefix}-{_next_id(f'job_code:{prefix}'):04d}"
+        if not jds.find_one({"job_code": code}, {"_id": 1}):
+            return code
+
+
+# Purpose: Gives every existing JD without a Job ID one generated from its title (runs once per process).
+_job_codes_backfilled = False
+
+
+def backfill_missing_job_codes() -> int:
+    global _job_codes_backfilled
+    if _job_codes_backfilled:
+        return 0
+    jds = _database().job_descriptions
+    filled = 0
+    for row in jds.find({"$or": [{"job_code": {"$exists": False}}, {"job_code": ""}, {"job_code": None}]}, {"id": 1, "title": 1}).sort("id", ASCENDING):
+        jds.update_one({"id": row["id"]}, {"$set": {"job_code": generate_job_code(row.get("title") or "")}})
+        filled += 1
+    _job_codes_backfilled = True
+    return filled
+
+
 # Purpose: Creates jd records or payloads.
 def create_jd(data: dict) -> int:
     new_id = _next_id("job_descriptions")
@@ -1379,7 +1428,7 @@ def create_jd(data: dict) -> int:
     doc = {
         "id": new_id,
         "title": data.get("title") or "",
-        "job_code": str(data.get("job_code") or "").strip(),
+        "job_code": str(data.get("job_code") or "").strip() or generate_job_code(data.get("title") or ""),
         "department": data.get("department") or "",
         "location": data.get("location") or "",
         "experience_required": data.get("experience_required") or data.get("experience") or "",
@@ -1505,6 +1554,8 @@ def update_jd(jd_id: int, data: dict) -> bool:
                 activity_feed.emit("jd_status", jd_id=int(jd_id), old=before.get("status"), new=patch["status"])
             if any(col != "status" and before.get(col) != patch[col] for col in watched):
                 activity_feed.emit("jd_updated", jd_id=int(jd_id))
+        if "required_candidate_count" in patch or patch.get("status") in (JD_ACTIVE, JD_FILLED):
+            sync_jd_fill_status(jd_id)
     return result.modified_count > 0
 
 
@@ -2114,7 +2165,10 @@ def delete_candidate(candidate_id: int) -> bool:
     result = db.candidates.delete_one({"id": int(candidate_id)})
     if result.deleted_count:
         activity_feed.emit("candidate_deleted", candidate_id=int(candidate_id), name=(existing or {}).get("name") or "")
+        affected_jds = {int(j) for j in db.comparisons.distinct("jd_id", {"candidate_id": int(candidate_id)}) if j}
         db.comparisons.delete_many({"candidate_id": int(candidate_id)})
+        for affected in affected_jds:  # a removed selection can reopen a Filled JD
+            sync_jd_fill_status(affected)
         refresh_dashboard_metrics()
     return result.deleted_count > 0
 
@@ -2163,6 +2217,8 @@ def get_candidates_for_jd(jd_id: int, status: Optional[str] = None) -> list[dict
                 "candidate_source": comp_doc.get("candidate_source") or merged.get("candidate_source", ""),
                 "selection_status": comp_doc.get("selection_status") or "",
                 "qualification_status": comp_doc.get("qualification_status") or "",
+                "placement_status": comp_doc.get("placement_status") or "",
+                "placement_reason": comp_doc.get("placement_reason") or "",
                 "_screening_comparison": {
                     "status": comp_doc.get("status"),
                     "selection_status": comp_doc.get("selection_status"),
@@ -2211,31 +2267,137 @@ def get_comparisons(jd_id: Optional[int] = None, candidate_id: Optional[int] = N
     return out
 
 
-# Purpose: Closes a JD automatically once enough candidates have been selected for it.
-def _close_jd_if_fulfilled(jd_id: int) -> None:
+# JD lifecycle:
+#   Active  - still hiring.
+#   Filled  - set automatically once enough selected candidates hold the posts; it goes
+#             back to Active by itself when one of them drops out / does not join.
+#   Closed  - closed by an admin because the role is no longer needed (never auto-reopens).
+JD_ACTIVE, JD_FILLED, JD_CLOSED = "Active", "Filled", "Closed"
+PLACEMENT_STATUSES = {"Joined", "Dropped", "Not Joined"}
+_LOST_PLACEMENTS = ["Dropped", "Not Joined"]
+
+
+# Purpose: Counts selected candidates still holding a post (drop-outs / no-shows excluded).
+def jd_filled_count(jd_id: int) -> int:
+    return _database().comparisons.count_documents(
+        {"jd_id": int(jd_id), "status": "Selected", "placement_status": {"$nin": _LOST_PLACEMENTS}}
+    )
+
+
+# Purpose: Moves a JD between Active and Filled as its selected candidates change.
+def sync_jd_fill_status(jd_id: int) -> Optional[str]:
     db = _database()
     jd = db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1, "required_candidate_count": 1, "title": 1})
-    if not jd or jd.get("status") != "Active":
-        return
+    if not jd or jd.get("status") not in (JD_ACTIVE, JD_FILLED):
+        return None
     required = jd.get("required_candidate_count")
     if required in (None, "") or int(required) <= 0:
-        return
-    selected = db.comparisons.count_documents({"jd_id": int(jd_id), "status": "Selected"})
-    if selected >= int(required):
-        # Filter on the Active status so only the request that actually closes
+        return None
+    required = int(required)
+    filled = jd_filled_count(jd_id)
+    title = jd.get("title") or f"JD #{int(jd_id)}"
+    if jd["status"] == JD_ACTIVE and filled >= required:
+        # Filter on the current status so only the request that actually moves
         # the JD records the notification (concurrent selections can't duplicate it).
         result = db.job_descriptions.update_one(
-            {"id": int(jd_id), "status": "Active"},
-            {"$set": {"status": "Closed", "updated_at": _now()}},
+            {"id": int(jd_id), "status": JD_ACTIVE},
+            {"$set": {"status": JD_FILLED, "filled_at": _now(), "updated_at": _now()}},
         )
         if getattr(result, "modified_count", 1):
-            title = jd.get("title") or f"JD #{int(jd_id)}"
             create_notification(
                 "jd_requirement_fulfilled",
                 "Requirement fulfilled",
-                _fulfilment_message(title, selected, int(required)),
+                _fulfilment_message(title, filled, required),
                 jd_id=int(jd_id),
             )
+            return JD_FILLED
+    elif jd["status"] == JD_FILLED and filled < required:
+        result = db.job_descriptions.update_one(
+            {"id": int(jd_id), "status": JD_FILLED},
+            {"$set": {"status": JD_ACTIVE, "reopened_at": _now(), "updated_at": _now()}},
+        )
+        if getattr(result, "modified_count", 1):
+            open_posts = required - filled
+            create_notification(
+                "jd_reopened",
+                "Job reopened",
+                f'"{title}" is active again: {open_posts} of {required} post{"" if required == 1 else "s"} '
+                f'need{"s" if open_posts == 1 else ""} to be filled.',
+                jd_id=int(jd_id),
+            )
+            return JD_ACTIVE
+    return None
+
+
+# Purpose: Records whether a selected candidate joined, dropped out or did not join.
+def set_candidate_placement(jd_id: int, candidate_id: int, placement_status: str, reason: str = "", actor: str = "") -> bool:
+    status = str(placement_status or "").strip()
+    if status and status not in PLACEMENT_STATUSES:
+        raise ValueError("placement_status must be Joined, Dropped, Not Joined or empty")
+    patch: dict[str, Any] = {"placement_status": status, "placement_reason": str(reason or "").strip()[:500],
+                             "placement_updated_at": _now(), "placement_updated_by": actor}
+    result = _database().comparisons.update_one({"jd_id": int(jd_id), "candidate_id": int(candidate_id)}, {"$set": patch})
+    if not result.matched_count:
+        return False
+    sync_jd_fill_status(jd_id)
+    return True
+
+
+# Purpose: Admin closes a JD that is no longer needed.
+def close_jd(jd_id: int, actor: str = "", reason: str = "") -> bool:
+    db = _database()
+    jd = db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1, "title": 1})
+    if not jd or jd.get("status") == JD_CLOSED:
+        return False
+    db.job_descriptions.update_one(
+        {"id": int(jd_id)},
+        {"$set": {"status": JD_CLOSED, "closed_at": _now(), "closed_by": actor,
+                  "close_reason": str(reason or "").strip()[:500], "updated_at": _now()}},
+    )
+    title = jd.get("title") or f"JD #{int(jd_id)}"
+    create_notification("jd_closed", "Job closed", f'"{title}" was closed{f" by {actor}" if actor else ""}.'
+                        + (f" Reason: {str(reason).strip()}" if str(reason or "").strip() else ""), jd_id=int(jd_id), actor=actor or None)
+    refresh_dashboard_metrics()
+    return True
+
+
+# Purpose: Admin reopens a closed JD; it lands on Filled straight away if its posts are still held.
+def reopen_jd(jd_id: int, actor: str = "") -> Optional[str]:
+    db = _database()
+    jd = db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1})
+    if not jd or jd.get("status") != JD_CLOSED:
+        return None
+    db.job_descriptions.update_one(
+        {"id": int(jd_id)},
+        {"$set": {"status": JD_ACTIVE, "reopened_at": _now(), "updated_at": _now()},
+         "$unset": {"closed_at": "", "closed_by": "", "close_reason": ""}},
+    )
+    sync_jd_fill_status(jd_id)
+    refresh_dashboard_metrics()
+    return (db.job_descriptions.find_one({"id": int(jd_id)}, {"status": 1}) or {}).get("status")
+
+
+# Purpose: JDs the old auto-close marked "Closed" become "Filled" (or Active again if no longer full).
+_fill_status_migrated = False
+
+
+def migrate_auto_closed_jds() -> int:
+    global _fill_status_migrated
+    if _fill_status_migrated:
+        return 0
+    db = _database()
+    moved = 0
+    for jd in db.job_descriptions.find({"status": JD_CLOSED, "closed_by": {"$exists": False}}, {"id": 1, "required_candidate_count": 1}):
+        required = jd.get("required_candidate_count")
+        if required in (None, "") or int(required) <= 0:
+            continue
+        if not db.notifications.find_one({"type": "jd_requirement_fulfilled", "jd_id": int(jd["id"])}, {"_id": 1}):
+            continue  # closed by hand before this change - leave it closed
+        db.job_descriptions.update_one({"id": jd["id"]}, {"$set": {"status": JD_FILLED}})
+        sync_jd_fill_status(jd["id"])
+        moved += 1
+    _fill_status_migrated = True
+    return moved
 
 
 # Global search (top-bar search box)
@@ -2314,7 +2476,7 @@ _notification_backfill_done = False
 
 
 def _fulfilment_message(title: str, selected: int, required: int) -> str:
-    return f"{title} has {selected} of {required} required candidates selected, so the JD has been closed."
+    return f"{title} has {selected} of {required} required candidates selected, so the job is now marked Filled."
 
 
 # Purpose: Creates the missing notification for JDs that were already closed because
@@ -2322,7 +2484,7 @@ def _fulfilment_message(title: str, selected: int, required: int) -> str:
 def backfill_fulfilled_jd_notifications() -> int:
     db = _database()
     created = 0
-    for jd in db.job_descriptions.find({"status": "Closed"}, {"id": 1, "title": 1, "required_candidate_count": 1, "updated_at": 1}):
+    for jd in db.job_descriptions.find({"status": JD_FILLED}, {"id": 1, "title": 1, "required_candidate_count": 1, "updated_at": 1}):
         required = jd.get("required_candidate_count")
         try:
             required = int(required)
@@ -2352,7 +2514,7 @@ def backfill_fulfilled_jd_notifications() -> int:
 # Notification types grouped by the preference that controls them.
 NOTIFICATION_CATEGORIES: dict[str, set[str]] = {
     "notify_jobs": {"jd_created", "jd_updated", "jd_status", "jd_deleted", "jd_vendors_assigned",
-                    "jd_requirement_fulfilled", "report_generated"},
+                    "jd_requirement_fulfilled", "jd_reopened", "jd_closed", "report_generated"},
     "notify_talent": {"resume_uploaded", "candidate_deleted", "candidate_status", "screening"},
     "notify_pipeline": {"candidate_stage", "candidate_hold", "interview", "assessment"},
 }
@@ -2517,8 +2679,7 @@ def upsert_comparison(data: dict) -> int:
         upsert=True,
     )
     activity_feed.emit("screening", jd_id=jd_id, candidate_id=candidate_id, status=status)
-    if status == "Selected":
-        _close_jd_if_fulfilled(jd_id)
+    sync_jd_fill_status(jd_id)
     refresh_dashboard_metrics()
     return comparison_id
 

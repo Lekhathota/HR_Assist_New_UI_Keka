@@ -22,7 +22,9 @@ const SECTION_HEADINGS = [
   'What We Offer',
 ];
 
-const BULLET_CHARS = '•●▪◦►➢✓';
+// Bullet glyphs seen in extracted JD text, incl. hollow circles and the private-use
+// glyphs (\uf0b7, \uf0a7, \uf0d8) Word/PDF exports use for bullets.
+const BULLET_CHARS = '•●▪◦►➢✓○◯■□◆◇➤✔\uf0b7\uf0a7\uf0d8';
 
 function alternation(phrases) {
   return [...phrases]
@@ -143,6 +145,39 @@ function extractedListFor(kind, body, jd) {
   return null;
 }
 
+// A sub-label inside a skills list ("... Git. Experience:", "Mandatory: ...") starts
+// the must-have part of the list.
+const MANDATORY_LABELS = String.raw`Experience|Mandatory(?:\s+Skills)?|Must[\s-]+Haves?|Required(?:\s+Skills)?|Requirements|Essential(?:\s+Skills)?`;
+const TRAILING_LABEL_RE = new RegExp(String.raw`^(.*?)\s*\b(?:${MANDATORY_LABELS})\s*:\s*$`, 'i');
+const LEADING_LABEL_RE = new RegExp(String.raw`^(?:${MANDATORY_LABELS})\s*:\s*(.+)$`, 'i');
+// Items that state a hard requirement rather than a skill area.
+const MANDATORY_ITEM_RE = /\b(?:must|mandatory|required|essential|minimum|at least|proven|demonstrated)\b|\d+\s*\+?\s*(?:years?|yrs)\b/i;
+
+/**
+ * Splits a technical-skills list into skills and must-have requirements.
+ * Returns null when the list has no clear must-have part.
+ */
+export function splitMandatorySkills(items) {
+  const technical = [];
+  const mandatory = [];
+  let inMandatory = false;
+  items.forEach(raw => {
+    let item = raw;
+    const leading = LEADING_LABEL_RE.exec(item);
+    if (leading) {
+      inMandatory = true;
+      item = leading[1];
+    }
+    const trailing = TRAILING_LABEL_RE.exec(item);
+    const startsMandatoryAfter = Boolean(trailing);
+    if (trailing) item = trailing[1];
+    item = collapse(item);
+    if (item) (inMandatory || MANDATORY_ITEM_RE.test(item) ? mandatory : technical).push(item);
+    if (startsMandatoryAfter) inMandatory = true;
+  });
+  return technical.length && mandatory.length ? { technical, mandatory } : null;
+}
+
 /**
  * Returns the JD as ordered groups:
  *   { kind: 'intro', title, fields: [{label, value}], blocks: [{heading, paragraphs, items}] }
@@ -180,8 +215,12 @@ export function parseJdSections(jd) {
         if (list) formatted = { paragraphs: [], items: list };
       }
       if (!formatted.paragraphs.length && !formatted.items.length) return;
+      const split = /technical/i.test(marker.heading) && formatted.items.length ? splitMandatorySkills(formatted.items) : null;
       if (kind === 'overview') {
         intro.blocks.push({ heading: marker.heading, ...formatted });
+      } else if (split) {
+        groups.push({ kind: 'section', heading: marker.heading, sectionKind: kind, paragraphs: formatted.paragraphs, items: split.technical });
+        groups.push({ kind: 'section', heading: 'Mandatory Skills', sectionKind: 'required', paragraphs: [], items: split.mandatory });
       } else {
         groups.push({ kind: 'section', heading: marker.heading, sectionKind: kind, ...formatted });
       }

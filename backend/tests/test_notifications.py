@@ -132,9 +132,9 @@ class BackfillDb:
 def test_backfill_creates_missing_notifications_once(monkeypatch):
     fake = BackfillDb(
         jds=[
-            {"id": 1, "status": "Closed", "title": "Data Engineer", "required_candidate_count": 2, "updated_at": "t1"},
-            {"id": 2, "status": "Closed", "title": "QA", "required_candidate_count": 3},       # not met
-            {"id": 3, "status": "Closed", "title": "Ops", "required_candidate_count": None},   # no target
+            {"id": 1, "status": "Filled", "title": "Data Engineer", "required_candidate_count": 2, "updated_at": "t1"},
+            {"id": 2, "status": "Filled", "title": "QA", "required_candidate_count": 3},       # not met
+            {"id": 3, "status": "Filled", "title": "Ops", "required_candidate_count": None},   # no target
             {"id": 4, "status": "Active", "title": "ML", "required_candidate_count": 1},       # still open
         ],
         selected={1: 2, 2: 1, 4: 5},

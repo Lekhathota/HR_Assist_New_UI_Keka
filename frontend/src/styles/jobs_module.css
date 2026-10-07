@@ -346,8 +346,7 @@
 }
 
 .app-shell .jobs-page table.jobs-table .jobs-nowrap,
-.app-shell .jobs-page table.jobs-table td:nth-child(2),
-.app-shell .jobs-page table.jobs-table td:nth-child(6) {
+.app-shell .jobs-page table.jobs-table td:nth-child(2) {
     white-space: nowrap;
 }
 
@@ -527,3 +526,54 @@
         padding-right: 0.875rem;
     }
 }
+
+/* Job status tabs: Active / Filled / Closed / All */
+.app-shell .jobs-status-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.85rem;
+    border-bottom: 1px solid var(--border-color, #e7e3dc);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.app-shell .jobs-status-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.85rem;
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.app-shell .jobs-status-tab span {
+    min-width: 1.4rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: #f3f1ed;
+    font-size: 0.6875rem;
+    text-align: center;
+}
+.app-shell .jobs-status-tab:hover { color: var(--text-primary, #1f2937); }
+.app-shell .jobs-status-tab.active {
+    border-bottom-color: var(--accent-color, #f97316);
+    color: var(--accent-dark, #c2410c);
+}
+.app-shell .jobs-status-tab.active span { background: #fff1e6; color: var(--accent-dark, #c2410c); }
+.app-shell .jobs-status-filled {
+    border-color: #cfe0f5;
+    background: #eef5fd;
+    color: #1d4ed8;
+}
+
+/* Location column: keep long multi-city locations readable without stretching the table. */
+.app-shell .jobs-page table.jobs-table td.jobs-location {
+    max-width: 180px;
+    color: var(--text-secondary, #4b5563);
+}
+.app-shell .jobs-page table.jobs-table .jobs-status { white-space: nowrap; }

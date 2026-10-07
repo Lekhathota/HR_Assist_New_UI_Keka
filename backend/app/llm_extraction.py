@@ -1127,6 +1127,7 @@ Job Description Text:
 Return ONLY valid JSON in this format (empty fields should be empty strings or empty arrays, NO null values):
 {{
   "job_title": "",
+  "job_id": "",
   "summary": "",
   "required_skills": [],
   "preferred_skills": [],
@@ -1151,6 +1152,7 @@ Rules:
 - If not mentioned, use empty values
 - Do NOT invent or assume information
 - Keep extracted values exact and concise
+- "job_id" is the job / requisition / reference ID exactly as written in the JD (e.g. "REQ-1023"); leave it empty if the JD has none. Never make one up.
 - "summary" is a plain-English overview of the role in 2-4 sentences (no bullet points), covering what the role
   is, the core responsibilities, and the key experience/skills expected. Base it only on the JD text.
 """
@@ -1164,6 +1166,7 @@ Rules:
 
     # Ensure all required fields exist
     default_fields = {
+        "job_id": "",
         "job_title": "",
         "summary": "",
         "required_skills": [],

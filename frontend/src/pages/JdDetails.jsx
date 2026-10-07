@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Layout from '../components/Layout.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiDelete, apiGet, apiPost, apiPostForm, apiPut } from '../api.js';
+import { getCurrentRole } from '../roleAccess.js';
 import { resolveAssessmentRow } from '../utils/assessmentDisplay.js';
 import { formatJdDate, parseJdSections } from '../utils/jdSections.js';
 import JdHiringProcessEditor from '../components/JdHiringProcessEditor.jsx';
@@ -108,7 +109,6 @@ function JdDetails() {
   const [selected, setSelected] = useState([]);
   const [rejected, setRejected] = useState([]);
   const [error, setError] = useState('');
-  const [deleting, setDeleting] = useState(false);
   const [showFullJd, setShowFullJd] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [candidateView, setCandidateView] = useState('selected');
@@ -302,30 +302,52 @@ function JdDetails() {
     }
   }, [timeOptions, interviewTime]);
  
-  const handleRemove = async () => {
+  const reloadJd = () => apiGet(`/api/jds/${jdId}`).then(payload => {
+    setJd(payload.jd || null);
+    setSelected(payload.selected || []);
+    setRejected(payload.rejected || []);
+  }).catch(() => {});
+
+  const closeJob = async () => {
     if (!jd) return;
     const approved = await confirm({
-      title: 'Remove job description',
-      message: `Remove "${jd.title}"? Related comparisons may be removed. This cannot be undone.`,
-      confirmLabel: 'Remove JD',
-      icon: 'fas fa-trash-alt',
+      title: 'Close this job',
+      message: `Close "${jd.title}" because it is no longer needed? It moves to the Closed tab and will not reopen by itself, even if a candidate drops out. You can reopen it later.`,
+      confirmLabel: 'Close job',
+      icon: 'fas fa-lock',
       danger: true,
     });
     if (!approved) return;
-    setDeleting(true);
-    try {
-      const { ok, data } = await apiPost(`/api/jds/${jdId}/delete`, { confirmed: true });
-      if (ok && data.success) {
-        toast({ type: 'success', message: 'Job description removed.' });
-        navigate('/jobs');
-      } else {
-        toast({ type: 'error', message: data.error || 'Could not remove job description.' });
-      }
-    } catch {
-      toast({ type: 'error', message: 'Remove failed. Please try again.' });
-    } finally {
-      setDeleting(false);
+    const { ok, data } = await apiPost(`/api/jds/${jdId}/close`, {});
+    if (!ok) { toast({ type: 'error', message: data.error || 'Could not close the job.' }); return; }
+    toast({ type: 'success', message: 'Job closed.' });
+    reloadJd();
+  };
+
+  const reopenJob = async () => {
+    const { ok, data } = await apiPost(`/api/jds/${jdId}/reopen`, {});
+    if (!ok) { toast({ type: 'error', message: data.error || 'Could not reopen the job.' }); return; }
+    toast({ type: 'success', message: data.status === 'Filled' ? 'Job reopened - all posts are still filled, so it is marked Filled.' : 'Job reopened and active again.' });
+    reloadJd();
+  };
+
+  const PLACEMENT_LABELS = { '': 'Awaiting joining', Joined: 'Joined', Dropped: 'Dropped out', 'Not Joined': 'Did not join' };
+  const setPlacement = async (candidate, placementStatus) => {
+    if (placementStatus === 'Dropped' || placementStatus === 'Not Joined') {
+      const approved = await confirm({
+        title: placementStatus === 'Dropped' ? 'Candidate dropped out' : 'Candidate did not join',
+        message: `Mark ${candidate.name} as "${PLACEMENT_LABELS[placementStatus]}"? Their post is freed and, if this job was Filled, it becomes Active again so the post can be filled.`,
+        confirmLabel: 'Confirm',
+        icon: 'fas fa-user-xmark',
+      });
+      if (!approved) return;
     }
+    const { ok, data } = await apiPost(`/api/jds/${jdId}/candidates/${candidate.id}/placement`, { placement_status: placementStatus });
+    if (!ok) { toast({ type: 'error', message: data.error || 'Could not update the candidate.' }); return; }
+    const reopened = jd?.status === 'Filled' && data.jd_status === 'Active';
+    const filled = jd?.status === 'Active' && data.jd_status === 'Filled';
+    toast({ type: 'success', message: reopened ? 'Post freed - the job is active again.' : filled ? 'All posts filled - the job is now marked Filled.' : 'Candidate updated.' });
+    reloadJd();
   };
 
   const openEditModal = () => {
@@ -1546,10 +1568,13 @@ const downloadPDF = (reportText) => {
 
   const requiredPosts = Number(jd.required_candidate_count || 0);
   const selectedCount = Number(jd.selected_count || 0);
+  // Posts still held (drop-outs / no-shows don't count).
+  const filledCount = Number(jd.filled_count ?? selectedCount);
+  const isAdmin = ['admin', 'administrator'].includes(getCurrentRole());
   const totalResumes = Number(jd.total_resumes || 0);
-  const fillPercent = requiredPosts ? Math.min(100, Math.round((selectedCount / requiredPosts) * 100)) : 0;
+  const fillPercent = requiredPosts ? Math.min(100, Math.round((filledCount / requiredPosts) * 100)) : 0;
   const screenPercent = totalResumes ? Math.round((screenedCount / totalResumes) * 100) : 0;
-  const statusTone = jd.status === 'Active' ? 'good' : jd.status === 'Closed' ? 'neutral' : 'warn';
+  const statusTone = { Active: 'good', Filled: 'info', Closed: 'neutral' }[jd.status] || 'warn';
   const tabs = [
     ['overview', 'Overview', null],
     ['candidates', 'Candidates', selected.length + rejected.length],
@@ -1581,8 +1606,27 @@ const downloadPDF = (reportText) => {
             <button type="button" className="jx-btn jx-btn-ghost" onClick={openEditModal}><i className="fas fa-pen" aria-hidden="true"></i> Edit JD</button>
             <button type="button" className="jx-btn jx-btn-ghost" onClick={() => setShowModal(true)}><i className="fas fa-file-export" aria-hidden="true"></i> Generate report</button>
             <button type="button" className="jx-btn jx-btn-primary" onClick={openAssignVendors}><i className="fas fa-handshake" aria-hidden="true"></i> Assign vendors</button>
+            {isAdmin && jd.status !== 'Closed' && (
+              <button type="button" className="jx-btn jx-btn-danger" onClick={closeJob}><i className="fas fa-lock" aria-hidden="true"></i> Close job</button>
+            )}
+            {isAdmin && jd.status === 'Closed' && (
+              <button type="button" className="jx-btn jx-btn-ghost" onClick={reopenJob}><i className="fas fa-lock-open" aria-hidden="true"></i> Reopen job</button>
+            )}
           </div>
         </section>
+
+        {jd.status === 'Filled' && (
+          <div className="jx-status-note filled" role="status">
+            <i className="fas fa-circle-check" aria-hidden="true"></i>
+            <span><strong>All {requiredPosts} post{requiredPosts === 1 ? ' is' : 's are'} filled.</strong> If a selected candidate drops out or does not join, mark them in <em>Candidates</em> and this job becomes active again automatically.</span>
+          </div>
+        )}
+        {jd.status === 'Closed' && (
+          <div className="jx-status-note closed" role="status">
+            <i className="fas fa-lock" aria-hidden="true"></i>
+            <span><strong>This job is closed{jd.closed_by ? ` by ${jd.closed_by}` : ''}.</strong>{jd.close_reason ? ` ${jd.close_reason}.` : ''} It will not reopen automatically{isAdmin ? ' - use Reopen job if it is needed again.' : '.'}</span>
+          </div>
+        )}
 
         <section className="jx-stats" aria-label="Job summary">
           <div className="jx-stat">
@@ -1598,8 +1642,8 @@ const downloadPDF = (reportText) => {
             <div>
               <span>Selected</span><strong>{selectedCount}</strong>
               {requiredPosts > 0 && (
-                <div className="jx-mini-progress" title={`${selectedCount} of ${requiredPosts} posts filled`}>
-                  <i style={{ width: `${fillPercent}%` }} /><small>{selectedCount} of {requiredPosts} filled</small>
+                <div className="jx-mini-progress" title={`${filledCount} of ${requiredPosts} posts filled`}>
+                  <i style={{ width: `${fillPercent}%` }} /><small>{filledCount} of {requiredPosts} filled</small>
                 </div>
               )}
             </div>
@@ -1733,7 +1777,7 @@ const downloadPDF = (reportText) => {
               {selected.length > 0 ? (
                 <div className="table-container jd-table-section">
                   <table>
-                    <thead><tr><th>Candidate Name</th><th>Email</th><th>Match Score</th><th>Current Stage</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Candidate Name</th><th>Email</th><th>Match Score</th><th>Current Stage</th><th>Joining</th><th>Actions</th></tr></thead>
                     <tbody>
                       {selected.map(c => {
                         const assessment = resolveAssessmentRow(c, assessmentMap);
@@ -1743,6 +1787,17 @@ const downloadPDF = (reportText) => {
                             <td>{c.email}</td>
                             <td><span className="jd-table-score-green">{c.match_score}%</span></td>
                             <td><span className="badge badge-success">{c.hiring_stage}</span></td>
+                            <td>
+                              <select
+                                className={`jx-placement jx-placement-${String(c.placement_status || 'pending').toLowerCase().replace(/\s+/g, '-')}`}
+                                value={c.placement_status || ''}
+                                aria-label={`Joining status for ${c.name}`}
+                                title={c.placement_reason || undefined}
+                                onChange={(e) => setPlacement(c, e.target.value)}
+                              >
+                                {Object.entries(PLACEMENT_LABELS).map(([value, label]) => <option key={value || 'pending'} value={value}>{label}</option>)}
+                              </select>
+                            </td>
                             <td>
                               <div className="jd-candidate-actions">
                                 <Link to={`/talent/${c.id}`} className="btn btn-primary jd-table-btn"><i className="fas fa-eye"></i> View</Link>
@@ -2314,8 +2369,8 @@ const downloadPDF = (reportText) => {
                     <label>Status</label>
                     <select value={editForm.status} onChange={(e) => setEditForm(f => ({ ...f, status: e.target.value }))}>
                       <option value="Active">Active</option>
-                      <option value="Closed">Closed</option>
                       <option value="Inactive">Inactive</option>
+                      {['Filled', 'Closed'].includes(jd.status) && <option value={jd.status} disabled>{jd.status}</option>}
                     </select>
                   </div>
                 </div>
@@ -2342,20 +2397,6 @@ const downloadPDF = (reportText) => {
               </div>
             </div>
           </div>
-        )}
-
-        {activeTab === 'overview' && (
-          <section className="jx-card jx-danger">
-            <div>
-              <strong>Remove this job</strong>
-              <p className="jx-muted">Deletes the job description and its screening results. This can't be undone.</p>
-            </div>
-            <button type="button" className="jx-btn jx-btn-danger" disabled={deleting} onClick={handleRemove}>
-              {deleting
-                ? <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Removing…</>
-                : <><i className="fas fa-trash-can" aria-hidden="true"></i> Remove job</>}
-            </button>
-          </section>
         )}
 
         <ReportModal />

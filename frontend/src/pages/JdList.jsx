@@ -161,8 +161,17 @@ function JdList() {
     setPage(1);
   }, [searchTerm, filterStatus, filterCategory, filterClient, filterDepartment, filterLocation]);
 
-  const STATUS_HEADINGS = { '': 'All Jobs', active: 'Active Jobs', closed: 'Closed Jobs', inactive: 'Inactive Jobs' };
-  const activeFilterCount = [filterStatus !== 'active', filterCategory, filterClient, filterDepartment, filterLocation]
+  const STATUS_HEADINGS = { '': 'All Jobs', active: 'Active Jobs', filled: 'Filled Jobs', closed: 'Closed Jobs', inactive: 'Inactive Jobs' };
+  // Active: still hiring. Filled: every post taken (reopens by itself if someone drops out).
+  // Closed: closed by an admin because the role is no longer needed.
+  const STATUS_TABS = [
+    ['active', 'Active', 'Still hiring'],
+    ['filled', 'Filled', 'Every post is taken - reopens automatically if a selected candidate drops out or does not join'],
+    ['closed', 'Closed', 'Closed by an admin - no longer needed'],
+    ['', 'All', 'Every job'],
+  ];
+  const statusCount = (key) => (key ? jds.filter(j => (j.status || '').toLowerCase() === key).length : jds.length);
+  const activeFilterCount = [filterCategory, filterClient, filterDepartment, filterLocation]
     .filter(Boolean).length;
   const filterMenuRef = useRef(null);
 
@@ -181,7 +190,6 @@ function JdList() {
   }, [showMoreFilters]);
   const clearFilters = () => {
     setSearchTerm('');
-    setFilterStatus('active');
     setFilterCategory('');
     setFilterClient('');
     setFilterDepartment('');
@@ -1006,6 +1014,16 @@ function JdList() {
           </div>
         ) : jds.length > 0 ? (
           <section className="jobs-panel">
+            <div className="jobs-status-tabs" role="tablist" aria-label="Job status">
+              {STATUS_TABS.map(([key, label, hint]) => (
+                <button key={key || 'all'} type="button" role="tab" title={hint}
+                  aria-selected={filterStatus === key}
+                  className={`jobs-status-tab${filterStatus === key ? ' active' : ''}`}
+                  onClick={() => setFilterStatus(key)}>
+                  {label}<span>{statusCount(key)}</span>
+                </button>
+              ))}
+            </div>
             <div className="jobs-toolbar">
               <label className="jobs-search">
                 <i className="fas fa-search" aria-hidden="true"></i>
@@ -1030,15 +1048,6 @@ function JdList() {
                 </button>
                 {showMoreFilters && (
                   <div id="jobs-filter-panel" className="jobs-filter-panel" role="dialog" aria-label="Job filters">
-                    <label className="jobs-filter-field">
-                      <span>Status</span>
-                      <select className="jobs-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="closed">Closed</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </label>
                     <label className="jobs-filter-field">
                       <span>Category</span>
                       <select className="jobs-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
@@ -1106,13 +1115,13 @@ function JdList() {
                           <input type="checkbox" checked={pageJds.length > 0 && selectedIds.size === pageJds.length}
                             onChange={() => toggleSelectAll(pageJds)} aria-label="Select all job descriptions" />
                         </th>
-                        <th>Job Title</th><th>Job ID</th><th>Category</th><th>Client</th><th className="jobs-num">Posts</th>
+                        <th>Job Title</th><th>Job ID</th><th>Category</th><th>Client</th><th>Location</th><th className="jobs-num">Posts</th>
                         <th>Date Posted</th><th>Status</th><th className="jobs-action-col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {pageJds.map(jd => {
-                        const secondary = [jd.location, jd.experience].filter(Boolean).join(' · ');
+                        const secondary = jd.experience || '';
                         return (
                           <tr key={jd.id}>
                             <td className="jobs-select-col">
@@ -1126,6 +1135,7 @@ function JdList() {
                             <td className="jobs-nowrap">{jd.job_code || '—'}</td>
                             <td><span className="jobs-pill">{jd.job_category || 'Others'}</span></td>
                             <td>{jd.client_name || '—'}</td>
+                            <td className="jobs-location">{jd.location || '—'}</td>
                             <td className="jobs-num">{jd.required_candidate_count ?? '—'}</td>
                             <td className="jobs-nowrap">{formatJdDate(jd.created_date || (jd.created || '').slice(0, 10)) || '—'}</td>
                             <td>

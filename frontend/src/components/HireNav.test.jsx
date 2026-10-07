@@ -45,7 +45,7 @@ test('Hire falls back to the first page the role may open', () => {
 
 test('shows the Hire tabs in order and marks the current page, including detail pages', () => {
   render('/talent/42');
-  expect(tabs()).toEqual([['Jobs', '/jobs'], ['Talent', '/talent'], ['Analyze', '/analyze'], ['Hiring Pipeline', '/hiring-pipeline']]);
+  expect(tabs()).toEqual([['Jobs', '/jobs'], ['Analyze', '/analyze'], ['Talent', '/talent'], ['Hiring Pipeline', '/hiring-pipeline']]);
   expect(container.querySelector('.hire-tab[aria-current="page"]').textContent).toBe('Talent');
 });
 

@@ -203,3 +203,34 @@
   .app-shell .jx-page .jx-process .hiring-process-mapping-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .app-shell .jx-page .jx-process .stage-builder-row { flex-direction: column; }
 }
+
+/* JD lifecycle: Filled / Closed */
+.jx-badge.info { background: #eef5fd; color: #1d4ed8; }
+.jx-badge.neutral { background: #f3f4f6; color: #4b5563; }
+.jx-btn.jx-btn-danger { background: #fff; border: 1px solid #f3c7c2; color: #c6382d; }
+.jx-btn.jx-btn-danger:hover { background: #fdf1ef; }
+.jx-status-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.jx-status-note i { margin-top: 0.2rem; }
+.jx-status-note.filled { background: #eef5fd; border: 1px solid #cfe0f5; color: #1e3a8a; }
+.jx-status-note.closed { background: #f6f5f3; border: 1px solid #e5e3df; color: #374151; }
+.jx-placement {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+.jx-placement-joined { border-color: #bbe5cc; background: #ecfdf3; color: #15803d; }
+.jx-placement-dropped,
+.jx-placement-not-joined { border-color: #f3c7c2; background: #fdf1ef; color: #c6382d; }

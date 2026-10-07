@@ -161,6 +161,8 @@ def api_jd_update(jd_id: int):
         "status",
     }
     patch = {key: data[key] for key in allowed if key in data}
+    if "status" in patch and patch["status"] != jd.get("status") and patch["status"] in {"Closed", "Filled"}:
+        return jsonify({"error": "Use Close job to close a JD; Filled is set automatically."}), 400
     if not patch:
         return jsonify({"error": "No editable fields provided."}), 400
 
@@ -204,6 +206,58 @@ def api_jd_hiring_process(jd_id: int):
         jd_id,
     )
     return jsonify({"success": True, "steps": steps, "event_mappings": mappings})
+
+
+def _username() -> str:
+    user = current_user()
+    return (user or {}).get("username") or ""
+
+
+# Purpose: Admin closes a JD that is no longer needed (it will not reopen by itself).
+@jd_bp.route("/api/jds/<int:jd_id>/close", methods=["POST"], endpoint="api_jd_close")
+@api_login_required
+@role_required()
+def api_jd_close(jd_id: int):
+    if not db.get_jd_by_id(jd_id):
+        return jsonify({"error": "JD not found"}), 404
+    reason = str((request.get_json(silent=True) or {}).get("reason") or "").strip()
+    if not db.close_jd(jd_id, _username(), reason):
+        return jsonify({"error": "This job is already closed."}), 400
+    db.log_audit("JD Closed", _username(), f"Closed JD id={jd_id}." + (f" Reason: {reason}" if reason else ""), jd_id)
+    return jsonify({"success": True, "status": "Closed"})
+
+
+# Purpose: Admin reopens a closed JD.
+@jd_bp.route("/api/jds/<int:jd_id>/reopen", methods=["POST"], endpoint="api_jd_reopen")
+@api_login_required
+@role_required()
+def api_jd_reopen(jd_id: int):
+    if not db.get_jd_by_id(jd_id):
+        return jsonify({"error": "JD not found"}), 404
+    status = db.reopen_jd(jd_id, _username())
+    if not status:
+        return jsonify({"error": "Only a closed job can be reopened."}), 400
+    db.log_audit("JD Reopened", _username(), f"Reopened JD id={jd_id}; status is now {status}.", jd_id)
+    return jsonify({"success": True, "status": status})
+
+
+# Purpose: Records whether a selected candidate joined, dropped out or did not join;
+# a drop-out or no-show frees the post and reopens a Filled JD automatically.
+@jd_bp.route("/api/jds/<int:jd_id>/candidates/<int:candidate_id>/placement", methods=["POST"], endpoint="api_jd_candidate_placement")
+@api_login_required
+@role_required("recruiter", "managers_consultant", "hr")
+def api_jd_candidate_placement(jd_id: int, candidate_id: int):
+    data = request.get_json(silent=True) or {}
+    try:
+        ok = db.set_candidate_placement(jd_id, candidate_id, data.get("placement_status") or "", data.get("reason") or "", _username())
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not ok:
+        return jsonify({"error": "This candidate has not been screened for this job."}), 404
+    status = data.get("placement_status") or "cleared"
+    db.log_audit("Candidate Placement", _username(), f"Set candidate id={candidate_id} placement to {status} for JD id={jd_id}.", jd_id)
+    jd = db.get_jd_by_id(jd_id) or {}
+    return jsonify({"success": True, "jd_status": jd.get("status"), "filled_count": db.jd_filled_count(jd_id)})
 
 
 # Purpose: API endpoint handler for jd delete.

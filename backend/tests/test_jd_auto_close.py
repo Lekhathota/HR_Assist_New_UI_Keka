@@ -58,31 +58,31 @@ class FakeDb:
         self.counters = FakeCounters()
 
 
-def test_closes_when_selected_meets_requirement(monkeypatch):
+def test_marks_filled_when_selected_meets_requirement(monkeypatch):
     fake = FakeDb({"id": 1, "status": "Active", "required_candidate_count": 2, "title": "Data Engineer"}, selected_count=2)
     monkeypatch.setattr(db, "_database", lambda: fake)
-    db._close_jd_if_fulfilled(1)
-    assert fake.job_descriptions.doc["status"] == "Closed"
+    db.sync_jd_fill_status(1)
+    assert fake.job_descriptions.doc["status"] == "Filled"
     assert fake.job_descriptions.updates
     [note] = fake.notifications.docs
     assert note["type"] == "jd_requirement_fulfilled"
     assert note["jd_id"] == 1
-    assert "Data Engineer" in note["message"] and "closed" in note["message"]
+    assert "Data Engineer" in note["message"] and "Filled" in note["message"]
     assert note["read_by"] == []
 
 
 def test_notifies_only_once_when_already_closed_by_another_request(monkeypatch):
     fake = FakeDb({"id": 1, "status": "Active", "required_candidate_count": 1, "title": "QA"}, selected_count=1)
     monkeypatch.setattr(db, "_database", lambda: fake)
-    db._close_jd_if_fulfilled(1)
-    db._close_jd_if_fulfilled(1)
+    db.sync_jd_fill_status(1)
+    db.sync_jd_fill_status(1)
     assert len(fake.notifications.docs) == 1
 
 
 def test_stays_open_when_below_requirement(monkeypatch):
     fake = FakeDb({"id": 1, "status": "Active", "required_candidate_count": 3}, selected_count=2)
     monkeypatch.setattr(db, "_database", lambda: fake)
-    db._close_jd_if_fulfilled(1)
+    db.sync_jd_fill_status(1)
     assert fake.job_descriptions.doc["status"] == "Active"
     assert not fake.job_descriptions.updates
     assert not fake.notifications.docs
@@ -91,15 +91,15 @@ def test_stays_open_when_below_requirement(monkeypatch):
 def test_noop_when_no_required_count(monkeypatch):
     fake = FakeDb({"id": 1, "status": "Active", "required_candidate_count": None}, selected_count=5)
     monkeypatch.setattr(db, "_database", lambda: fake)
-    db._close_jd_if_fulfilled(1)
+    db.sync_jd_fill_status(1)
     assert fake.job_descriptions.doc["status"] == "Active"
     assert not fake.job_descriptions.updates
     assert not fake.notifications.docs
 
 
-def test_noop_when_already_closed(monkeypatch):
+def test_noop_when_closed_by_admin(monkeypatch):
     fake = FakeDb({"id": 1, "status": "Closed", "required_candidate_count": 1}, selected_count=5)
     monkeypatch.setattr(db, "_database", lambda: fake)
-    db._close_jd_if_fulfilled(1)
+    db.sync_jd_fill_status(1)
     assert not fake.job_descriptions.updates
     assert not fake.notifications.docs

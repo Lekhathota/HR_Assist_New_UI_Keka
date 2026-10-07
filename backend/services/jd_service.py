@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 
 import database as db
 from app.llm_extraction import extract_jd_json
+from app.job_code_extraction import extract_job_code
 from app.text_extractor import extract_text
 from app.utils import clean_jd_text
 from services.candidate_service import candidates_payload
@@ -85,7 +86,7 @@ def create_jd_from_upload(file: FileStorage, upload_folder: str, client_id: int 
             "status": "Active",
             "client_id": client_id,
             "required_candidate_count": required_candidate_count,
-            "job_code": (job_code or "").strip(),
+            "job_code": (job_code or "").strip() or extract_job_code(raw_text, cleaned, jd_json.get("job_id") or ""),
         }
     )
     jd = _apply_jd_category(db.get_jd_by_id(new_id, include_raw_text=True) or {})
@@ -122,6 +123,7 @@ def create_jd_from_path(filename: str, filepath: str, client_id: int | None = No
             "status": "Active",
             "client_id": client_id,
             "required_candidate_count": required_candidate_count,
+            "job_code": extract_job_code(raw_text, cleaned, jd_json.get("job_id") or ""),
         }
     )
     jd = _apply_jd_category(db.get_jd_by_id(new_id, include_raw_text=True) or {})
@@ -193,5 +195,7 @@ def jd_details_payload(jd_id: int) -> dict[str, Any] | None:
     candidates = candidates_payload({"jd_id": jd_id})
     selected = [row for row in candidates if row.get("status") == "Selected"]
     rejected = [row for row in candidates if row.get("status") == "Rejected"]
-    counts = {"selected_count": len(selected), "rejected_count": len(rejected), "total_resumes": len(candidates)}
+    # Posts still held: drop-outs and no-shows free their post again.
+    filled = sum(1 for row in selected if row.get("placement_status") not in ("Dropped", "Not Joined"))
+    counts = {"selected_count": len(selected), "rejected_count": len(rejected), "total_resumes": len(candidates), "filled_count": filled}
     return {"jd": {**row, **counts}, "selected": selected, "rejected": rejected}

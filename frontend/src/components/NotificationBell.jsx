@@ -6,6 +6,8 @@ const POLL_MS = 30000;
 // Icon and colour tone for each kind of Hire activity.
 const KINDS = {
   jd_requirement_fulfilled: ['fa-circle-check', 'success'],
+  jd_reopened: ['fa-rotate-left', 'warning'],
+  jd_closed: ['fa-lock', 'neutral'],
   jd_created: ['fa-file-circle-plus', 'accent'],
   jd_updated: ['fa-pen-to-square', 'neutral'],
   jd_status: ['fa-toggle-on', 'info'],

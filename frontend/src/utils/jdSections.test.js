@@ -90,3 +90,42 @@ test('text without any headings is shown as plain paragraphs', () => {
   ]);
   expect(parseJdSections({ raw_text: '' })).toEqual([]);
 });
+
+test('hollow-circle bullets become list items and technical skills split out mandatory ones', () => {
+  const raw = [
+    'Key Responsibilities',
+    '• Backend Development: Design and maintain backend systems using Python.',
+    '• Code Quality: Write clean, maintainable code.',
+    'Technical Skills',
+    '○ Proficiency in Python for backend development. ○ Strong experience with SQL and relational databases. '
+      + '○ Familiarity with version control systems, such as Git. Experience: '
+      + '○ 5+years of experience in backend development with a focus on Python, SQL, and REST APIs. '
+      + '○ Demonstrated experience working with Google APIs and GCP services. '
+      + '○ Proven track record of delivering scalable and reliable backend systems.',
+    'Soft Skills',
+    '○ Excellent problem-solving skills. ○ Strong communication and collaboration abilities.',
+  ].join('\n');
+  const sections = parseJdSections({ raw_text: raw }).filter(g => g.kind === 'section');
+  const byHeading = Object.fromEntries(sections.map(g => [g.heading, g]));
+
+  expect(sections.map(g => g.heading)).toEqual(['Key Responsibilities', 'Technical Skills', 'Mandatory Skills', 'Soft Skills']);
+  expect(byHeading['Technical Skills'].paragraphs).toEqual([]);
+  expect(byHeading['Technical Skills'].items).toEqual([
+    'Proficiency in Python for backend development.',
+    'Strong experience with SQL and relational databases.',
+    'Familiarity with version control systems, such as Git.',
+  ]);
+  expect(byHeading['Mandatory Skills'].items).toEqual([
+    '5+years of experience in backend development with a focus on Python, SQL, and REST APIs.',
+    'Demonstrated experience working with Google APIs and GCP services.',
+    'Proven track record of delivering scalable and reliable backend systems.',
+  ]);
+  expect(byHeading['Soft Skills'].items).toHaveLength(2);
+});
+
+test('technical skills without must-have items stay as one list', () => {
+  const raw = 'Technical Skills\n○ Python ○ Docker ○ Kubernetes';
+  const [section] = parseJdSections({ raw_text: raw }).filter(g => g.kind === 'section');
+  expect(section.heading).toBe('Technical Skills');
+  expect(section.items).toEqual(['Python', 'Docker', 'Kubernetes']);
+});

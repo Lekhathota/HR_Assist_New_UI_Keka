@@ -6,8 +6,8 @@ import { getCurrentRole, roleCanAccess } from '../roleAccess.js';
 // path prefix that belongs to the tab (detail pages, legacy URLs).
 export const HIRE_TABS = [
   { path: '/jobs', label: 'Jobs', match: ['/jobs', '/job-details.html'] },
-  { path: '/talent', label: 'Talent', match: ['/talent'] },
   { path: '/analyze', label: 'Analyze', match: ['/analyze'] },
+  { path: '/talent', label: 'Talent', match: ['/talent'] },
   { path: '/hiring-pipeline', label: 'Hiring Pipeline', match: ['/hiring-pipeline'] },
 ];
 
