@@ -187,3 +187,9 @@
   .um-dialog, .um-skeleton td span { animation: none; }
   .um-page *, .um-page *::before { transition: none !important; }
 }
+
+/* Deactivate + Remove sit side by side; Remove is the stronger, filled danger action. */
+.um-actions { white-space: nowrap; }
+.um-actions .um-btn + .um-btn { margin-left: 0.4rem; }
+.um-page .um-btn-remove { border-color: #dc2626; background: #dc2626; color: #fff; }
+.um-page .um-btn-remove:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }

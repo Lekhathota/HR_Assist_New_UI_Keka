@@ -168,3 +168,24 @@ def admin_update_user(user_id):
     if not updates: return jsonify({"error": "No supported fields supplied."}), 400
     if not db.update_managed_user(user_id, updates): return jsonify({"error": "User not found."}), 404
     return jsonify({"success": True})
+
+
+@auth_bp.route("/api/admin/users/<int:user_id>", methods=["DELETE"], endpoint="admin_delete_user")
+@api_login_required
+def admin_delete_user(user_id):
+    admin, error = _admin_user()
+    if error: return error
+    import database as db
+    if int(admin["id"]) == user_id:
+        return jsonify({"error": "You cannot remove your own account."}), 400
+    target = db.get_user_by_id(user_id)
+    if not target:
+        return jsonify({"error": "User not found."}), 404
+    if target.get("role") in {"admin", "administrator"} and target.get("is_active", True):
+        active_admins = [u for u in db.list_users() if u.get("role") in {"admin", "administrator"} and u.get("is_active", True)]
+        if len(active_admins) <= 1:
+            return jsonify({"error": "At least one active administrator must remain."}), 400
+    if not db.delete_managed_user(user_id, admin.get("username") or ""):
+        return jsonify({"error": "User not found."}), 404
+    db.log_audit("User Removed", admin.get("username") or "", f"Removed user '{target.get('username')}' (id={user_id}, role={target.get('role')}).", None)
+    return jsonify({"success": True})

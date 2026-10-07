@@ -409,6 +409,8 @@ def _seed_default_users() -> None:
             continue
         if db.users.find_one({"username": username}):
             continue
+        if db.deleted_users.find_one({"username": username}):
+            continue  # an admin removed this default account; don't bring it back
         user_id = _next_id("users")
         db.users.insert_one(
             {
@@ -3347,6 +3349,23 @@ def create_managed_user(username: str, password: str, email: str, role: str) -> 
 def update_managed_user(user_id: int, updates: dict) -> bool:
     result = _database().users.update_one({"id": int(user_id)}, {"$set": updates})
     return result.matched_count > 0
+
+
+# Purpose: Permanently removes a user account and signs it out everywhere.
+def delete_managed_user(user_id: int, actor: str = "") -> bool:
+    db = _database()
+    row = db.users.find_one({"id": int(user_id)}, {"username": 1})
+    if not row:
+        return False
+    db.users.delete_one({"id": int(user_id)})
+    db.user_session_tokens.delete_many({"user_id": int(user_id)})
+    # Remembered so startup seeding does not recreate a removed default account.
+    db.deleted_users.update_one(
+        {"username": row.get("username")},
+        {"$set": {"username": row.get("username"), "user_id": int(user_id), "deleted_at": _now(), "deleted_by": actor}},
+        upsert=True,
+    )
+    return True
 
 
 def get_user_by_id(user_id: int) -> Optional[dict]:

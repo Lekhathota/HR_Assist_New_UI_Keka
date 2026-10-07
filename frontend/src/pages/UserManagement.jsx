@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiGet, apiPatch, apiPost } from '../api.js';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../api.js';
 import Layout from '../components/Layout.jsx';
 import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import { roleCanAccess } from '../roleAccess.js';
@@ -207,6 +207,28 @@ export default function UserManagement() {
     if (approved) update(user, { is_active: !deactivating }, `${user.username} was ${deactivating ? 'deactivated' : 'reactivated'}.`);
   };
 
+  const removeUser = async user => {
+    const approved = await confirm({
+      title: 'Remove user?',
+      message: `${user.username} will be permanently removed and signed out everywhere. This can't be undone - to block access temporarily, deactivate the user instead.`,
+      confirmLabel: 'Remove user',
+      danger: true,
+      icon: 'fas fa-user-minus',
+    });
+    if (!approved) return;
+    setPending(user.id);
+    try {
+      const { ok, data } = await apiDelete(`/api/admin/users/${user.id}`);
+      if (!ok) throw new Error(data?.error || 'Could not remove user.');
+      setUsers(previous => previous.filter(u => u.id !== user.id));
+      toast({ type: 'success', message: `${user.username} was removed.` });
+    } catch (e) {
+      toast({ type: 'error', message: e.message || 'Could not remove user.' });
+    } finally {
+      setPending(null);
+    }
+  };
+
   if (!canManageUsers) {
     return <Layout><div className="um-page"><section className="um-card um-denied">
       <i className="fas fa-lock" aria-hidden="true" />
@@ -303,6 +325,12 @@ export default function UserManagement() {
                           {busy ? <i className="fas fa-spinner fa-spin" aria-hidden="true" />
                             : isActive(user) ? <><i className="fas fa-user-slash" aria-hidden="true" /> Deactivate</>
                               : <><i className="fas fa-user-check" aria-hidden="true" /> Reactivate</>}
+                        </button>
+                        <button type="button" className="um-btn um-btn-sm um-btn-remove"
+                          disabled={busy || self} title={self ? 'You cannot remove your own account' : `Remove ${user.username}`}
+                          aria-label={`Remove ${user.username}`}
+                          onClick={() => removeUser(user)}>
+                          <i className="fas fa-trash-can" aria-hidden="true" /> Remove
                         </button>
                       </td>
                     </tr>

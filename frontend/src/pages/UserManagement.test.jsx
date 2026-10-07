@@ -2,10 +2,10 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import UserManagement, { roleAccessSummary } from './UserManagement.jsx';
-import { apiGet, apiPatch, apiPost } from '../api.js';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../api.js';
 
 const mockConfirm = jest.fn();
-jest.mock('../api.js', () => ({ apiGet: jest.fn(), apiPatch: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../api.js', () => ({ apiDelete: jest.fn(), apiGet: jest.fn(), apiPatch: jest.fn(), apiPost: jest.fn() }));
 jest.mock('../components/Layout.jsx', () => ({ children }) => <main>{children}</main>);
 jest.mock('../components/EnterpriseFeedback.jsx', () => ({ toast: jest.fn(), useConfirm: () => mockConfirm }));
 
@@ -38,6 +38,7 @@ beforeEach(() => {
   apiGet.mockResolvedValue({ users: USERS.map(u => ({ ...u })) });
   apiPatch.mockResolvedValue({ ok: true, data: { success: true } });
   apiPost.mockResolvedValue({ ok: true, data: { success: true } });
+  apiDelete.mockResolvedValue({ ok: true, data: { success: true } });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -68,6 +69,7 @@ test('you cannot change your own role or deactivate yourself', async () => {
   const selfRow = $$('tbody tr')[0];
   expect(selfRow.querySelector('.um-role-select').disabled).toBe(true);
   expect(selfRow.querySelector('.um-actions button').disabled).toBe(true);
+  expect(selfRow.querySelector('.um-btn-remove').disabled).toBe(true);
 });
 
 test('role changes and deactivation are confirmed, then saved', async () => {
@@ -112,4 +114,22 @@ test('role descriptions follow the real page access rules', () => {
   expect(roleAccessSummary('admin')).toContain('Full access');
   expect(roleAccessSummary('recruiter')).toBe('Home, Jobs, Talent, Analyze, Hiring Pipeline');
   expect(roleAccessSummary('it')).toBe('Home and Profile only');
+});
+
+test('removing a user is confirmed, then the user leaves the list', async () => {
+  await render();
+  await act(async () => $$('tbody tr')[1].querySelector('.um-btn-remove').click());
+  expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Remove user?', danger: true }));
+  expect(apiDelete).toHaveBeenCalledWith('/api/admin/users/2');
+  expect(names()).toEqual(['lekha', 'meera']);
+});
+
+test('a failed or cancelled removal keeps the user', async () => {
+  mockConfirm.mockResolvedValueOnce(false);
+  await render();
+  await act(async () => $$('tbody tr')[1].querySelector('.um-btn-remove').click());
+  expect(apiDelete).not.toHaveBeenCalled();
+  apiDelete.mockResolvedValueOnce({ ok: false, data: { error: 'At least one active administrator must remain.' } });
+  await act(async () => $$('tbody tr')[1].querySelector('.um-btn-remove').click());
+  expect(names()).toEqual(['lekha', 'ravi', 'meera']);
 });
