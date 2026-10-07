@@ -168,6 +168,366 @@
     font-weight: 800;
 }
 
+.client-config-card {
+    align-content: start;
+    cursor: default;
+}
+
+.client-config-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.client-project-grid > .client-pipeline-card {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+}
+
+.client-pipeline-card {
+    gap: 1rem;
+}
+
+.client-config-card-heading,
+.client-config-actions,
+.client-editor-heading,
+.client-editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.client-pipeline-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.client-pipeline-heading strong {
+    color: #25364a;
+    font-weight: 700;
+}
+
+.client-pipeline-stage-count {
+    flex: 0 0 auto;
+    color: #64748b;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.client-default-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(249, 115, 22, 0.12);
+    border: 1px solid rgba(249, 115, 22, 0.24);
+    color: #f97316;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.client-pipeline-stepper {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0.3rem 0 0;
+    overflow-x: auto;
+    list-style: none;
+}
+
+.client-pipeline-stepper li {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0 0.25rem;
+    text-align: center;
+}
+
+.client-pipeline-stepper li:not(:first-child)::before {
+    position: absolute;
+    z-index: 0;
+    top: 11px;
+    right: 50%;
+    left: -50%;
+    height: 1.5px;
+    background: rgba(249, 115, 22, 0.35);
+    content: "";
+}
+
+.client-pipeline-stage-number {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    flex: 0 0 24px;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #f97316;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.client-pipeline-stage-name {
+    display: block;
+    width: 100%;
+    color: #25364a;
+    font-size: 0.88rem;
+    font-weight: 500;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.client-pipeline-stepper.is-scrollable li {
+    flex: 0 0 120px;
+}
+
+.client-pipeline-actions {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+}
+
+.client-pipeline-actions .btn {
+    padding: 0.32rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.client-config-edit {
+    justify-self: start;
+}
+
+.client-config-actions .btn,
+.client-config-edit {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.85rem;
+}
+
+.client-config-editor {
+    display: grid;
+    gap: 0.8rem;
+    padding-top: 0.6rem;
+}
+
+.client-config-editor .client-pipeline-name-field {
+    display: grid;
+    width: min(100%, 24rem);
+    gap: 0.4rem;
+    font-weight: 600;
+}
+
+.client-config-editor .client-pipeline-name-field input {
+    width: 100%;
+    min-height: 2.65rem;
+    box-sizing: border-box;
+    font: inherit;
+    font-weight: 400;
+}
+
+.client-editor-heading {
+    color: #25364a;
+}
+
+.client-editor-heading span,
+.client-editor-note {
+    color: #64748b;
+    font-size: 0.88rem;
+}
+
+.client-stage-editor-grid {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.client-stage-editor-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.client-stage-editor-row.drop-before::before,
+.client-stage-editor-row.drop-after::after {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: #f97316;
+    box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
+    content: "";
+    pointer-events: none;
+}
+
+.client-stage-editor-row.drop-before::before {
+    top: -0.32rem;
+}
+
+.client-stage-editor-row.drop-after::after {
+    bottom: -0.32rem;
+}
+
+.client-stage-editor-row.is-dragging {
+    z-index: 1;
+    opacity: 0.55;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+}
+
+.client-stage-editor-drag-handle {
+    display: grid;
+    width: 1.8rem;
+    height: 2rem;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #64748b;
+    cursor: grab;
+    touch-action: none;
+}
+
+.client-stage-editor-drag-handle:hover {
+    background: rgba(249, 115, 22, 0.1);
+    color: #ea580c;
+}
+
+.client-stage-editor-drag-handle:active {
+    cursor: grabbing;
+}
+
+.client-stage-editor-drag-handle:focus-visible {
+    outline: 2px solid #f97316;
+    outline-offset: 2px;
+}
+
+.client-stage-editor-row input,
+.client-config-editor input,
+.client-config-editor select,
+.client-archive-role-move select {
+    min-width: 0;
+    padding: 0.65rem 0.75rem;
+    border-radius: 7px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #25364a;
+}
+
+.client-stage-editor-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.client-stage-editor-actions .btn {
+    min-width: 2.1rem;
+    padding: 0.35rem;
+}
+
+.client-config-editor .client-hiring-stage-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    justify-self: start;
+    min-height: 2.4rem;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid rgba(249, 115, 22, 0.35);
+    border-radius: 7px;
+    background: rgba(249, 115, 22, 0.08);
+    color: #c2410c;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.client-config-editor .client-hiring-stage-add:hover {
+    border-color: #f97316;
+    background: #f97316;
+    color: #fff;
+}
+
+.client-config-editor .client-hiring-stage-add:focus-visible {
+    outline: 2px solid #f97316;
+    outline-offset: 2px;
+}
+
+.client-editor-note {
+    margin: 0;
+}
+
+.client-editor-footer {
+    justify-content: flex-end;
+}
+
+.client-archive-role-move {
+    display: grid;
+    gap: 0.65rem;
+    padding-top: 0.5rem;
+}
+
+.client-editor-card {
+    grid-column: 1 / -1;
+}
+
+.client-role-editor {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    align-items: end;
+}
+
+.client-role-editor > label {
+    display: grid;
+    min-width: 0;
+    gap: 0.45rem;
+    align-content: start;
+    font-weight: 600;
+}
+
+.client-role-editor > label input,
+.client-role-editor > label select {
+    width: 100%;
+    min-height: 2.65rem;
+    box-sizing: border-box;
+    font: inherit;
+    font-weight: 400;
+}
+
+.client-role-editor .client-editor-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 0.2rem;
+}
+
+@media (max-width: 640px) {
+    .client-role-editor {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .client-role-editor .client-editor-footer {
+        flex-wrap: wrap;
+    }
+}
+
 .client-role-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -893,6 +1253,38 @@ body .clients-page .client-form-grid textarea {
     border-color: #cbd5e1;
 }
 
+body .clients-page .client-config-card:hover {
+    background: #f8fafc;
+    border-color: #dbe3ec;
+}
+
+body .clients-page .client-pipeline-card .client-pipeline-heading strong {
+    color: #25364a;
+}
+
+body .clients-page .client-pipeline-card .client-pipeline-stage-count {
+    color: #64748b;
+}
+
+body .clients-page .client-pipeline-stepper .client-pipeline-stage-number {
+    background: #f97316;
+    color: #ffffff;
+}
+
+body .clients-page .client-pipeline-stepper .client-pipeline-stage-name {
+    color: #25364a;
+    font-weight: 500;
+}
+
+body .clients-page .client-stage-editor-row input,
+body .clients-page .client-config-editor input,
+body .clients-page .client-config-editor select,
+body .clients-page .client-archive-role-move select {
+    background: #ffffff;
+    color: #25364a;
+    border-color: #cbd5e1;
+}
+
 body .clients-page .client-list-item,
 body .clients-page .client-project-card {
     background: #f8fafc;
@@ -968,6 +1360,42 @@ body .clients-page :is(.client-list-item.active, .client-list-item:hover,
         grid-template-columns: 1fr;
     }
 
+    .client-pipeline-stepper,
+    .client-pipeline-stepper.is-scrollable {
+        display: grid;
+        gap: 0;
+        overflow-x: visible;
+    }
+
+    .client-pipeline-stepper li,
+    .client-pipeline-stepper.is-scrollable li {
+        display: flex;
+        flex: initial;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 0.75rem;
+        min-width: 0;
+        min-height: 58px;
+        padding: 0;
+        text-align: left;
+    }
+
+    .client-pipeline-stepper li:not(:first-child)::before {
+        top: -29px;
+        right: auto;
+        left: 11px;
+        width: 1.5px;
+        height: 58px;
+    }
+
+    .client-pipeline-stage-name {
+        text-align: left;
+    }
+
+    .client-pipeline-actions {
+        flex-wrap: wrap;
+    }
+
     .project-detail-header,
     .project-overview-title-row {
         flex-direction: column;
@@ -978,5 +1406,122 @@ body .clients-page :is(.client-list-item.active, .client-list-item:hover,
         justify-content: center;
         order: -1;
         margin-left: 0;
+    }
+}
+
+.client-role-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+body .clients-page .client-role-card {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: 0;
+    min-height: 0;
+    padding: 0.8rem 0;
+    border: 0;
+    border-bottom: 1px solid #f1f5f9;
+    border-radius: 0;
+    background: transparent;
+    color: #25364a;
+    box-shadow: none;
+}
+
+body .clients-page .client-role-card.client-config-card:hover {
+    border-color: #f1f5f9;
+    background: transparent;
+    box-shadow: none;
+}
+
+.client-role-row {
+    display: flex;
+    align-items: center;
+    gap: clamp(1rem, 3vw, 2.5rem);
+    min-width: 0;
+}
+
+.client-role-title,
+.client-role-pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.client-role-title {
+    flex: 0 1 24rem;
+}
+
+.client-role-title > strong,
+.client-role-pipeline > strong {
+    color: #25364a;
+    font-weight: 700;
+}
+
+.client-role-title > strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.client-role-level,
+.client-role-archived {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid rgba(249, 115, 22, 0.28);
+    border-radius: 999px;
+    background: rgba(249, 115, 22, 0.08);
+    color: #c2410c;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.client-role-pipeline {
+    flex: 0 1 18rem;
+    gap: 0.35rem;
+}
+
+.client-role-pipeline > span {
+    color: #64748b;
+}
+
+.client-role-pipeline > strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.client-role-archived {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.client-role-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-left: auto;
+}
+
+.client-role-card > .client-role-editor {
+    margin-top: 0.8rem;
+}
+
+@media (max-width: 760px) {
+    .client-role-row {
+        flex-wrap: wrap;
+        gap: 0.65rem 1rem;
+    }
+
+    .client-role-title,
+    .client-role-pipeline {
+        flex: 1 1 100%;
+    }
+
+    .client-role-actions {
+        margin-left: auto;
     }
 }

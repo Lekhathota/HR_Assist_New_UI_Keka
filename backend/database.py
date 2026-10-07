@@ -12,7 +12,7 @@ import os
 import re
 import hashlib
 import json
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -28,6 +28,8 @@ DEFAULT_CLIENT_ACCOUNT_ID = "SHIMENTOX"
 DEFAULT_CLIENT_NAME = "ShimentoX"
 DEFAULT_PROJECT_NAME = "ShimentoX Internal"
 LEGACY_DEFAULT_PROJECT_NAMES = ["Internal Bench"]
+DEFAULT_HIRING_STAGES = ["Sourced", "Screening", "Interview", "Offer", "Hired"]
+CLIENT_ROLE_LEVELS = {"Junior", "Mid", "Senior", "Lead"}
 
 
 # Purpose: Fetches mongo uri from storage or service context.
@@ -527,14 +529,241 @@ def get_default_client() -> Optional[dict]:
     return get_client_by_account_id(DEFAULT_CLIENT_ACCOUNT_ID)
 
 
+def _validate_client_stages(
+    stages: Any,
+    *,
+    minimum: int = 2,
+    stable_seed: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    if not isinstance(stages, list):
+        raise ValueError("Hiring stages must be a list.")
+    if len(stages) < minimum:
+        raise ValueError("Each hiring pipeline must have at least two stages.")
+
+    normalized: list[dict[str, Any]] = []
+    seen_names: set[str] = set()
+    seen_ids: set[str] = set()
+    for index, stage in enumerate(stages):
+        if isinstance(stage, str):
+            stage_name = stage.strip()
+            stage_id = ""
+        elif isinstance(stage, dict):
+            stage_name = stage.get("name")
+            if not isinstance(stage_name, str):
+                raise ValueError("Hiring stage names must be strings.")
+            stage_name = stage_name.strip()
+            stage_id = str(stage.get("id") or "").strip()
+        else:
+            raise ValueError("Each hiring stage must be a string or an object.")
+        if not stage_name:
+            raise ValueError("Hiring stage names cannot be empty.")
+        if len(stage_name) >= 40:
+            raise ValueError("Hiring stage names must be under 40 characters.")
+        normalized_name = stage_name.casefold()
+        if normalized_name in seen_names:
+            raise ValueError("Hiring stage names must be unique.")
+        seen_names.add(normalized_name)
+        if not stage_id:
+            if stable_seed:
+                stage_id = uuid5(
+                    NAMESPACE_URL,
+                    f"{stable_seed}:stage:{index}:{normalized_name}",
+                ).hex[:8]
+            else:
+                stage_id = uuid4().hex[:8]
+        if stage_id in seen_ids:
+            raise ValueError("Hiring stage IDs must be unique within a pipeline.")
+        seen_ids.add(stage_id)
+        normalized.append({"id": stage_id, "name": stage_name, "order": index})
+    return normalized
+
+
+def validate_client_hiring_config(
+    data: dict[str, Any],
+    client_id: Optional[int] = None,
+) -> dict[str, Any]:
+    """Validate and normalize a client's pipelines, roles, and legacy stage mirror."""
+    if "hiring_pipelines" in data:
+        raw_pipelines = data["hiring_pipelines"]
+        if not isinstance(raw_pipelines, list):
+            raise ValueError("Hiring pipelines must be a list.")
+        pipelines = []
+        seen_pipeline_names: set[str] = set()
+        seen_pipeline_ids: set[str] = set()
+        for index, pipeline in enumerate(raw_pipelines):
+            if not isinstance(pipeline, dict):
+                raise ValueError("Each hiring pipeline must be an object.")
+            name = pipeline.get("name")
+            if not isinstance(name, str):
+                raise ValueError("Hiring pipeline names must be strings.")
+            name = name.strip()
+            if not name:
+                raise ValueError("Hiring pipeline names cannot be empty.")
+            normalized_name = name.casefold()
+            if normalized_name in seen_pipeline_names:
+                raise ValueError("Hiring pipeline names must be unique.")
+            seen_pipeline_names.add(normalized_name)
+            is_default = pipeline.get("is_default", False)
+            is_archived = pipeline.get("is_archived", False)
+            if not isinstance(is_default, bool) or not isinstance(is_archived, bool):
+                raise ValueError("Pipeline default and archived flags must be boolean.")
+            if is_default and is_archived:
+                raise ValueError("The default hiring pipeline cannot be archived.")
+            pipeline_id = str(pipeline.get("id") or "").strip()
+            if not pipeline_id:
+                pipeline_id = (
+                    uuid5(
+                        NAMESPACE_URL,
+                        f"client:{client_id}:pipeline:{index}:{normalized_name}",
+                    ).hex[:8]
+                    if client_id is not None
+                    else uuid4().hex[:8]
+                )
+            if pipeline_id in seen_pipeline_ids:
+                raise ValueError("Hiring pipeline IDs must be unique.")
+            seen_pipeline_ids.add(pipeline_id)
+            stages = _validate_client_stages(
+                pipeline.get("stages"),
+                stable_seed=f"client:{client_id}:pipeline:{pipeline_id}" if client_id is not None else None,
+            )
+            pipelines.append(
+                {
+                    "id": pipeline_id,
+                    "name": name,
+                    "is_default": is_default,
+                    "is_archived": is_archived,
+                    "stages": stages,
+                }
+            )
+        if sum(1 for pipeline in pipelines if pipeline["is_default"]) != 1:
+            raise ValueError("Exactly one hiring pipeline must be the default.")
+    else:
+        if "roles" in data:
+            raise ValueError("Roles require hiring_pipelines with pipeline IDs.")
+        legacy_stages = data.get("hiring_stages")
+        if legacy_stages is None or legacy_stages == []:
+            legacy_stages = DEFAULT_HIRING_STAGES
+        stages = _validate_client_stages(legacy_stages)
+        pipelines = [
+            {
+                "id": uuid4().hex[:8],
+                "name": "Standard",
+                "is_default": True,
+                "is_archived": False,
+                "stages": stages,
+            }
+        ]
+
+    raw_roles = data.get("roles", [])
+    if not isinstance(raw_roles, list):
+        raise ValueError("Client roles must be a list.")
+    pipeline_ids = {pipeline["id"] for pipeline in pipelines}
+    roles = []
+    seen_role_ids: set[str] = set()
+    for index, role in enumerate(raw_roles):
+        if not isinstance(role, dict):
+            raise ValueError("Each client role must be an object.")
+        title = role.get("title")
+        if not isinstance(title, str):
+            raise ValueError("Role titles must be strings.")
+        title = title.strip()
+        if not title:
+            raise ValueError("Role titles cannot be empty.")
+        level = role.get("level")
+        if not isinstance(level, str) or level not in CLIENT_ROLE_LEVELS:
+            raise ValueError("Role level must be Junior, Mid, Senior, or Lead.")
+        pipeline_id = str(role.get("pipeline_id") or "").strip()
+        if pipeline_id not in pipeline_ids:
+            raise ValueError("Each role must reference a pipeline in this client.")
+        role_id = str(role.get("id") or "").strip()
+        if not role_id:
+            role_id = (
+                uuid5(
+                    NAMESPACE_URL,
+                    f"client:{client_id}:role:{index}:{title.casefold()}",
+                ).hex[:8]
+                if client_id is not None
+                else uuid4().hex[:8]
+            )
+        if role_id in seen_role_ids:
+            raise ValueError("Client role IDs must be unique.")
+        seen_role_ids.add(role_id)
+        is_archived = role.get("is_archived", False)
+        if not isinstance(is_archived, bool):
+            raise ValueError("Role archived flag must be boolean.")
+        roles.append(
+            {
+                "id": role_id,
+                "title": title,
+                "level": level,
+                "pipeline_id": pipeline_id,
+                "is_archived": is_archived,
+            }
+        )
+
+    default_pipeline = next(pipeline for pipeline in pipelines if pipeline["is_default"])
+    return {
+        "hiring_pipelines": pipelines,
+        "roles": roles,
+        "hiring_stages": default_pipeline["stages"],
+    }
+
+
+def _client_with_hiring_config(client: Optional[dict]) -> Optional[dict]:
+    if not client:
+        return None
+    result = dict(client)
+    if "hiring_pipelines" in result:
+        config = validate_client_hiring_config(
+            {
+                "hiring_pipelines": result["hiring_pipelines"],
+                "roles": result.get("roles", []),
+            },
+            int(result.get("id") or 0) or None,
+        )
+    else:
+        legacy_stages = result.get("hiring_stages")
+        if not isinstance(legacy_stages, list) or not legacy_stages:
+            legacy_stages = DEFAULT_HIRING_STAGES
+        stable_key = (
+            result.get("id")
+            or result.get("client_account_id")
+            or result.get("name")
+            or "legacy-client"
+        )
+        stages = _validate_client_stages(
+            legacy_stages,
+            minimum=0,
+            stable_seed=f"client:{stable_key}:standard",
+        )
+        config = {
+            "hiring_pipelines": [
+                {
+                    "id": uuid5(
+                        NAMESPACE_URL,
+                        f"client:{stable_key}:pipeline:standard",
+                    ).hex[:8],
+                    "name": "Standard",
+                    "is_default": True,
+                    "is_archived": False,
+                    "stages": stages,
+                }
+            ],
+            "roles": [],
+            "hiring_stages": stages,
+        }
+    result.update(config)
+    return result
+
+
 def get_client_by_account_id(client_account_id: str) -> Optional[dict]:
     row = _database().clients.find_one({"client_account_id": str(client_account_id or "").strip().upper()})
-    return _serialize_doc(row)
+    return _client_with_hiring_config(_serialize_doc(row))
 
 
 def get_client_by_id(client_id: int) -> Optional[dict]:
     row = _database().clients.find_one({"id": int(client_id)})
-    return _serialize_doc(row)
+    return _client_with_hiring_config(_serialize_doc(row))
 
 
 def create_client(data: dict) -> int:
@@ -542,28 +771,7 @@ def create_client(data: dict) -> int:
     name = str(data.get("name") or data.get("client_name") or "").strip()
     if not name:
         raise ValueError("Client name is required.")
-    hiring_stages = data.get("hiring_stages")
-    if "hiring_stages" not in data or hiring_stages == []:
-        hiring_stages = ["Sourced", "Screening", "Interview", "Offer", "Hired"]
-    if not isinstance(hiring_stages, list):
-        raise ValueError("Hiring stages must be a list of strings.")
-    validated_hiring_stages = []
-    seen_stage_names = set()
-    for stage in hiring_stages:
-        if not isinstance(stage, str):
-            raise ValueError("Each hiring stage must be a string.")
-        stage_name = stage.strip()
-        if not stage_name:
-            raise ValueError("Hiring stage names cannot be empty.")
-        if len(stage_name) >= 40:
-            raise ValueError("Hiring stage names must be under 40 characters.")
-        normalized_stage_name = stage_name.casefold()
-        if normalized_stage_name in seen_stage_names:
-            raise ValueError("Hiring stage names must be unique.")
-        seen_stage_names.add(normalized_stage_name)
-        validated_hiring_stages.append(
-            {"id": uuid4().hex[:8], "name": stage_name, "order": len(validated_hiring_stages)}
-        )
+    hiring_config = validate_client_hiring_config(data)
     if not account_id:
         account_id = "".join(ch for ch in name.upper() if ch.isalnum())[:24] or f"CLIENT{_next_id('clients')}"
     existing = get_client_by_account_id(account_id)
@@ -585,13 +793,207 @@ def create_client(data: dict) -> int:
             "account_owner": data.get("account_owner") or "",
             "status": data.get("status") or "Active",
             "notes": data.get("notes") or "",
-            "hiring_stages": validated_hiring_stages,
+            **hiring_config,
             "created_at": now,
             "updated_at": now,
         }
     )
     create_project({"client_id": new_id, "status": "Active", **_default_project_payload_for_client(new_id)})
     return new_id
+
+
+def _client_config_for_update(client: dict) -> dict[str, Any]:
+    config = validate_client_hiring_config(
+        {
+            "hiring_pipelines": client.get("hiring_pipelines", []),
+            "roles": client.get("roles", []),
+        },
+        int(client.get("id") or 0),
+    )
+    return config
+
+
+def _save_client_hiring_config(client_id: int, pipelines: list[dict], roles: list[dict]) -> dict:
+    config = validate_client_hiring_config(
+        {"hiring_pipelines": pipelines, "roles": roles},
+        int(client_id),
+    )
+    _database().clients.update_one(
+        {"id": int(client_id)},
+        {"$set": {**config, "updated_at": _now()}},
+    )
+    return get_client_by_id(client_id) or {}
+
+
+def _stages_with_preserved_ids(previous: list[dict], requested: Any) -> Any:
+    if not isinstance(requested, list):
+        return requested
+    result = [
+        {"name": stage} if isinstance(stage, str) else dict(stage) if isinstance(stage, dict) else stage
+        for stage in requested
+    ]
+    used_previous: set[int] = set()
+    matched: set[int] = set()
+
+    for index, stage in enumerate(result):
+        if not isinstance(stage, dict):
+            continue
+        explicit_id = str(stage.get("id") or "").strip()
+        if not explicit_id:
+            continue
+        for old_index, old_stage in enumerate(previous):
+            if old_index not in used_previous and str(old_stage.get("id") or "") == explicit_id:
+                used_previous.add(old_index)
+                matched.add(index)
+                break
+
+    for index, stage in enumerate(result):
+        if (
+            index in matched
+            or not isinstance(stage, dict)
+            or str(stage.get("id") or "").strip()
+        ):
+            continue
+        name = stage.get("name")
+        if not isinstance(name, str):
+            continue
+        normalized_name = name.strip().casefold()
+        for old_index, old_stage in enumerate(previous):
+            old_name = old_stage.get("name")
+            if (
+                old_index not in used_previous
+                and isinstance(old_name, str)
+                and old_name.strip().casefold() == normalized_name
+            ):
+                stage["id"] = old_stage.get("id")
+                used_previous.add(old_index)
+                matched.add(index)
+                break
+
+    for index, stage in enumerate(result):
+        if (
+            index in matched
+            or not isinstance(stage, dict)
+            or str(stage.get("id") or "").strip()
+        ):
+            continue
+        if index < len(previous) and index not in used_previous:
+            stage["id"] = previous[index].get("id")
+            used_previous.add(index)
+    return result
+
+
+def add_client_pipeline(client_id: int, data: dict[str, Any]) -> Optional[dict]:
+    client = get_client_by_id(client_id)
+    if not client:
+        return None
+    pipeline = {
+        "id": data.get("id"),
+        "name": data.get("name"),
+        "is_default": data.get("is_default", False),
+        "is_archived": data.get("is_archived", False),
+        "stages": data.get("stages"),
+    }
+    config = _client_config_for_update(client)
+    pipelines = config["hiring_pipelines"]
+    if pipeline["is_default"]:
+        for existing in pipelines:
+            existing["is_default"] = False
+    pipelines.append(pipeline)
+    return _save_client_hiring_config(client_id, pipelines, config["roles"])
+
+
+def update_client_pipeline(
+    client_id: int,
+    pipeline_id: str,
+    data: dict[str, Any],
+) -> Optional[dict]:
+    client = get_client_by_id(client_id)
+    if not client:
+        return None
+    config = _client_config_for_update(client)
+    pipelines = config["hiring_pipelines"]
+    pipeline = next((row for row in pipelines if row["id"] == pipeline_id), None)
+    if not pipeline:
+        return None
+    roles = config["roles"]
+
+    if "name" in data:
+        pipeline["name"] = data["name"]
+    if "stages" in data:
+        pipeline["stages"] = _stages_with_preserved_ids(pipeline["stages"], data["stages"])
+    if "is_default" in data:
+        if not isinstance(data["is_default"], bool):
+            raise ValueError("Pipeline default flag must be boolean.")
+        if data["is_default"]:
+            if pipeline["is_archived"]:
+                raise ValueError("An archived pipeline cannot be the default.")
+            for existing in pipelines:
+                existing["is_default"] = existing["id"] == pipeline_id
+        else:
+            pipeline["is_default"] = False
+    if "is_archived" in data:
+        if not isinstance(data["is_archived"], bool):
+            raise ValueError("Pipeline archived flag must be boolean.")
+        if data["is_archived"]:
+            if pipeline["is_default"]:
+                raise ValueError("The default hiring pipeline cannot be archived.")
+            move_to_id = str(data.get("move_roles_to_pipeline_id") or "").strip()
+            active_roles = [
+                role
+                for role in roles
+                if role["pipeline_id"] == pipeline_id and not role["is_archived"]
+            ]
+            if active_roles and not move_to_id:
+                raise ValueError("Move active roles before archiving this pipeline.")
+            if active_roles:
+                target = next((row for row in pipelines if row["id"] == move_to_id), None)
+                if not target or target["is_archived"] or target["id"] == pipeline_id:
+                    raise ValueError("Roles must be moved to another active pipeline.")
+                for role in active_roles:
+                    role["pipeline_id"] = move_to_id
+        pipeline["is_archived"] = data["is_archived"]
+
+    return _save_client_hiring_config(client_id, pipelines, roles)
+
+
+def add_client_role(client_id: int, data: dict[str, Any]) -> Optional[dict]:
+    client = get_client_by_id(client_id)
+    if not client:
+        return None
+    config = _client_config_for_update(client)
+    role_data = {key: data[key] for key in ("id", "title", "level", "pipeline_id", "is_archived") if key in data}
+    target = next(
+        (pipeline for pipeline in config["hiring_pipelines"] if pipeline["id"] == role_data.get("pipeline_id")),
+        None,
+    )
+    if target and target["is_archived"]:
+        raise ValueError("A role cannot be assigned to an archived pipeline.")
+    config["roles"].append(role_data)
+    return _save_client_hiring_config(client_id, config["hiring_pipelines"], config["roles"])
+
+
+def update_client_role(
+    client_id: int,
+    role_id: str,
+    data: dict[str, Any],
+) -> Optional[dict]:
+    client = get_client_by_id(client_id)
+    if not client:
+        return None
+    config = _client_config_for_update(client)
+    role = next((row for row in config["roles"] if row["id"] == role_id), None)
+    if not role:
+        return None
+    updates = {key: data[key] for key in ("title", "level", "pipeline_id", "is_archived") if key in data}
+    role.update(updates)
+    target = next(
+        (pipeline for pipeline in config["hiring_pipelines"] if pipeline["id"] == role["pipeline_id"]),
+        None,
+    )
+    if target and target["is_archived"]:
+        raise ValueError("A role cannot be assigned to an archived pipeline.")
+    return _save_client_hiring_config(client_id, config["hiring_pipelines"], config["roles"])
 
 
 def update_client(client_id: int, data: dict) -> bool:
@@ -825,6 +1227,7 @@ def get_projects_for_client(client_id: int) -> list[dict]:
 
 
 def client_summary(client: dict) -> dict:
+    client = _client_with_hiring_config(client) or {}
     db = _database()
     client_id = int(client.get("id") or 0)
     active_jobs = db.job_descriptions.count_documents({"client_id": client_id, "status": "Active"})
