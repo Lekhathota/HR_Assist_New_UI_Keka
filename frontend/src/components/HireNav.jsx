@@ -39,7 +39,6 @@ export function HireTabs() {
   if (!active || !tabs.length) return null;
   return (
     <nav className="hire-tabs" aria-label="Hire">
-      <span className="hire-tabs-title">Hire</span>
       <div className="hire-tabs-list">
         {tabs.map(tab => {
           const current = tab === active;

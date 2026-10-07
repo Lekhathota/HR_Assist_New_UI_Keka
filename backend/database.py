@@ -1103,6 +1103,26 @@ def _candidate_skill_names(candidate: dict) -> list[str]:
     return list(dict.fromkeys(values))[:8]
 
 
+def _bench_availability_label(available: int, total: int) -> str:
+    if total <= 0:
+        return "No one on bench"
+    if available == total:
+        return "All available"
+    if available == 0:
+        return "None available"
+    return f"{available} of {total} available"
+
+
+# Purpose: Priority comes from the real shortfall; an explicitly set priority is kept
+# unless the role is understaffed by two or more posts.
+def _role_priority(required_count: int, gap: int, configured: Optional[str]) -> str:
+    if gap > 0 and required_count >= 2:
+        return "High"
+    if configured:
+        return str(configured)
+    return "Medium" if gap > 0 else "Low"
+
+
 def _bench_cards(project_id: int) -> list[dict]:
     rows = _serialize_docs(
         list(
@@ -1118,9 +1138,12 @@ def _bench_cards(project_id: int) -> list[dict]:
         role = _role_key(roles[0] if roles else (skills[0] if skills else "General Bench"))
         group = groups.setdefault(
             role,
-            {"role": role, "count": 0, "skills": [], "avg_match": 0, "availability": "Immediate", "candidate_ids": [], "_score_total": 0},
+            {"role": role, "count": 0, "skills": [], "avg_match": 0, "available": 0, "candidate_ids": [], "_score_total": 0},
         )
         group["count"] += 1
+        # Blank availability is treated as available, matching the bench-matching query.
+        if str(candidate.get("availability_status") or "Available").strip().lower() == "available":
+            group["available"] += 1
         group["_score_total"] += int(candidate.get("match_score") or 0)
         group["candidate_ids"].append(candidate.get("id"))
         for skill in skills:
@@ -1135,7 +1158,8 @@ def _bench_cards(project_id: int) -> list[dict]:
                 "count": count,
                 "skills": group["skills"][:6],
                 "avg_match": int(group["_score_total"] / count) if count else 0,
-                "availability": group["availability"],
+                "available_count": int(group["available"]),
+                "availability": _bench_availability_label(int(group["available"]), count),
                 "candidate_ids": group["candidate_ids"][:12],
             }
         )
@@ -1152,7 +1176,7 @@ def _required_role_cards(project: dict, project_id: int) -> list[dict]:
         required[role] = {
             "role": role,
             "required_count": int(item.get("required_count") or 1),
-            "priority": item.get("priority") or "Medium",
+            "priority": item.get("priority") or None,
             "skills": _list(item.get("skills")),
             "linked_jobs": [],
         }
@@ -1162,7 +1186,7 @@ def _required_role_cards(project: dict, project_id: int) -> list[dict]:
         role = _role_key(job.get("title") or "Required Role")
         row = required.setdefault(
             role,
-            {"role": role, "required_count": 0, "priority": "Medium", "skills": [], "linked_jobs": []},
+            {"role": role, "required_count": 0, "priority": None, "skills": [], "linked_jobs": []},
         )
         row["required_count"] = max(1, int(row.get("required_count") or 0) + 1)
         row["linked_jobs"].append({"id": job.get("id"), "title": job.get("title") or role})
@@ -1189,7 +1213,7 @@ def _required_role_cards(project: dict, project_id: int) -> list[dict]:
                 "required_count": required_count,
                 "available_count": available,
                 "gap": gap,
-                "priority": "High" if gap > 0 and required_count >= 2 else row.get("priority") or "Medium",
+                "priority": _role_priority(required_count, gap, row.get("priority")),
                 "skills": (row.get("skills") or [])[:6],
                 "linked_jobs": (row.get("linked_jobs") or [])[:6],
             }

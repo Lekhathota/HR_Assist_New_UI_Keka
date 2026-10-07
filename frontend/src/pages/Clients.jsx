@@ -7,6 +7,7 @@ import RoleEditor from '../components/RoleEditor.jsx';
 import { apiGet, apiPost, apiPut } from '../api.js';
 import '../styles/clients.css';
 import '../styles/jd_create.css';
+import '../styles/clients_page.css';
 
 const EMPTY_CLIENT_FORM = {
   name: '',
@@ -312,7 +313,7 @@ function Clients({ createPage = false }) {
 
   return (
     <Layout>
-      <div className={`clients-page${createPage ? ' client-create-page' : ''}`}>
+      <div className={`clients-page cl-page${createPage ? ' client-create-page' : ''}`}>
         {createPage ? (
           <div className="jd-create-container client-create-container">
             <div className="jd-create-header">
@@ -421,11 +422,11 @@ function Clients({ createPage = false }) {
           <>
         <div className="clients-header">
           <div>
-            <h1><i className="fas fa-building"></i> Clients</h1>
+            <h1>Clients</h1>
             <p>Client accounts connected to jobs, candidates, and interview activity.</p>
           </div>
           <button type="button" className="btn btn-primary" onClick={openAddClient}>
-            <i className="fas fa-plus"></i> Add Client
+            <i className="fas fa-plus"></i> Add client
           </button>
         </div>
 
@@ -450,9 +451,14 @@ function Clients({ createPage = false }) {
                     className={`client-list-item${String(client?.id) === String(activeClientId) ? ' active' : ''}`}
                     onClick={() => setActiveClientId(client?.id)}
                   >
-                    <strong>{client?.name}</strong>
-                    <span>{client?.client_account_id}</span>
-                    <small>{client?.active_jobs || 0} required jobs - {client?.total_candidates || 0} bench candidates</small>
+                    <span className="cl-avatar" aria-hidden="true">
+                      {String(client?.name || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}
+                    </span>
+                    <span className="cl-list-text">
+                      <strong>{client?.name}</strong>
+                      <span>{client?.client_account_id}{client?.industry ? ` · ${client.industry}` : ''}</span>
+                      <small>{client?.active_jobs || 0} active jobs · {client?.total_candidates || 0} candidates</small>
+                    </span>
                   </button>
                 ))}
                 {filteredClients.length === 0 && <div className="client-list-empty">No matching clients</div>}
@@ -466,23 +472,27 @@ function Clients({ createPage = false }) {
                     <div>
                       <span className="client-account-id">{selectedClient?.client_account_id}</span>
                       <h2>{selectedClient?.name}</h2>
-                      <p>{selectedClient?.notes || 'Default client account for existing recruitment data.'}</p>
-                      <div className="client-overview-stats">
+                      {selectedClient?.notes && <p>{selectedClient.notes}</p>}
+                      <div className="cl-meta">
                         {[
-                          ['Total Projects', projects.length],
-                          ['Total Bench', clientTotals.benchCandidates],
-                          ['Total Required', clientTotals.requiredJobs],
-                        ].map(([label, value]) => (
-                          <div key={label}>
-                            <span>{label}</span>
-                            <strong>{value}</strong>
-                          </div>
+                          ['fa-industry', selectedClient?.industry],
+                          ['fa-location-dot', selectedClient?.location],
+                          ['fa-user', selectedClient?.contact_person],
+                          ['fa-envelope', selectedClient?.contact_email],
+                          ['fa-user-tie', selectedClient?.account_owner && `Owner: ${selectedClient.account_owner}`],
+                          ['fa-folder-tree', `${projects.length} project${projects.length === 1 ? '' : 's'}`],
+                          ['fa-briefcase', selectedClient?.total_jobs != null && `${selectedClient.total_jobs} job${selectedClient.total_jobs === 1 ? '' : 's'} in total`],
+                          ['fa-calendar-check', selectedClient?.upcoming_interviews != null && `${selectedClient.upcoming_interviews} upcoming interview${selectedClient.upcoming_interviews === 1 ? '' : 's'}`],
+                        ].filter(([, value]) => value).map(([icon, value]) => (
+                          <span key={icon}><i className={`fas ${icon}`} aria-hidden="true"></i>{value}</span>
                         ))}
                       </div>
                     </div>
-                    <span className={`client-status status-${String(selectedClient?.status || 'active').toLowerCase()}`}>
-                      {selectedClient?.status || 'Active'}
-                    </span>
+                    {selectedClient?.status && (
+                      <span className={`client-status status-${String(selectedClient.status).toLowerCase()}`}>
+                        {selectedClient.status}
+                      </span>
+                    )}
                   </section>
 
                   <section className="client-metrics client-overview-metrics">
@@ -735,8 +745,8 @@ function Clients({ createPage = false }) {
                           onClick={() => navigate(`/clients/${selectedClient?.id}/projects/${project?.id}`)}
                         >
                           <strong>{project?.name}</strong>
-                          <span>{project?.project_type || 'Client'} - {project?.status || 'Active'}</span>
-                          <small>{project?.active_jobs || 0} required jobs - {project?.current_candidates || 0} bench candidates</small>
+                          <span>{[project?.project_type, project?.status].filter(Boolean).join(' · ') || 'Project'}</span>
+                          <small>{project?.active_jobs || 0} active jobs · {project?.current_candidates || 0} on bench · {project?.interviews || 0} upcoming interviews</small>
                           <em>Open project</em>
                         </button>
                       ))}

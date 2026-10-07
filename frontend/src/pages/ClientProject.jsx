@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { apiGet } from '../api.js';
 import '../styles/clients.css';
+import '../styles/clients_page.css';
 
 function ClientProject() {
   const { clientId, projectId } = useParams();
@@ -31,12 +32,12 @@ function ClientProject() {
 
   return (
     <Layout>
-      <div className="clients-page project-detail-page">
+      <div className="clients-page project-detail-page cl-page">
         <div className="project-detail-header">
           <div>
-            <span className="client-account-id">{client?.client_account_id || 'CLIENT'}</span>
+            {client?.client_account_id && <span className="client-account-id">{client.client_account_id}</span>}
             <h1>{project?.name || 'Project'}</h1>
-            <p>{client?.name || 'Client'} project workspace for required roles, required jobs, and bench candidates.</p>
+            <p>{client?.name ? `${client.name} · ` : ''}Required roles, active jobs and bench candidates for this project.</p>
           </div>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/clients')}>
             <i className="fas fa-arrow-left"></i> Back to Clients
@@ -57,18 +58,20 @@ function ClientProject() {
                   <div>
                     <span className="client-account-id">PROJECT</span>
                     <h2>{project.name}</h2>
-                    <p>{project.notes || 'Project workspace for active requirements and internal bench candidates.'}</p>
+                    {project.notes && <p>{project.notes}</p>}
                   </div>
-                  <span className={`client-status status-${String(project.status || 'active').toLowerCase()}`}>
-                    {project.status || 'Active'}
-                  </span>
+                  {project.status && (
+                    <span className={`client-status status-${String(project.status).toLowerCase()}`}>
+                      {project.status}
+                    </span>
+                  )}
                 </div>
                 <div className="client-info-grid project-info-grid">
                   {[
                     ['Client', client?.name || 'Not set'],
-                    ['Project Type', project.project_type || 'Internal'],
-                    ['People Type', 'Internal'],
-                    ['People Status', 'On Bench'],
+                    ['Project Type', project.project_type || 'Not set'],
+                    ['Total Jobs', project.total_jobs ?? 0],
+                    ['Upcoming Interviews', project.interviews ?? 0],
                     ['Industry', client?.industry || 'Not set'],
                     ['Account Owner', client?.account_owner || 'Not set'],
                   ].map(([label, value]) => (
@@ -103,10 +106,10 @@ function ClientProject() {
               </div>
               <div className="client-role-grid required-role-grid">
                 {requiredRoleCards.map((card) => (
-                  <article key={card.role} className={`client-role-card required-card priority-${String(card.priority || 'medium').toLowerCase()}`}>
+                  <article key={card.role} className={`client-role-card required-card${card.priority ? ` priority-${String(card.priority).toLowerCase()}` : ''}`}>
                     <div className="client-role-card-head">
                       <strong>{card.role}</strong>
-                      <span>{card.priority || 'Medium'}</span>
+                      {card.priority && <span title="Based on how many posts are still unfilled">{card.priority} priority</span>}
                     </div>
                     <div className="client-role-counts">
                       <div>
@@ -151,7 +154,7 @@ function ClientProject() {
                     </div>
                     <div className="client-role-metric-row">
                       <span>Availability</span>
-                      <strong>{card.availability || 'Immediate'}</strong>
+                      <strong>{card.availability || '—'}</strong>
                     </div>
                     <div className="client-role-metric-row">
                       <span>Avg Match</span>
