@@ -146,3 +146,15 @@ def test_backfill_creates_missing_notifications_once(monkeypatch):
     assert "Data Engineer has 2 of 2" in note["message"] and note["created_at"] == "t1"
     assert db.backfill_fulfilled_jd_notifications() == 0
     assert len(fake.notifications.docs) == 1
+
+
+def test_clear_hides_notifications_only_for_that_user(monkeypatch):
+    fake = FakeDb(_docs())
+    monkeypatch.setattr(db, "_database", lambda: fake)
+    assert db.clear_notifications(8) == 2
+    cleared = db.list_notifications(8)
+    assert cleared["notifications"] == [] and cleared["unread_count"] == 0
+    other = db.list_notifications(7)
+    assert [n["title"] for n in other["notifications"]] == ["Newer", "Older"]
+    assert "cleared_by" not in other["notifications"][0]
+    assert db.clear_notifications(8) == 0

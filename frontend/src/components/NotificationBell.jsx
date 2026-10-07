@@ -102,6 +102,23 @@ function NotificationBell() {
     try { await apiPost('/api/notifications/read', ids ? { ids } : {}); } catch { load(); }
   };
 
+  // Clears every notification for this user only (teammates keep theirs).
+  const clearAll = async () => {
+    if (!items.length) return;
+    const previous = { items, unread };
+    setItems([]);
+    setUnread(0);
+    try {
+      const { ok } = await apiPost('/api/notifications/clear', {});
+      if (!ok) throw new Error('clear failed');
+    } catch {
+      setItems(previous.items);
+      setUnread(previous.unread);
+      setError('');
+      load();
+    }
+  };
+
   const openItem = (item) => {
     if (!item.read) markRead([item.id]);
     setOpen(false);
@@ -123,7 +140,12 @@ function NotificationBell() {
         <div id="workspace-notification-panel" className="workspace-notification-panel" role="dialog" aria-label="Notifications">
           <div className="workspace-notification-head">
             <strong>Notifications</strong>
-            {unread > 0 && <button type="button" onClick={() => markRead(null)}>Mark all as read</button>}
+            {items.length > 0 && (
+              <span className="workspace-notification-actions">
+                {unread > 0 && <button type="button" onClick={() => markRead(null)}>Mark all as read</button>}
+                <button type="button" className="workspace-notification-clear" onClick={clearAll}>Clear all</button>
+              </span>
+            )}
           </div>
           {loading ? <p className="workspace-notification-empty">Loading…</p>
             : error ? <p className="workspace-notification-empty" role="alert">{error} <button type="button" onClick={load}>Retry</button></p>

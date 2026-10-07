@@ -41,3 +41,13 @@ def api_notifications_read():
             return jsonify({"error": "ids must be numbers."}), 400
     updated = db.mark_notifications_read(user["id"], ids)
     return jsonify({"success": True, "updated": updated})
+
+
+# Purpose: API endpoint handler clearing all of the signed-in user's notifications (only for them).
+@notification_bp.route("/api/notifications/clear", methods=["POST"], endpoint="api_notifications_clear")
+@api_login_required
+def api_notifications_clear():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"success": True, "cleared": db.clear_notifications(user["id"])})

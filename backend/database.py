@@ -2017,16 +2017,29 @@ def list_notifications(user_id: int, limit: int = 20) -> dict:
     db = _database()
     uid = int(user_id)
     muted = _muted_notification_types(uid)
-    visible: dict[str, Any] = {"type": {"$nin": muted}} if muted else {}
+    # Notifications this user cleared stay hidden for them only.
+    visible: dict[str, Any] = {"cleared_by": {"$ne": uid}}
+    if muted:
+        visible["type"] = {"$nin": muted}
     rows = list(db.notifications.find(visible).sort("created_at", DESCENDING).limit(max(1, min(int(limit), 100))))
     items = []
     for row in rows:
         read_by = row.get("read_by") or []
-        item = _serialize_doc({k: v for k, v in row.items() if k != "read_by"}) or {}
+        item = _serialize_doc({k: v for k, v in row.items() if k not in {"read_by", "cleared_by"}}) or {}
         item["read"] = uid in read_by
         items.append(item)
     unread = db.notifications.count_documents({**visible, "read_by": {"$ne": uid}})
     return {"notifications": items, "unread_count": int(unread)}
+
+
+# Purpose: Clears (hides) every notification currently visible to one user. Other users are unaffected.
+def clear_notifications(user_id: int) -> int:
+    uid = int(user_id)
+    result = _database().notifications.update_many(
+        {"cleared_by": {"$ne": uid}},
+        {"$addToSet": {"cleared_by": uid, "read_by": uid}},
+    )
+    return int(getattr(result, "modified_count", 0))
 
 
 # Purpose: Marks the given notifications (or all of them) as read for one user.

@@ -19,11 +19,6 @@ body.theme-shimento .app-shell .workspace-content > .main-container {
 
 /* ---------- Home ---------- */
 @media (max-width: 640px) {
-  /* Quick actions: even two-column grid instead of ragged pills. */
-  body.theme-shimento .home-quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  body.theme-shimento .home-quick-actions a { justify-content: space-between; min-width: 0; padding: 10px 12px; font-size: 12.5px; }
-  body.theme-shimento .home-quick-actions a span { margin-left: auto; }
-
   /* KPI cards: two per row, icon above the number. */
   body.theme-shimento .insight-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
   body.theme-shimento .insight-kpi { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 0; padding: 14px; }
@@ -101,6 +96,5 @@ body.theme-shimento .app-shell .workspace-content > .main-container {
 /* ---------- Very small phones (≤ 360px) ---------- */
 @media (max-width: 360px) {
   body.theme-shimento .app-shell .workspace-content > .main-container { padding-inline: 12px; }
-  body.theme-shimento .home-quick-actions { grid-template-columns: minmax(0, 1fr); }
   body.theme-shimento h1 { font-size: 22px; }
 }

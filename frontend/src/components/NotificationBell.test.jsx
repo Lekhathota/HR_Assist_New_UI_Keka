@@ -93,6 +93,24 @@ test('opens the notification link and shows a kind-specific icon', async () => {
   expect($('output').textContent).toBe('/talent');
 });
 
+test('Clear all empties the panel and the badge', async () => {
+  await render();
+  await click($('.workspace-notification'));
+  await click($('.workspace-notification-clear'));
+  expect(apiPost).toHaveBeenCalledWith('/api/notifications/clear', {});
+  expect(container.querySelector('.workspace-notification-item')).toBeNull();
+  expect($('.workspace-notification-badge')).toBeNull();
+  expect($('.workspace-notification-empty').textContent).toContain("You're all caught up.");
+});
+
+test('Clear all restores the list if the server fails', async () => {
+  apiPost.mockResolvedValueOnce({ ok: false, data: {} });
+  await render();
+  await click($('.workspace-notification'));
+  await click($('.workspace-notification-clear'));
+  expect(container.querySelectorAll('.workspace-notification-item').length).toBeGreaterThan(0);
+});
+
 test('formats relative times', () => {
   const now = Date.parse('2026-10-06T12:00:00Z');
   expect(timeAgo('2026-10-06T11:59:30Z', now)).toBe('Just now');

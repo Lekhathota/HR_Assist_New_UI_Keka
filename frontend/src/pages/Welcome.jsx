@@ -11,12 +11,9 @@ export default function Welcome() {
   const state = useAnalytics('/api/dashboard');
   const { data } = state;
   const can = path => roleCanAccess(getCurrentRole(), path);
-  const actions = [['Create Job Description', '/jobs/create', 'fa-briefcase'], ['Analyze Resumes', '/analyze', 'fa-code-compare'], ['View Candidates', '/talent', 'fa-users'], ['Schedule Interviews', '/hiring-pipeline', 'fa-calendar']];
-  const visibleActions = actions.filter(([, path]) => can(path));
   const a = data?.analytics;
   return <Layout><div className="insights-page home-page">
     <div className="insights-heading"><div><h1>Welcome back, {displayName(readUser()).split(' ')[0]}!</h1><p>Here's an overview of your hiring activities.</p></div><AnalyticsFilters {...state} /></div>
-    {visibleActions.length > 0 && <nav className="home-quick-actions" aria-label="Recruiting quick actions">{visibleActions.map(([label, path, icon]) => <Link key={path} to={path}><i className={`fas ${icon}`} aria-hidden="true" />{label}<span aria-hidden="true">&rarr;</span></Link>)}</nav>}
     <AnalyticsStatus {...state} />
     {data && <>
       <Kpis data={data} />

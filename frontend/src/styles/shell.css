@@ -151,6 +151,9 @@ body.theme-shimento .app-shell .workspace-notification-empty button {
   font-weight: 600;
   cursor: pointer;
 }
+body.theme-shimento .app-shell .workspace-notification-actions { display: inline-flex; align-items: center; gap: 14px; }
+body.theme-shimento .app-shell .workspace-notification-head button.workspace-notification-clear { color: #6b7280; }
+body.theme-shimento .app-shell .workspace-notification-head button.workspace-notification-clear:hover { color: #b91c1c; }
 body.theme-shimento .app-shell .workspace-notification-list { max-height: min(420px, 60vh); margin: 0; padding: 6px; overflow-y: auto; list-style: none; }
 body.theme-shimento .app-shell .workspace-notification-item {
   display: flex;
