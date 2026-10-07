@@ -4,6 +4,7 @@ import Layout from '../components/Layout.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiDelete, apiGet, apiPost, apiPostForm, apiPut } from '../api.js';
 import { getCurrentRole } from '../roleAccess.js';
+import RecruiterSelect from '../components/RecruiterSelect.jsx';
 import { resolveAssessmentRow } from '../utils/assessmentDisplay.js';
 import { formatJdDate, parseJdSections } from '../utils/jdSections.js';
 import JdHiringProcessEditor from '../components/JdHiringProcessEditor.jsx';
@@ -356,6 +357,7 @@ function JdDetails() {
     setEditForm({
       title: jd.title || '',
       job_code: jd.job_code || '',
+      recruiter: jd.recruiter || '',
       department: jd.department || '',
       location: jd.location || '',
       experience_required: jd.experience || jd.experience_required || '',
@@ -386,6 +388,7 @@ function JdDetails() {
       const { ok, data } = await apiPut(`/api/jds/${jdId}`, {
         title: editForm.title.trim(),
         job_code: editForm.job_code.trim(),
+        recruiter: editForm.recruiter,
         department: editForm.department.trim(),
         location: editForm.location.trim(),
         experience_required: editForm.experience_required.trim(),
@@ -1559,6 +1562,7 @@ const downloadPDF = (reportText) => {
   const jobInfo = [
     ['Job ID', jd.job_code],
     ['Client Allotted', jd.client_name || '—'],
+    ['Recruiter', jd.recruiter],
     ['No. of Posts', jd.required_candidate_count ?? '—'],
     ['Job Category', jd.job_category || '—'],
     ['Date Posted', postedDate || '—'],
@@ -2336,9 +2340,19 @@ const downloadPDF = (reportText) => {
                   <label>Title</label>
                   <input type="text" value={editForm.title} onChange={(e) => setEditForm(f => ({ ...f, title: e.target.value }))} />
                 </div>
-                <div className="form-group">
-                  <label>Job ID</label>
-                  <input type="text" value={editForm.job_code} onChange={(e) => setEditForm(f => ({ ...f, job_code: e.target.value }))} placeholder="e.g. REQ-1023" />
+                <div className="jd-edit-form-row">
+                  <div className="form-group">
+                    <label>Job ID</label>
+                    <input type="text" value={editForm.job_code} onChange={(e) => setEditForm(f => ({ ...f, job_code: e.target.value }))} placeholder="e.g. REQ-1023" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="edit-recruiter">Recruiter</label>
+                    <RecruiterSelect
+                      id="edit-recruiter"
+                      value={editForm.recruiter}
+                      onChange={(value) => setEditForm(f => ({ ...f, recruiter: value }))}
+                    />
+                  </div>
                 </div>
                 <div className="jd-edit-form-row">
                   <div className="form-group">

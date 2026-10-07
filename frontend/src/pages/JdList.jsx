@@ -138,6 +138,7 @@ function JdList() {
     const haystack = [
       jd.title,
       jd.client_name,
+      jd.recruiter,
       jd.department,
       jd.job_category,
       ...((jd.skills || []).map(skill => typeof skill === 'string' ? skill : '')),
@@ -1115,7 +1116,7 @@ function JdList() {
                           <input type="checkbox" checked={pageJds.length > 0 && selectedIds.size === pageJds.length}
                             onChange={() => toggleSelectAll(pageJds)} aria-label="Select all job descriptions" />
                         </th>
-                        <th>Job Title</th><th>Job ID</th><th>Category</th><th>Client</th><th>Location</th><th className="jobs-num">Posts</th>
+                        <th>Job Title</th><th>Job ID</th><th>Category</th><th>Client</th><th>Location</th><th>Recruiter</th><th className="jobs-num">Posts</th>
                         <th>Date Posted</th><th>Status</th><th className="jobs-action-col">Action</th>
                       </tr>
                     </thead>
@@ -1136,6 +1137,7 @@ function JdList() {
                             <td><span className="jobs-pill">{jd.job_category || 'Others'}</span></td>
                             <td>{jd.client_name || '—'}</td>
                             <td className="jobs-location">{jd.location || '—'}</td>
+                            <td className="jobs-nowrap">{jd.recruiter || '—'}</td>
                             <td className="jobs-num">{jd.required_candidate_count ?? '—'}</td>
                             <td className="jobs-nowrap">{formatJdDate(jd.created_date || (jd.created || '').slice(0, 10)) || '—'}</td>
                             <td>

@@ -40,6 +40,7 @@ from routes.notification_routes import notification_bp
 from routes.profile_routes import profile_bp
 from routes.report_routes import report_bp
 from routes.search_routes import search_bp
+from routes.recruiter_routes import recruiter_bp
 from database import init_db, seed_data
 from routes.vendor_routes import vendor_bp
 from routes.workflow_admin_routes import workflow_admin_bp
@@ -92,6 +93,7 @@ app.register_blueprint(workflow_admin_bp)
 app.register_blueprint(notification_bp)
 app.register_blueprint(activity_bp)
 app.register_blueprint(search_bp)
+app.register_blueprint(recruiter_bp)
 
 
 # Turn this request's Hire-panel actions into notifications, only if it succeeded.

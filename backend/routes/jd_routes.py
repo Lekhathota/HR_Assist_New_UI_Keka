@@ -37,7 +37,8 @@ def jd_create():
             if required_count <= 0:
                 raise ValueError("required_candidate_count must be greater than zero")
             job_code = request.form.get("job_code") or ""
-            created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count, job_code)
+            recruiter = request.form.get("recruiter") or ""
+            created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count, job_code, recruiter)
             user = current_user()
             db.log_audit(
                 "JD Created",
@@ -112,7 +113,8 @@ def api_create_jd():
         if required_count <= 0:
             return jsonify({"error": "required_candidate_count must be greater than zero"}), 400
         job_code = request.form.get("job_code") or ""
-        created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count, job_code)
+        recruiter = request.form.get("recruiter") or ""
+        created = create_jd_from_upload(file, current_app.config["UPLOAD_FOLDER"], client_id, required_count, job_code, recruiter)
         user = current_user()
         db.log_audit(
             "JD Created",
@@ -150,6 +152,7 @@ def api_jd_update(jd_id: int):
     allowed = {
         "title",
         "job_code",
+        "recruiter",
         "department",
         "location",
         "experience_required",

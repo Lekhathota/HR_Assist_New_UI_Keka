@@ -1429,6 +1429,7 @@ def create_jd(data: dict) -> int:
         "id": new_id,
         "title": data.get("title") or "",
         "job_code": str(data.get("job_code") or "").strip() or generate_job_code(data.get("title") or ""),
+        "recruiter": str(data.get("recruiter") or "").strip(),
         "department": data.get("department") or "",
         "location": data.get("location") or "",
         "experience_required": data.get("experience_required") or data.get("experience") or "",
@@ -1480,6 +1481,7 @@ def update_jd(jd_id: int, data: dict) -> bool:
     mapping = {
         "title": "title",
         "job_code": "job_code",
+        "recruiter": "recruiter",
         "department": "department",
         "location": "location",
         "experience_required": "experience_required",
@@ -3399,3 +3401,36 @@ def reset_user_password(username: str, password: str) -> bool:
         {"$set": {"password": generate_password_hash(password)}},
     )
     return result.modified_count > 0
+
+
+# Recruiters who can own a JD (Create JD dropdown). Seeded with the team's names on first use.
+DEFAULT_RECRUITERS = ["Prajwal P", "Rajeswari L", "Mamatha M", "Soumen S", "Afritha P"]
+
+
+def _normalize_person_name(name: str) -> str:
+    return re.sub(r"\s+", " ", str(name or "")).strip()
+
+
+# Purpose: Lists recruiter names in the order they were added.
+def list_recruiters() -> list[str]:
+    db = _database()
+    if not db.recruiters.count_documents({}):
+        for name in DEFAULT_RECRUITERS:
+            db.recruiters.insert_one({"id": _next_id("recruiters"), "name": name, "created_at": _now(), "created_by": "system"})
+    return [row["name"] for row in db.recruiters.find({}, {"name": 1, "id": 1}).sort("id", ASCENDING)]
+
+
+# Purpose: Adds a recruiter; names are unique ignoring case and spacing.
+def add_recruiter(name: str, actor: str = "") -> tuple[str, bool]:
+    clean = _normalize_person_name(name)
+    if not clean:
+        raise ValueError("Recruiter name is required.")
+    if len(clean) > 80:
+        raise ValueError("Recruiter name must be 80 characters or fewer.")
+    list_recruiters()  # make sure the defaults exist first
+    db = _database()
+    existing = db.recruiters.find_one({"name": {"$regex": f"^{re.escape(clean)}$", "$options": "i"}}, {"name": 1})
+    if existing:
+        return existing["name"], False
+    db.recruiters.insert_one({"id": _next_id("recruiters"), "name": clean, "created_at": _now(), "created_by": actor})
+    return clean, True

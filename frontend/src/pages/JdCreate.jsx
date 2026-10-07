@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { toast } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPostForm } from '../api.js';
+import RecruiterSelect from '../components/RecruiterSelect.jsx';
 import '../styles/profile_extra.css';
 import '../styles/jd_create.css';
 
@@ -15,6 +16,7 @@ function JdCreate() {
   const [clientId, setClientId]   = useState('');
   const [clientsError, setClientsError] = useState('');
   const [requiredCount, setRequiredCount] = useState('');
+  const [recruiter, setRecruiter] = useState('');
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -116,6 +118,21 @@ function JdCreate() {
                   {clientsError && (
                     <div className="analyze-submit-error" role="alert">{clientsError}</div>
                   )}
+                </div>
+
+                <div className="form-group jd-create-field">
+                  <label htmlFor="recruiter">
+                    <i className="fas fa-user-tie"></i> Recruiter
+                  </label>
+                  <RecruiterSelect
+                    id="recruiter"
+                    name="recruiter"
+                    className="jd-create-select"
+                    value={recruiter}
+                    required
+                    onChange={setRecruiter}
+                  />
+                  <div className="jd-create-hint"><i className="fas fa-user-check"></i> The recruiter responsible for filling this job.</div>
                 </div>
 
                 <div className="form-group jd-create-field">
