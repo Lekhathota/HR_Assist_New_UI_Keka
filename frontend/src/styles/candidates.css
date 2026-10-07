@@ -916,3 +916,9 @@
 }
 
 
+
+/* Compact search on wide screens; the Filters button moves to the right. */
+@media (min-width: 900px) {
+    .app-shell .candidates-filter-bar input[type="text"] { flex: 0 1 22rem; min-width: 14rem; }
+    .app-shell .candidates-filter-bar .candidates-filters-anchor { margin-left: auto; }
+}

@@ -39,6 +39,11 @@ function JdList() {
   const [filterClient, setFilterClient] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
+  // Date posted: one day ("on") or a from/to range ("range"); dates are YYYY-MM-DD.
+  const [dateMode, setDateMode] = useState('on');
+  const [dateOn, setDateOn] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -134,6 +139,18 @@ function JdList() {
   const departmentOptions = useMemo(() => distinctValues('department'), [distinctValues]);
   const locationOptions = useMemo(() => distinctValues('location'), [distinctValues]);
 
+  const postedDate = jd => String(jd.created_date || jd.created || jd.created_at || '').slice(0, 10);
+  // A reversed range (From after To) is read the other way round.
+  const [rangeStart, rangeEnd] = dateFrom && dateTo && dateFrom > dateTo ? [dateTo, dateFrom] : [dateFrom, dateTo];
+  const dateFilterActive = dateMode === 'on' ? Boolean(dateOn) : Boolean(dateFrom || dateTo);
+  const matchesDate = jd => {
+    if (!dateFilterActive) return true;
+    const posted = postedDate(jd);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(posted)) return false;
+    if (dateMode === 'on') return posted === dateOn;
+    return (!rangeStart || posted >= rangeStart) && (!rangeEnd || posted <= rangeEnd);
+  };
+
   const filteredJds = jds.filter(jd => {
     const haystack = [
       jd.title,
@@ -149,7 +166,7 @@ function JdList() {
     const matchClient = !filterClient || jd.client_name === filterClient;
     const matchDepartment = !filterDepartment || jd.department === filterDepartment;
     const matchLocation = !filterLocation || jd.location === filterLocation;
-    return matchSearch && matchStatus && matchCategory && matchClient && matchDepartment && matchLocation;
+    return matchSearch && matchStatus && matchCategory && matchClient && matchDepartment && matchLocation && matchesDate(jd);
   });
 
   const PAGE_SIZE = 10;
@@ -160,7 +177,7 @@ function JdList() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, filterStatus, filterCategory, filterClient, filterDepartment, filterLocation]);
+  }, [searchTerm, filterStatus, filterCategory, filterClient, filterDepartment, filterLocation, dateMode, dateOn, dateFrom, dateTo]);
 
   const STATUS_HEADINGS = { '': 'All Jobs', active: 'Active Jobs', filled: 'Filled Jobs', closed: 'Closed Jobs', inactive: 'Inactive Jobs' };
   // Active: still hiring. Filled: every post taken (reopens by itself if someone drops out).
@@ -172,7 +189,7 @@ function JdList() {
     ['', 'All', 'Every job'],
   ];
   const statusCount = (key) => (key ? jds.filter(j => (j.status || '').toLowerCase() === key).length : jds.length);
-  const activeFilterCount = [filterCategory, filterClient, filterDepartment, filterLocation]
+  const activeFilterCount = [filterCategory, filterClient, filterDepartment, filterLocation, dateFilterActive]
     .filter(Boolean).length;
   const filterMenuRef = useRef(null);
 
@@ -195,6 +212,9 @@ function JdList() {
     setFilterClient('');
     setFilterDepartment('');
     setFilterLocation('');
+    setDateOn('');
+    setDateFrom('');
+    setDateTo('');
   };
 
   // ============================================================
@@ -1079,6 +1099,30 @@ function JdList() {
                         {locationOptions.map(value => <option key={value} value={value}>{value}</option>)}
                       </select>
                     </label>
+                    <fieldset className="jobs-filter-field jobs-date-filter">
+                      <legend>Date posted</legend>
+                      <div className="jobs-date-mode" role="group" aria-label="Date filter type">
+                        <button type="button" aria-pressed={dateMode === 'on'} className={dateMode === 'on' ? 'active' : ''}
+                          onClick={() => setDateMode('on')}>On a date</button>
+                        <button type="button" aria-pressed={dateMode === 'range'} className={dateMode === 'range' ? 'active' : ''}
+                          onClick={() => setDateMode('range')}>Between dates</button>
+                      </div>
+                      {dateMode === 'on' ? (
+                        <input type="date" className="jobs-date-input" aria-label="Posted on" value={dateOn}
+                          onChange={(e) => setDateOn(e.target.value)} />
+                      ) : (
+                        <div className="jobs-date-range">
+                          <label><small>From</small>
+                            <input type="date" className="jobs-date-input" value={dateFrom} max={dateTo || undefined}
+                              onChange={(e) => setDateFrom(e.target.value)} />
+                          </label>
+                          <label><small>To</small>
+                            <input type="date" className="jobs-date-input" value={dateTo} min={dateFrom || undefined}
+                              onChange={(e) => setDateTo(e.target.value)} />
+                          </label>
+                        </div>
+                      )}
+                    </fieldset>
                     <div className="jobs-filter-actions">
                       <button type="button" className="jobs-clear-btn" onClick={clearFilters}>Clear filters</button>
                       <button type="button" className="btn btn-primary jobs-btn" onClick={() => setShowMoreFilters(false)}>Apply</button>
