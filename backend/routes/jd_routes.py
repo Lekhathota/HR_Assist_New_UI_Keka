@@ -8,7 +8,7 @@ from spa_urls import redirect_to_spa
 
 from services.auth_service import api_login_required, current_user, login_required, role_required
 from services.fulfilment_service import run_automated_bench_workflow
-from services.hiring_process_service import build_steps, validate_mappings, validate_step_removal, normalize_process
+from services.hiring_process_service import build_steps, validate_mappings, validate_step_removal, resolve_process
 from services.jd_service import allowed_file, create_jd_from_upload, jd_details_payload, jd_summary_list_payload
 
 jd_bp = Blueprint("jd_routes", __name__)
@@ -196,7 +196,7 @@ def api_jd_hiring_process(jd_id: int):
     mappings, error = validate_mappings(steps, data.get("event_mappings"))
     if error:
         return jsonify({"error": error}), 400
-    previous_steps = normalize_process(jd.get("hiring_process"))["steps"]
+    previous_steps = resolve_process(jd)["steps"]
     error = validate_step_removal(jd_id, previous_steps, steps, data.get("event_mappings"))
     if error:
         return jsonify({"error": error}), 400

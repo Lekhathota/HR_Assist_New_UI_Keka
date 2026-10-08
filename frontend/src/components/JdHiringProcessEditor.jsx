@@ -5,6 +5,7 @@ import { toast } from './EnterpriseFeedback.jsx';
 import '../styles/hiring_process.css';
 
 const EVENTS = [
+  ['assessment_passed', 'Assessment passed'],
   ['scheduled', 'Scheduled'],
   ['rescheduled', 'Rescheduled'],
   ['selected_after_interview', 'Selected after interview'],

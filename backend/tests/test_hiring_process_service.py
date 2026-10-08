@@ -85,6 +85,56 @@ class ValidateStepRemovalTests(unittest.TestCase):
 
 
 class ComputeEffectiveStageTests(unittest.TestCase):
+    def test_talent_candidate_without_job_inherits_own_client_stages(self) -> None:
+        steps = [{"id": "s1", "name": "Screening"},
+                 {"id": "s2", "name": "Technical"},
+                 {"id": "s3", "name": "HR"}, {"id": "s4", "name": "Offer"}]
+        with patch.object(hps.db, "get_client_by_id", return_value={"hiring_stages": steps}) as lookup:
+            result = hps.compute_effective_stage(_candidate(jd_id=None, client_id=7, status="Selected"), None)
+        lookup.assert_called_once_with(7)
+        self.assertEqual(result["steps"], steps)
+        self.assertEqual(result["stage_name"], "Screening")
+
+    def test_job_missing_client_uses_candidate_client(self) -> None:
+        steps = [{"id": "s1", "name": "HR"}]
+        with patch.object(hps.db, "get_client_by_id", return_value={"hiring_stages": steps}):
+            result = hps.compute_effective_stage(_candidate(client_id=7, stage_id="s1"), _jd())
+        self.assertEqual(result["stage_name"], "HR")
+
+    def test_legacy_candidate_client_account_resolves_stages(self) -> None:
+        steps = [{"id": "s1", "name": "HR"}]
+        with patch.object(hps.db, "get_client_by_account_id", return_value={"hiring_stages": steps}) as lookup:
+            result = hps.compute_effective_stage(_candidate(jd_id=None, client_account_id="KORE"), None)
+        lookup.assert_called_once_with("KORE")
+        self.assertEqual(result["steps"], steps)
+
+    def test_inherits_all_client_stages_for_existing_screened_candidate(self) -> None:
+        steps = [{"id": "s1", "name": "Screening"},
+                 {"id": "s2", "name": "Technical Round"},
+                 {"id": "s3", "name": "Offer"}, {"id": "s4", "name": "Hired"}]
+        jd = {**_jd(), "client_id": 7}
+        client = {"hiring_pipelines": [{"is_default": True, "stages": steps}]}
+        with patch.object(hps.db, "get_client_by_id", return_value=client):
+            result = hps.compute_effective_stage(_candidate(status="Selected"), jd)
+            manual = hps.compute_effective_stage(_candidate(stage_id="s3"), jd)
+        self.assertEqual(result["steps"], steps)
+        self.assertEqual(result["stage_name"], "Screening")
+        self.assertEqual(manual["stage_name"], "Offer")
+
+    def test_job_override_takes_precedence_over_client_pipeline(self) -> None:
+        steps = [{"id": "custom", "name": "Assessment"}]
+        with patch.object(hps.db, "get_client_by_id") as get_client:
+            result = hps.resolve_process({**_jd(steps=steps), "client_id": 7})
+        self.assertEqual(result["steps"], steps)
+        get_client.assert_not_called()
+
+    def test_inherited_stages_are_available_in_stage_filter(self) -> None:
+        steps = [{"id": "offer", "name": "Offer"}]
+        with patch.object(hps.db, "get_all_jds", return_value=[{**_jd(), "client_id": 7}]), \
+             patch.object(hps.db, "get_client_by_id", return_value={"hiring_stages": steps}):
+            groups = hps.get_stage_options()
+        self.assertEqual(groups[0]["steps"], steps)
+
     def test_unconfigured_jd_reports_not_configured(self) -> None:
         result = hps.compute_effective_stage(_candidate(), _jd(steps=[]))
         self.assertFalse(result["configured"])
@@ -102,6 +152,25 @@ class ComputeEffectiveStageTests(unittest.TestCase):
 
 
 class ApplyHiringEventTests(unittest.TestCase):
+    def test_assessment_pass_advances_to_next_configured_round(self) -> None:
+        steps = [{"id": "s1", "name": "Screening"}, {"id": "s2", "name": "Assessment"},
+                 {"id": "s3", "name": "Technical Round"}, {"id": "s4", "name": "Offer"}]
+        with patch.object(hps.db, "get_candidate_by_id", return_value=_candidate(stage_id="s2")), \
+             patch.object(hps.db, "get_jd_by_id", return_value=_jd(steps)), \
+             patch.object(hps.db, "update_candidate", return_value=True) as update:
+            self.assertTrue(hps.advance_after_assessment(10, 1))
+        update.assert_called_once_with(10, {"stage_id": "s3"})
+
+    def test_assessment_does_not_override_hold_or_later_stage(self) -> None:
+        steps = [{"id": "s1", "name": "Assessment"}, {"id": "s2", "name": "Interview"},
+                 {"id": "s3", "name": "Offer"}]
+        for candidate in (_candidate(on_hold=True), _candidate(automation_paused=True), _candidate(stage_id="s3")):
+            with patch.object(hps.db, "get_candidate_by_id", return_value=candidate), \
+                 patch.object(hps.db, "get_jd_by_id", return_value=_jd(steps)), \
+                 patch.object(hps.db, "update_candidate") as update:
+                self.assertFalse(hps.advance_after_assessment(10, 1))
+            update.assert_not_called()
+
     def _run(self, candidate, jd, event_key):
         with patch.object(hps.db, "get_candidate_by_id", return_value=candidate), \
             patch.object(hps.db, "get_jd_by_id", return_value=jd), \

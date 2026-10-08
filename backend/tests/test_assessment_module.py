@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import sys
 import unittest
+from unittest.mock import patch
+from flask import Flask
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -21,10 +23,27 @@ from assessment.utilities import (
     generate_access_token,
     score_assessment,
     score_question,
+    assessment_link,
+    validate_public_assessment_link,
 )
 
 
 class AssessmentUtilitiesTests(unittest.TestCase):
+    def test_link_uses_serving_app_origin_instead_of_loopback_default(self) -> None:
+        with patch.dict('os.environ', {}, clear=True), Flask(__name__).test_request_context(base_url='https://hiring.example.com'):
+            link = assessment_link(generate_access_token())
+        self.assertTrue(link.startswith('https://hiring.example.com/assessment/'))
+
+    def test_public_url_configuration_takes_precedence(self) -> None:
+        with patch.dict('os.environ', {'CANDIDATE_TEST_BASE_URL': 'https://tests.example.com'}, clear=True):
+            link = assessment_link(generate_access_token())
+        self.assertTrue(link.startswith('https://tests.example.com/assessment/'))
+
+    def test_local_links_cannot_be_emailed_to_candidates(self) -> None:
+        for host in ('localhost', '127.0.0.1', '0.0.0.0', '192.168.1.5'):
+            with self.assertRaises(ValueError):
+                validate_public_assessment_link(f'http://{host}:5001/assessment/token')
+
     def test_generate_access_token_is_uuid(self) -> None:
         token = generate_access_token()
         self.assertEqual(len(token), 36)

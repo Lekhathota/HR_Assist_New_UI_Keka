@@ -12,6 +12,7 @@ import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { currentReportId, issueReportId } from '../utils/reportId.js';
 import { useRoleCategories } from '../utils/useRoleCategories.js';
+import { dedupeCandidates } from '../utils/candidateGrouping.js';
 
 
 const ROLE_CATEGORY_FILTER_LABELS = {
@@ -31,24 +32,6 @@ const ROLE_CATEGORY_FILTER_LABELS = {
 // records (one per JD match). Collapse those into one card per person, merging
 // their applied roles, so the Talent page shows one candidate with every role
 // they've applied for underneath their name instead of duplicate cards.
-function dedupeCandidates(rows) {
-  const order = [];
-  const groups = new Map();
-  for (const c of rows) {
-    const email = (c.email || '').trim().toLowerCase();
-    const name = (c.name || '').trim().toLowerCase();
-    const key = email || (name ? `name:${name}` : null);
-    if (!key) { order.push(c.id); groups.set(c.id, { ...c, applied_roles: [...(c.applied_roles || [])] }); continue; }
-    const existing = groups.get(key);
-    if (!existing) {
-      order.push(key);
-      groups.set(key, { ...c, applied_roles: [...(c.applied_roles || [])] });
-    } else {
-      existing.applied_roles = Array.from(new Set([...(existing.applied_roles || []), ...(c.applied_roles || [])]));
-    }
-  }
-  return order.map(key => groups.get(key));
-}
 
 const EMPTY_FILTERS = { clientId: '', projectId: '', status: '', stageId: '', uploadFrom: '', uploadTo: '', interviewFrom: '', interviewTo: '' };
 
@@ -228,7 +211,7 @@ function Candidates() {
 
   const baseRows = serverFiltered ?? candidates;
   const filtered = baseRows.filter(c => {
-    const haystack = `${c.name || ''} ${c.client_name || ''} ${c.primary_category || ''}`.toLowerCase();
+    const haystack = `${c.name || ''} ${c.client_name || ''} ${c.primary_category || ''} ${(c.job_applications || []).map(job => job.jd_title).join(' ')}`.toLowerCase();
     const matchSearch = haystack.includes(searchTerm.toLowerCase());
     const matchCategory = !filterCategory || c.primary_category === filterCategory;
     return matchSearch && matchCategory;
@@ -1454,7 +1437,14 @@ function Candidates() {
                         <input type="checkbox" checked={selectedIds.has(c.id)}
                           onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.name}`} />
                       </td>
-                      <td className="candidates-simple-name">{c.name}</td>
+                      <td className="candidates-simple-name">
+                        {c.name}
+                        <div className="candidates-job-statuses">
+                          {(c.job_applications || []).map(job => (
+                            <div key={job.jd_id ?? job.jd_title}>{job.jd_title} · {job.status}</div>
+                          ))}
+                        </div>
+                      </td>
                       <td className="candidates-simple-client">{c.client_name || 'No client'}</td>
                       <td className="candidates-simple-stage" data-label="Stage">
                         <StageTrackerDelivery screeningStatus={c.screening_status ?? null} steps={c.hiring_process_steps} stageId={c.stage_id} hiringStage={c.hiring_stage} onHold={Boolean(c.on_hold)} />

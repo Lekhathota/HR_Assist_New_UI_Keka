@@ -2014,6 +2014,23 @@ def get_available_bench_candidates_for_category(category: str, project_id: Optio
 
 
 # Purpose: Fetches candidate by id from storage or service context.
+def get_related_candidate_records(candidate: dict) -> list[dict]:
+    """Find submissions belonging to the same contact; never merge by name alone."""
+    email = str(candidate.get("email") or (candidate.get("structured_data") or {}).get("email") or "").strip()
+    if email:
+        match = {"$regex": "^\\s*" + re.escape(email) + "\\s*$", "$options": "i"}
+        query = {"$or": [{"email": match}, {"structured_data.email": match}]}
+    else:
+        phone = str(candidate.get("phone") or "").strip()
+        if not phone:
+            return [candidate]
+        query = {"phone": phone, "email": {"$in": [None, ""]}}
+    rows = _serialize_docs(list(_database().candidates.find(query)))
+    if not any(row.get("id") == candidate.get("id") for row in rows):
+        rows.append(candidate)
+    return rows
+
+
 def get_candidate_by_id(candidate_id: int) -> Optional[dict]:
     row = _database().candidates.find_one({"id": int(candidate_id)})
     return _serialize_doc(row)

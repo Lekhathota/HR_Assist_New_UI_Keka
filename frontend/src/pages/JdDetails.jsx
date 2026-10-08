@@ -1609,6 +1609,12 @@ const downloadPDF = (reportText) => {
           <div className="jx-hero-actions">
             <button type="button" className="jx-btn jx-btn-ghost" onClick={openEditModal}><i className="fas fa-pen" aria-hidden="true"></i> Edit JD</button>
             <button type="button" className="jx-btn jx-btn-ghost" onClick={() => setShowModal(true)}><i className="fas fa-file-export" aria-hidden="true"></i> Generate report</button>
+            {jd.status !== 'Closed' && (
+              <button type="button" className="jx-btn jx-btn-ghost" onClick={() => navigate(`/analyze?jd=${encodeURIComponent(jd.id)}&source=upload`)}
+                title="Upload resumes and match them against this job on the Analyze page">
+                <i className="fas fa-file-arrow-up" aria-hidden="true"></i> Upload resumes
+              </button>
+            )}
             <button type="button" className="jx-btn jx-btn-primary" onClick={openAssignVendors}><i className="fas fa-handshake" aria-hidden="true"></i> Assign vendors</button>
             {isAdmin && jd.status !== 'Closed' && (
               <button type="button" className="jx-btn jx-btn-danger" onClick={closeJob}><i className="fas fa-lock" aria-hidden="true"></i> Close job</button>

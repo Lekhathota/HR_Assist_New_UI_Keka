@@ -81,6 +81,22 @@ class CandidatesPayloadStatusFilterTests(unittest.TestCase):
 
 
 class DeriveScreeningStatusTests(unittest.TestCase):
+    def test_profile_includes_rejected_jobs_from_other_submissions(self) -> None:
+        candidate = {"id": 1, "jd_id": 10, "email": "person@example.com", "status": "Selected", "hiring_process_steps": [{"id": "stage"}]}
+        comparisons = {
+            1: [{"jd_id": 10, "jd_title": "Developer", "match_score": 90, "status": "Selected"}],
+            2: [{"jd_id": 20, "jd_title": "Tester", "match_score": 20, "status": "Rejected"}],
+        }
+        with patch.object(candidate_service.db, "get_candidate_by_id", return_value=candidate), \
+             patch.object(candidate_service, "normalize_candidate_record", side_effect=lambda row: row), \
+             patch.object(candidate_service.db, "get_related_candidate_records", return_value=[candidate, {"id": 2}]), \
+             patch.object(candidate_service.db, "get_comparisons", side_effect=lambda candidate_id: comparisons[candidate_id]), \
+             patch.object(candidate_service.db, "get_interviews", return_value=[]):
+            payload = candidate_service.candidate_profile_payload(1)
+        summaries = payload["candidate"]["screening_summaries"]
+        self.assertEqual([(item["jd_title"], item["status"]) for item in summaries],
+                         [("Developer", "Selected"), ("Tester", "Rejected")])
+
     def test_comparison_status_and_waitlist_precedence(self) -> None:
         candidate = {"status": "Rejected"}
         self.assertEqual(candidate_service.derive_screening_status(candidate, {"status": "sElEcTeD"}), "accepted")

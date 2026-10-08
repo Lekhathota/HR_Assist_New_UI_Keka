@@ -9,6 +9,7 @@ from uuid import uuid4
 import database as db
 
 EVENT_KEYS = (
+    "assessment_passed",
     "scheduled",
     "rescheduled",
     "selected_after_interview",
@@ -94,8 +95,32 @@ def validate_step_removal(
 
 
 # Purpose: Resolves the display-ready effective hiring stage for one candidate.
+def resolve_process(jd: dict[str, Any] | None, candidate: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Use a job override when present, otherwise inherit the client's default pipeline."""
+    jd = jd or {}
+    candidate = candidate or {}
+    process = normalize_process(jd.get("hiring_process"))
+    if process["steps"]:
+        return process
+    client_id = jd.get("client_id") or candidate.get("client_id")
+    account_id = jd.get("client_account_id") or candidate.get("client_account_id")
+    if client_id:
+        client = db.get_client_by_id(int(client_id)) or {}
+    elif account_id:
+        client = db.get_client_by_account_id(account_id) or {}
+    else:
+        return process
+    pipeline = next(
+        (item for item in client.get("hiring_pipelines", [])
+         if item.get("is_default") and not item.get("is_archived")),
+        None,
+    )
+    stages = pipeline.get("stages", []) if pipeline else client.get("hiring_stages", [])
+    return normalize_process({"steps": stages})
+
+
 def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None) -> dict[str, Any]:
-    process = normalize_process((jd or {}).get("hiring_process"))
+    process = resolve_process(jd, candidate)
     steps = process["steps"]
     if not steps:
         return {
@@ -107,6 +132,16 @@ def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None
             "steps": [],
         }
     stage_id = candidate.get("stage_id")
+    # Existing screened candidates have no stored stage. Reflect their known
+    # progress in inherited pipelines without guessing completion of later rounds.
+    inherited = not normalize_process((jd or {}).get("hiring_process"))["steps"]
+    if not stage_id and inherited and not candidate.get("automation_paused"):
+        hiring_stage = str(candidate.get("hiring_stage") or "").casefold()
+        name = "interview" if "interview" in hiring_stage else "screening" if (
+            str(candidate.get("status") or "").casefold() in {"selected", "rejected"}
+            or candidate.get("screening_status") in {"accepted", "rejected", "waitlisted"}
+        ) else None
+        stage_id = next((step["id"] for step in steps if step["name"].casefold() == name), None)
     stage_name = next((step["name"] for step in steps if step["id"] == stage_id), None) or "Not Started"
     return {
         "configured": True,
@@ -126,7 +161,7 @@ def apply_hiring_event(candidate_id: int, jd_id: int | None, event_key: str) -> 
     jd = db.get_jd_by_id(int(jd_id))
     if not candidate or not jd:
         return False
-    process = normalize_process(jd.get("hiring_process"))
+    process = resolve_process(jd)
     if not process["steps"] or candidate.get("on_hold") or candidate.get("automation_paused"):
         return False
     mapped_step_id = process["event_mappings"].get(event_key)
@@ -137,11 +172,37 @@ def apply_hiring_event(candidate_id: int, jd_id: int | None, event_key: str) -> 
 
 
 # Purpose: Aggregates distinct configured steps across JDs, grouped by requirement (project).
+def advance_after_assessment(candidate_id: int, jd_id: int) -> bool:
+    """Advance a passing candidate once, respecting manual state and pipeline order."""
+    candidate = db.get_candidate_by_id(candidate_id)
+    jd = db.get_jd_by_id(jd_id) if jd_id else None
+    if not candidate or candidate.get("on_hold") or candidate.get("automation_paused"):
+        return False
+    if candidate.get("jd_id") and int(candidate["jd_id"]) != jd_id:
+        return False
+    process = resolve_process(jd, candidate)
+    steps = process["steps"]
+    current = next((i for i, step in enumerate(steps) if step["id"] == candidate.get("stage_id")), -1)
+    assessment_index = next((i for i, step in enumerate(steps)
+                             if "assessment" in step["name"].casefold() or "test" == step["name"].casefold()), -1)
+    mapped = process["event_mappings"].get("assessment_passed")
+    if mapped:
+        target = next(i for i, step in enumerate(steps) if step["id"] == mapped)
+    elif assessment_index >= 0:
+        target = assessment_index + 1
+    else:
+        screening = next((i for i, step in enumerate(steps) if step["name"].casefold() == "screening"), -1)
+        target = screening + 1 if screening >= 0 else -1
+    if target < 0 or target >= len(steps) or target <= current:
+        return False
+    return bool(db.update_candidate(candidate_id, {"stage_id": steps[target]["id"]}))
+
+
 def get_stage_options(project_id: int | None = None) -> list[dict[str, Any]]:
     jds = db.get_all_jds({"project_id": project_id} if project_id else None)
     groups: dict[int, dict[str, Any]] = {}
     for jd in jds:
-        process = normalize_process(jd.get("hiring_process"))
+        process = resolve_process(jd)
         if not process["steps"]:
             continue
         pid = int(jd.get("project_id") or 0)

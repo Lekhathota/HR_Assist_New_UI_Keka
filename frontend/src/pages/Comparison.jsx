@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { apiGet, apiPostForm } from '../api.js';
 import { initials } from '../utils/userDisplay.js';
@@ -25,9 +25,11 @@ const SORTS = {
 };
 
 function Comparison() {
+  // /analyze?jd=<id>&source=upload (from a job's "Upload resumes" button) preselects the job and source.
+  const [searchParams] = useSearchParams();
   const [jds, setJds] = useState([]);
-  const [selectedJdId, setSelectedJdId] = useState('');
-  const [source, setSource] = useState('bench');
+  const [selectedJdId, setSelectedJdId] = useState(() => searchParams.get('jd') || '');
+  const [source, setSource] = useState(() => (searchParams.get('source') === 'upload' ? 'upload' : 'bench'));
   const [resumeFiles, setResumeFiles] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(-1);

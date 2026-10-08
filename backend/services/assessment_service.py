@@ -40,6 +40,7 @@ from assessment.utilities import (
     token_expiry,
     token_is_expired,
     utc_now,
+    validate_public_assessment_link,
 )
 from email_utils import normalize_email
 from services.interview_service import default_from_email, send_email
@@ -729,7 +730,11 @@ def _prepare_assessment_send(
 
     token = normalize_access_token(str(assessment.get("access_token") or "")) or generate_access_token()
     expires_at = token_expiry()
-    link = assessment_link(token)
+    try:
+        link = assessment_link(token)
+        validate_public_assessment_link(link)
+    except ValueError as exc:
+        raise AssessmentServiceError(str(exc)) from exc
     from_email = default_from_email(recruiter)
     to_email = normalize_email(to_email_override)
     if not to_email:
@@ -794,13 +799,10 @@ def send_assessment(
     if not is_candidate_test_url(link) or link not in body:
         raise AssessmentServiceError("Candidate test link could not be included in the email.")
 
-    print(f"[email] Candidate test link: {link}", flush=True)
-    send_email(to_email, subject, body, from_email, primary_link=link)
-
     if current_status == AssessmentStatus.DRAFT:
         assert_status_transition(current_status, AssessmentStatus.SENT)
 
-    assessment_repo.update_assessment(
+    saved = assessment_repo.update_assessment(
         assessment_id,
         {
             "status": AssessmentStatus.SENT,
@@ -810,6 +812,17 @@ def send_assessment(
             "candidate_email": to_email,
         },
     )
+
+    if not saved:
+        raise AssessmentServiceError("Could not activate the assessment link. Email was not sent.")
+    try:
+        send_email(to_email, subject, body, from_email, primary_link=link)
+    except Exception:
+        assessment_repo.update_assessment(assessment_id, {
+            key: assessment.get(key) for key in
+            ("status", "access_token", "token_expires_at", "sent_at", "candidate_email")
+        })
+        raise
 
     db.log_audit(
         "Assessment Sent",
@@ -830,7 +843,7 @@ def send_assessment(
     }
 
 
-def _resolve_token_assessment(token: str) -> dict[str, Any]:
+def _resolve_token_assessment(token: str, *, allow_time_expired: bool = False) -> dict[str, Any]:
     raw_token = str(token or "").strip()
     if not raw_token:
         raise AssessmentServiceError("Assessment token is required.", status_code=400)
@@ -856,7 +869,7 @@ def _resolve_token_assessment(token: str) -> dict[str, Any]:
         raise AssessmentServiceError("Assessment is not available yet.", status_code=403)
 
     remaining = remaining_seconds(assessment)
-    if remaining is not None and remaining <= 0:
+    if remaining is not None and remaining <= 0 and not allow_time_expired:
         raise AssessmentServiceError("Assessment time limit has expired.", status_code=403)
 
     return assessment
@@ -925,14 +938,15 @@ def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
 
 
 def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    assessment = _resolve_token_assessment(token)
+    assessment = _resolve_token_assessment(token, allow_time_expired=True)
     assessment_id = int(assessment["id"])
     questions = assessment_repo.get_questions_for_assessment(assessment_id)
     if not questions:
         raise AssessmentServiceError("Assessment has no questions.")
 
     answers_by_question: dict[int, str] = {}
-    if answers:
+    expired = remaining_seconds(assessment) == 0
+    if answers and not expired:
         for item in answers:
             answers_by_question[int(item["question_id"])] = str(item.get("answer") or "")
     else:
@@ -1001,6 +1015,10 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
         int(assessment.get("candidate_id") or 0),
         {"hiring_stage": "Assessment Passed" if passed else "Assessment Failed"},
     )
+
+    if passed:
+        from services.hiring_process_service import advance_after_assessment
+        advance_after_assessment(int(assessment.get("candidate_id") or 0), int(assessment.get("jd_id") or 0))
 
     db.log_audit(
         "Assessment Completed",

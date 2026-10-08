@@ -417,6 +417,15 @@ def normalize_candidate_record(candidate: dict[str, Any], *, repair: bool = True
     candidate["on_hold"] = effective["on_hold"]
     candidate["automation_paused"] = effective["automation_paused"]
     candidate["hiring_process_steps"] = effective["steps"]
+    comparisons = db.get_comparisons(candidate_id=int(candidate["id"])) if candidate.get("id") else []
+    candidate["job_applications"] = [
+        {"jd_id": comparison.get("jd_id"), "jd_title": comparison.get("jd_title") or "Job",
+         "status": comparison.get("status") or "Pending", "candidate_id": candidate.get("id")}
+        for comparison in comparisons
+    ]
+    if jd and not any(item.get("jd_id") == jd.get("id") for item in candidate["job_applications"]):
+        candidate["job_applications"].append({"jd_id": jd.get("id"), "jd_title": jd.get("title") or "Job",
+                                               "status": candidate.get("status") or "Pending", "candidate_id": candidate.get("id")})
     return candidate
 
 
@@ -488,8 +497,21 @@ def candidate_profile_payload(candidate_id: int) -> dict[str, Any] | None:
     if not candidate:
         return None
     candidate = normalize_candidate_record(candidate)
-    _apply_current_hiring_stage(candidate)
-    comps = db.get_comparisons(candidate_id=candidate_id)
+    if not candidate.get("hiring_process_steps"):
+        _apply_current_hiring_stage(candidate)
+    related = db.get_related_candidate_records(candidate)
+    comps = []
+    for submission in related:
+        comps.extend(db.get_comparisons(candidate_id=int(submission["id"])))
+    # Keep the latest screening for each job when a resume was resubmitted.
+    comps.sort(key=lambda item: str(item.get("comparison_date") or ""), reverse=True)
+    seen_jobs = set()
+    latest_comps = []
+    for comparison in comps:
+        if comparison.get("jd_id") not in seen_jobs:
+            latest_comps.append(comparison)
+            seen_jobs.add(comparison.get("jd_id"))
+    comps = latest_comps
     candidate_jd_id = int(candidate.get("jd_id") or 0)
     screening_comparison = next(
         (co for co in comps if int(co.get("jd_id") or 0) == candidate_jd_id),

@@ -15,6 +15,7 @@ from app.job_code_extraction import extract_job_code
 from app.text_extractor import extract_text
 from app.utils import clean_jd_text
 from services.candidate_service import candidates_payload
+from services.hiring_process_service import resolve_process
 from services.role_category_service import categorize_jd
 
 ALLOWED_EXTENSIONS = {"pdf", "docx"}
@@ -189,6 +190,7 @@ def jd_details_payload(jd_id: int) -> dict[str, Any] | None:
         return None
     row = _apply_jd_category(row)
     # raw_text is kept: the Job Details page shows it as the Job Description.
+    row["hiring_process"] = resolve_process(row)
     row["experience"] = row.get("experience") or row.get("experience_required") or ""
     row["file"] = row.get("file") or row.get("file_name") or ""
     created = row.get("created") or row.get("created_at") or ""

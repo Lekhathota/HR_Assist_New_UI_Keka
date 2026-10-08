@@ -20,6 +20,7 @@ from flask_cors import CORS
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
@@ -49,6 +50,8 @@ from security.rbac import enforce_api_role
 
 
 BUILD_DIR = os.path.join(BASE_DIR, "build")
+if not os.path.isfile(os.path.join(BUILD_DIR, "index.html")):
+    BUILD_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "build"))
 
 app = Flask(__name__, template_folder="templates", static_folder="static", static_url_path="/static")
 app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "static", "uploads")
@@ -75,6 +78,21 @@ def _enforce_role_permissions():
     if request.path.startswith("/api/") and request.path not in {"/api/login", "/api/logout"}:
         return enforce_api_role(current_user)
     return None
+
+
+@app.get("/static/js/<path:filename>")
+def frontend_javascript(filename: str):
+    return send_from_directory(os.path.join(BUILD_DIR, "static", "js"), filename)
+
+
+@app.get("/static/css/<path:filename>")
+def frontend_stylesheet(filename: str):
+    return send_from_directory(os.path.join(BUILD_DIR, "static", "css"), filename)
+
+
+@app.get("/static/media/<path:filename>")
+def frontend_media(filename: str):
+    return send_from_directory(os.path.join(BUILD_DIR, "static", "media"), filename)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)

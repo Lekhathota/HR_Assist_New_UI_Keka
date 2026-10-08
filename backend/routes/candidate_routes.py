@@ -16,7 +16,7 @@ from services.candidate_service import (
     parse_calendar_bound,
     repair_all_candidates,
 )
-from services.hiring_process_service import compute_effective_stage, get_stage_options, normalize_process
+from services.hiring_process_service import compute_effective_stage, get_stage_options, resolve_process
 
 candidate_bp = Blueprint("candidate_routes", __name__)
 
@@ -96,7 +96,7 @@ def api_candidate_hiring_state(candidate_id: int):
     if not candidate:
         return jsonify({"error": "Candidate not found"}), 404
     jd = db.get_jd_by_id(int(candidate["jd_id"])) if candidate.get("jd_id") else None
-    process = normalize_process((jd or {}).get("hiring_process"))
+    process = resolve_process(jd, candidate)
     data = request.get_json(silent=True) or {}
     updates: dict[str, Any] = {}
     notes: list[str] = []

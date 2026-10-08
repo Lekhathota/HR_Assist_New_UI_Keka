@@ -7,6 +7,9 @@ from __future__ import annotations
 import os
 import re
 import uuid
+import ipaddress
+from urllib.parse import urlsplit
+from flask import has_request_context, request
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -39,11 +42,27 @@ def token_expiry(days: int | None = None) -> datetime:
 
 def candidate_test_base_url() -> str:
     """Base URL used only for candidate assessment test links (never the recruiter app/dev URL)."""
-    return (
+    base = (
         os.environ.get("CANDIDATE_TEST_BASE_URL")
         or os.environ.get("ASSESSMENT_PUBLIC_URL")
-        or f"http://{os.environ.get('FLASK_HOST', '127.0.0.1')}:{os.environ.get('PORT', '5000')}"
+        or os.environ.get("FRONTEND_URL")
+        or (request.url_root if has_request_context() else "")
     ).rstrip("/")
+    parsed = urlsplit(base)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.query or parsed.fragment:
+        raise ValueError("Set CANDIDATE_TEST_BASE_URL to the public URL serving the candidate assessment page.")
+    return base
+
+
+def validate_public_assessment_link(link: str) -> None:
+    host = (urlsplit(link).hostname or "").lower()
+    local = host in {"localhost", "0.0.0.0"} or host.endswith(".localhost")
+    try:
+        local = local or not ipaddress.ip_address(host).is_global
+    except ValueError:
+        pass
+    if local:
+        raise ValueError("Candidates cannot open a local assessment URL. Set CANDIDATE_TEST_BASE_URL to your publicly accessible app URL before sending.")
 
 
 def normalize_access_token(token: str | None) -> str:

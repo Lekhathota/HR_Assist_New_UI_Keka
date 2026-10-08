@@ -75,3 +75,17 @@ test('shows stats, grouped tabs, score order and search', async () => {
   });
   expect($('.az-list-empty').textContent).toContain('No waitlisted candidates match');
 });
+
+test('opening /analyze?jd=1&source=upload preselects the job and the upload source', async () => {
+  act(() => root.unmount());
+  root = createRoot(container);
+  await act(async () => root.render(
+    <MemoryRouter initialEntries={['/analyze?jd=1&source=upload']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Comparison />
+    </MemoryRouter>,
+  ));
+  expect($('#jd_id').value).toBe('1');
+  expect($('.az-jd').textContent).toContain('Senior AI Engineer');
+  expect($('.az-drop')).not.toBeNull();
+  expect($('.az-hint').textContent).toBe('Add at least one resume to continue.');
+});
