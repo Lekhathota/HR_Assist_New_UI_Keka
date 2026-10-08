@@ -21,6 +21,7 @@ from services.assessment_service import (
     add_question,
     assessment_pipeline_snapshot,
     generate_assessment,
+    generate_jd_exam,
     generate_assessment_email,
     get_assessment_by_token,
     get_assessment_detail,
@@ -70,6 +71,21 @@ def api_assessment_generate():
     except Exception as exc:
         return _json_error(f"Could not generate assessment: {exc}", 500)
     return jsonify({"success": True, **result})
+
+
+@assessment_bp.route("/api/assessment/exam/generate", methods=["POST"])
+@api_login_required
+def api_jd_exam_generate():
+    try:
+        data = request.get_json(silent=True) or {}
+        jd_id = int(data.get("jd_id") or 0)
+        if jd_id < 1:
+            return _json_error("A valid jd_id is required.")
+        return jsonify(generate_jd_exam(jd_id))
+    except AssessmentServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except (ValueError, TypeError, AttributeError):
+        return _json_error("A valid jd_id is required.")
 
 
 @assessment_bp.route("/api/assessment/lookup", methods=["GET"], endpoint="api_assessment_lookup")

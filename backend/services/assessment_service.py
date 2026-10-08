@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import os
-import random
 import uuid
 from datetime import datetime
 from typing import Any
@@ -15,14 +14,12 @@ import database as db
 from assessment import repository as assessment_repo
 from assessment.models import (
     AssessmentStatus,
-    CODING_COUNT,
     DEFAULT_PASSING_SCORE,
-    MCQ_COUNT,
     QuestionType,
-    SQL_COUNT,
     TOTAL_GENERATED_QUESTIONS,
 )
 from assessment.schemas import SchemaValidationError
+from assessment.generation import normalized_jd, requirement_catalog, validate_exam
 from assessment.evaluation_service import evaluate_assessment
 from assessment.utilities import (
     assert_status_transition,
@@ -238,7 +235,7 @@ def _candidate_selected_for_jd(candidate_id: int, jd_id: int) -> bool:
 
 def _load_context(candidate_id: int, jd_id: int) -> dict[str, Any]:
     candidate = db.get_candidate_by_id(candidate_id)
-    jd = db.get_jd_by_id(jd_id, include_raw_text=False)
+    jd = db.get_jd_by_id(jd_id, include_raw_text=True)
     if not candidate:
         raise AssessmentServiceError("Candidate not found.")
     if not jd:
@@ -251,236 +248,69 @@ def _load_context(candidate_id: int, jd_id: int) -> dict[str, Any]:
     return {"candidate": candidate, "jd": jd}
 
 
-def _normalized_jd_payload(jd_row: dict) -> dict:
-    jd_json = jd_row.get("structured_data") or {}
-    if isinstance(jd_json, str):
-        jd_json = json.loads(jd_json)
-    if not isinstance(jd_json, dict):
-        jd_json = {}
-    skills = jd_json.get("required_skills") or jd_row.get("skills") or []
-    jd_json.setdefault("job_title", jd_row.get("title", "Unknown"))
-    jd_json.setdefault("required_skills", skills)
-    jd_json.setdefault("preferred_skills", [])
-    jd_json.setdefault("experience_range", jd_row.get("experience_required") or "")
-    jd_json.setdefault("responsibilities", jd_row.get("responsibilities") or [])
-    return jd_json
+def _generate_questions_with_ai(jd: dict, *, previous_questions=None):
+    """Generate for a posted job only; candidate details are assignment metadata."""
+    context = normalized_jd(jd)
+    if not (context["posted_jd_text"] or context["skills"] or context["responsibilities"] or context["structured_requirements"]):
+        raise AssessmentServiceError("The posted JD has no requirements to assess. Add the complete JD first.")
+    prompt_service = PromptService()
+    feedback = ""
+    catalog = requirement_catalog(context)
+    try:
+        llm = LLMService(model=os.getenv("ASSESSMENT_MODEL") or "gpt-4.1", temperature=0.6)
+    except Exception as exc:
+        raise AssessmentServiceError("AI assessment generation is unavailable. Check the configured AI service; no generic exam was created.") from exc
+    for attempt in range(3):
+        try:
+            prompt = prompt_service.render(
+                "assessment_generate.jinja", jd_data=context,
+                total_questions=TOTAL_GENERATED_QUESTIONS, requirement_catalog=catalog,
+                generation_nonce=uuid.uuid4().hex, validation_feedback=feedback,
+            )
+            exam = parse_json_response(llm.invoke(prompt, temperature=0.6))
+            for question in exam.get("questions", []):
+                if isinstance(question, dict) and question.get("jd_requirement_id"):
+                    ref = question["jd_requirement_id"]
+                    if not isinstance(ref, str) or ref not in catalog:
+                        raise ValueError("Each jd_requirement_id must reference the supplied JD catalog.")
+                    question["jd_requirement"] = catalog[ref]
+            rows = validate_exam(exam, context, TOTAL_GENERATED_QUESTIONS, previous_questions or ())
+            review = parse_json_response(llm.invoke(prompt_service.render(
+                "assessment_validate.jinja", jd_data=context, requirement_catalog=catalog, exam=exam,
+            ), temperature=0.0))
+            if not isinstance(review, dict) or review.get("valid") is not True or review.get("issues") != []:
+                raise ValueError("JD review rejected the exam: " + str(review.get("issues", "invalid review") if isinstance(review, dict) else "invalid review"))
+            return {key: exam[key] for key in ("exam_title", "job_title", "experience_required")}, rows
+        except (ValueError, TypeError, KeyError) as exc:
+            feedback = str(exc)[:2000]
+        except Exception as exc:
+            raise AssessmentServiceError("AI assessment generation failed. Please retry; the existing draft was preserved.") from exc
+    raise AssessmentServiceError("The AI could not produce a complete, validated JD-based exam after three attempts. Please retry. " + feedback)
 
 
-def _fallback_questions(jd: dict) -> list[dict[str, Any]]:
-    """Fallback question set with light variation when AI output is incomplete."""
-    skills = list(jd.get("skills") or []) or ["General Skills", "Problem Solving", "Communication"]
-    random.shuffle(skills)
-    mcq_templates = [
-        "Which option best demonstrates production-ready proficiency in {skill}?",
-        "In a real project, what is the strongest evidence that a candidate can apply {skill} effectively?",
-        "Which behavior most clearly shows practical experience with {skill}?",
-    ]
-    coding_templates = [
-        "Write a function that solves a practical {skill} problem relevant to the {role} position. Include time complexity in a comment.",
-        "Implement a small utility for a {role} workflow using {skill}. Handle invalid input and explain the complexity.",
-        "Build a concise solution for a realistic {skill} task a {role} would face. Include one edge-case check.",
-    ]
-    sql_prompts = [
-        (
-            "Given tables `employees(id, name, department_id)` and "
-            "`departments(id, name)`, write a SQL query to list each department "
-            "name with the count of employees in that department.",
-            "SELECT d.name, COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees e ON e.department_id = d.id GROUP BY d.name;",
-        ),
-        (
-            "Given tables `candidates(id, name)` and `applications(id, candidate_id, status)`, "
-            "write a SQL query to count selected applications per candidate.",
-            "SELECT c.name, COUNT(a.id) AS selected_count FROM candidates c LEFT JOIN applications a ON a.candidate_id = c.id AND a.status = 'Selected' GROUP BY c.name;",
-        ),
-    ]
-    questions: list[dict[str, Any]] = []
-    order = 0
-
-    for index in range(MCQ_COUNT):
-        skill = skills[index % len(skills)]
-        correct = f"Demonstrated production experience with {skill}"
-        distractors = [
-            f"No experience with {skill}",
-            "Only theoretical knowledge",
-            "Unrelated experience",
-            "Unable to explain tradeoffs",
-        ]
-        options = [correct, *random.sample(distractors, 3)]
-        random.shuffle(options)
-        questions.append(
-            {
-                "question_text": random.choice(mcq_templates).format(skill=skill),
-                "question_type": QuestionType.MCQ.value,
-                "options": options,
-                "correct_answer": correct,
-                "starter_code": "",
-                "points": 10,
-                "skill_tag": str(skill),
-                "sort_order": order,
-            }
-        )
-        order += 1
-
-    for index in range(CODING_COUNT):
-        skill = skills[index % len(skills)]
-        questions.append(
-            {
-                "question_text": random.choice(coding_templates).format(skill=skill, role=jd.get("title") or "role"),
-                "question_type": QuestionType.CODING.value,
-                "options": [],
-                "correct_answer": f"# Reference solution using {skill}",
-                "starter_code": "def solution(data):\n    # Your code here\n    pass\n",
-                "points": 20,
-                "skill_tag": str(skill),
-                "sort_order": order,
-            }
-        )
-        order += 1
-
-    sql_question, sql_answer = random.choice(sql_prompts)
-    questions.append(
-        {
-            "question_text": sql_question,
-            "question_type": QuestionType.SQL.value,
-            "options": [],
-            "correct_answer": sql_answer,
-            "starter_code": "",
-            "points": 15,
-            "skill_tag": "SQL",
-            "sort_order": order,
-        }
-    )
-    return questions
-
-
-def _normalize_ai_question(item: dict[str, Any], question_type: str, sort_order: int) -> dict[str, Any] | None:
-    if not isinstance(item, dict):
-        return None
-    text = str(item.get("question_text") or "").strip()
-    if not text:
-        return None
-    options = [str(x).strip() for x in (item.get("options") or []) if str(x).strip()]
-    correct_answer = str(item.get("correct_answer") or "").strip()
-    if question_type == QuestionType.MCQ.value:
-        options = list(dict.fromkeys(options))[:4]
-        if len(options) != 4 or correct_answer not in options:
-            return None
+def _exam_payload(title, job_title, experience, questions):
     return {
-        "question_text": text,
-        "question_type": question_type,
-        "options": options,
-        "correct_answer": correct_answer,
-        "starter_code": str(item.get("starter_code") or "").strip(),
-        "points": int(item.get("points") or 10),
-        "skill_tag": str(item.get("skill_tag") or "").strip(),
-        "sort_order": sort_order,
+        "exam_title": title, "job_title": job_title,
+        "experience_required": experience or "Not specified",
+        "total_questions": len(questions),
+        "skills_covered": list(dict.fromkeys(q.get("skill_tag") for q in questions if q.get("skill_tag"))),
+        "questions": [{
+            "question_id": q.get("question_id") or f"Q{i+1:03d}",
+            "question": q.get("question_text"), "question_type": str(q.get("question_type") or "mcq").upper(),
+            "skill": q.get("skill_tag"), "correct_answer": q.get("correct_answer"),
+            "options": q.get("options") or [], "starter_code": q.get("starter_code") or "",
+            **{key: q.get(key) for key in ("difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement")},
+        } for i, q in enumerate(questions)],
     }
 
 
-def _previous_question_texts(jd_id: int, *, limit: int = 40) -> list[str]:
-    questions = assessment_repo.get_recent_questions_for_jd(jd_id, limit=limit)
-    texts = []
-    for row in questions:
-        text = str(row.get("question_text") or "").strip()
-        if text:
-            texts.append(text[:240])
-    return list(dict.fromkeys(texts))
-
-
-def _variation_blueprint(jd: dict) -> str:
-    skills = [str(skill).strip() for skill in (jd.get("skills") or []) if str(skill).strip()]
-    focus_skill = random.choice(skills) if skills else str(jd.get("title") or "role fundamentals")
-    blueprint_options = [
-        f"Scenario-heavy assessment focused on practical {focus_skill} work, debugging, and tradeoffs.",
-        f"Concept-depth assessment using different edge cases, production constraints, and {focus_skill} examples.",
-        f"Hands-on assessment with output prediction, troubleshooting, and role-specific implementation tasks around {focus_skill}.",
-        f"Mixed-difficulty assessment emphasizing design choices, failure modes, and applied {focus_skill} decisions.",
-    ]
-    return random.choice(blueprint_options)
-
-
-def _generate_questions_with_ai(
-    jd: dict,
-    candidate: dict,
-    *,
-    previous_questions: list[str] | None = None,
-) -> tuple[str, list[dict[str, Any]]]:
-    generation_nonce = uuid.uuid4().hex
-    prompt_service = PromptService()
-    llm = None
-    title = f"{jd.get('title') or 'Role'} Technical Assessment"
-    questions: list[dict[str, Any]] = []
-    for temperature in (0.7, 0.55):
-        prompt = prompt_service.render(
-            "assessment_generate.jinja",
-            jd_data=_normalized_jd_payload(jd),
-            resume_data=candidate.get("structured_data") or {},
-            mcq_count=MCQ_COUNT,
-            coding_count=CODING_COUNT,
-            sql_count=SQL_COUNT,
-            generation_nonce=generation_nonce,
-            variation_blueprint=_variation_blueprint(jd),
-            previous_questions=(previous_questions or [])[:20],
-        )
-        try:
-            llm = llm or LLMService(temperature=temperature)
-            raw = llm.invoke(prompt, temperature=temperature)
-            parsed = parse_json_response(raw)
-        except Exception:
-            parsed = {}
-
-        title = str(parsed.get("title") or title).strip()
-        questions = []
-        order = 0
-
-        for item in (parsed.get("mcq_questions") or [])[:MCQ_COUNT]:
-            row = _normalize_ai_question(item, QuestionType.MCQ.value, order)
-            if row:
-                questions.append(row)
-                order += 1
-
-        for item in (parsed.get("coding_questions") or [])[:CODING_COUNT]:
-            row = _normalize_ai_question(item, QuestionType.CODING.value, order)
-            if row:
-                if not row["starter_code"]:
-                    row["starter_code"] = "def solution():\n    pass\n"
-                questions.append(row)
-                order += 1
-
-        for item in (parsed.get("sql_questions") or [])[:SQL_COUNT]:
-            row = _normalize_ai_question(item, QuestionType.SQL.value, order)
-            if row:
-                questions.append(row)
-                order += 1
-
-        # Legacy flat "questions" array support
-        if len(questions) < TOTAL_GENERATED_QUESTIONS:
-            for item in (parsed.get("questions") or []):
-                if len(questions) >= TOTAL_GENERATED_QUESTIONS:
-                    break
-                qtype = str(item.get("question_type") or QuestionType.MCQ.value)
-                row = _normalize_ai_question(item, qtype, order)
-                if row:
-                    questions.append(row)
-                    order += 1
-
-        if len(questions) >= TOTAL_GENERATED_QUESTIONS:
-            break
-
-    if len(questions) < TOTAL_GENERATED_QUESTIONS:
-        fallback = _fallback_questions(jd)
-        seen_orders = {q["sort_order"] for q in questions}
-        for item in fallback:
-            if len(questions) >= TOTAL_GENERATED_QUESTIONS:
-                break
-            if item["sort_order"] not in seen_orders:
-                questions.append(item)
-
-    questions.sort(key=lambda q: int(q.get("sort_order") or 0))
-    for index, question in enumerate(questions[:TOTAL_GENERATED_QUESTIONS]):
-        question["sort_order"] = index
-
-    return title, questions[:TOTAL_GENERATED_QUESTIONS]
+def generate_jd_exam(jd_id: int):
+    """Generate an unassigned exam without requiring a candidate or resume."""
+    jd = db.get_jd_by_id(jd_id, include_raw_text=True)
+    if not jd:
+        raise AssessmentServiceError("Job description not found.")
+    metadata, questions = _generate_questions_with_ai(jd)
+    return _exam_payload(metadata["exam_title"], metadata["job_title"], metadata["experience_required"], questions)
 
 
 def _build_assessment_response(assessment_id: int, *, reused: bool = False) -> dict[str, Any]:
@@ -488,6 +318,7 @@ def _build_assessment_response(assessment_id: int, *, reused: bool = False) -> d
     questions = assessment_repo.get_questions_for_assessment(assessment_id)
     return {
         "reused": reused,
+        "exam": _exam_payload(assessment.get("title"), assessment.get("job_role"), assessment.get("experience_required"), questions),
         "assessment": assessment_summary_payload(assessment, questions=questions, include_token=False),
         "questions": [recruiter_question_payload(q) for q in questions],
     }
@@ -517,10 +348,9 @@ def generate_assessment(
                 f"An active assessment already exists (id={existing.get('id')}, status={status})."
             )
 
-    previous_questions = _previous_question_texts(jd_id)
-    generated_title, generated_questions = _generate_questions_with_ai(
+    previous_questions = [str(q.get("question_text") or "") for q in assessment_repo.get_recent_questions_for_jd(jd_id, limit=80)]
+    generated_exam, generated_questions = _generate_questions_with_ai(
         jd,
-        candidate,
         previous_questions=previous_questions,
     )
     assessment_id = assessment_repo.create_assessment(
@@ -529,10 +359,11 @@ def generate_assessment(
             "jd_id": jd_id,
             "recruiter_id": recruiter_id,
             "status": AssessmentStatus.DRAFT,
-            "title": title or generated_title,
+            "title": title or generated_exam["exam_title"],
             "candidate_name": candidate.get("name") or "",
             "candidate_email": normalize_email(candidate.get("email")),
-            "job_role": jd.get("title") or "",
+            "job_role": generated_exam["job_title"],
+            "experience_required": generated_exam["experience_required"],
             "passing_score": passing_score,
             "time_limit_minutes": time_limit_minutes,
         }

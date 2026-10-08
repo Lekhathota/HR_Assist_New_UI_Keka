@@ -71,3 +71,11 @@ npm start
 ```
 
 Keep secrets in `backend/.env`. Do not commit `.env`.
+
+## JD-based assessments
+
+Hiring Pipeline assessments generate 14 JD-based scenario questions in every assessment: 10 MCQs (4 moderate and 6 hard), 2 moderate coding questions, and 2 moderate SQL questions. Complexity is calibrated to JD experience. Coding uses a JD language/tool or pseudocode; SQL tasks use data relevant to JD responsibilities. Drafts can be replaced using **Regenerate from JD**. Candidate information is used only to assign and deliver an assessment.
+
+Assessment generation and review default to `gpt-4.1`, with an independent JD relevance and question-quality review. Set `ASSESSMENT_MODEL` in `backend/.env` to override this model. Generation requires the existing `OPENAI_API_KEY`. Invalid exams are retried up to three times; failure preserves the existing draft and never inserts generic fallback questions.
+
+The authenticated `POST /api/assessment/exam/generate` endpoint accepts `{ "jd_id": 27 }` and returns the requested exam JSON without requiring a candidate or saving an assignment. Answer explanations and evaluation details appear only in recruiter responses.

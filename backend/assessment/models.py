@@ -47,14 +47,16 @@ class QuestionType(str, Enum):
 
 
 DEFAULT_PASSING_SCORE = 70
-DEFAULT_QUESTION_COUNT = 10
+DEFAULT_QUESTION_COUNT = 14
 DEFAULT_TOKEN_TTL_DAYS = 7
 
-# Fixed AI generation blueprint
+# Fixed question mix required for every generated assessment
 MCQ_COUNT = 10
 CODING_COUNT = 2
-SQL_COUNT = 1
+SQL_COUNT = 2
 TOTAL_GENERATED_QUESTIONS = MCQ_COUNT + CODING_COUNT + SQL_COUNT
+MCQ_MEDIUM_COUNT = 4
+MCQ_HARD_COUNT = 6
 
 
 @dataclass

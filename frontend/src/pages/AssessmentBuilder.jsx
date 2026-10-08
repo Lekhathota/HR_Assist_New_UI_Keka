@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
 import '../styles/assessment_builder.css';
@@ -30,6 +30,7 @@ function typeBadgeClass(type) {
 
 function AssessmentBuilder() {
   const { jdId, assessmentId } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -92,6 +93,25 @@ function AssessmentBuilder() {
   }, [notice]);
 
   const showNotice = (msg) => setNotice(msg);
+
+  const handleRegenerate = async () => {
+    if (!window.confirm('Replace this draft with 14 JD-based questions: 10 MCQs, 2 moderate coding and 2 moderate SQL questions?')) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { ok, data } = await apiPost('/api/assessment/generate', {
+        candidate_id: assessment.candidate_id, jd_id: assessment.jd_id,
+        passing_score: draft.passing_score, time_limit_minutes: draft.time_limit_minutes,
+      });
+      if (!ok) throw new Error(data.error || 'Generation failed.');
+      navigate(`/hiring-pipeline/assessment/${data.assessment.id}`);
+      showNotice('JD-based assessment generated.');
+    } catch (err) {
+      setError(err.message || 'Could not regenerate assessment.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleSaveDraft = async () => {
     setBusy(true);
@@ -438,6 +458,9 @@ function AssessmentBuilder() {
             </button>
             {isDraft && (
               <>
+                <button type="button" className="btn btn-secondary" onClick={handleRegenerate} disabled={busy}>
+                  <i className="fas fa-magic" /> {busy ? "Generating..." : "Regenerate from JD"}
+                </button>
                 <button type="button" className="btn btn-secondary" onClick={handleSaveDraft} disabled={busy}>
                   <i className="fas fa-save" /> Save Draft
                 </button>
@@ -528,6 +551,8 @@ function AssessmentBuilder() {
                     {TYPE_LABELS[q.question_type] || q.question_type}
                   </span>
                   {q.skill_tag && <span className="ab-skill">{q.skill_tag}</span>}
+                  {q.difficulty && <span className="ab-badge">{q.difficulty}</span>}
+                  {q.scenario_type && <span className="ab-skill">{q.scenario_type}</span>}
                   <span className="ab-points">{q.points} pts</span>
                   {isDraft && (
                     <div className="ab-question-actions">
@@ -546,6 +571,9 @@ function AssessmentBuilder() {
                   : (
                     <>
                       <p className="ab-question-text">{q.question_text}</p>
+                      {q.explanation && <p><strong>Explanation:</strong> {q.explanation}</p>}
+                      {q.jd_requirement && <p><strong>JD requirement:</strong> {q.jd_requirement}</p>}
+                      {q.evaluation_focus?.length > 0 && <p><strong>Evaluation focus:</strong> {q.evaluation_focus.join(", ")}</p>}
                       {q.question_type === 'mcq' && (
                         <ul className="ab-option-list">
                           {(q.options || []).map(opt => (

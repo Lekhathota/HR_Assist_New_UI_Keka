@@ -198,6 +198,7 @@ def recruiter_question_payload(question: dict[str, Any]) -> dict[str, Any]:
         "correct_answer": question.get("correct_answer") or "",
         "starter_code": question.get("starter_code") or "",
         "points": int(question.get("points") or 0),
+        **{key: question.get(key) for key in ("question_id", "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement") if question.get(key) is not None},
         "skill_tag": question.get("skill_tag") or "",
         "sort_order": int(question.get("sort_order") or 0),
         "created_at": question.get("created_at"),
@@ -207,7 +208,8 @@ def recruiter_question_payload(question: dict[str, Any]) -> dict[str, Any]:
 
 def candidate_question_payload(question: dict[str, Any]) -> dict[str, Any]:
     payload = recruiter_question_payload(question)
-    payload.pop("correct_answer", None)
+    for key in ("correct_answer", "explanation", "evaluation_focus", "jd_requirement"):
+        payload.pop(key, None)
     return payload
 
 

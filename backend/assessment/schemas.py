@@ -7,11 +7,8 @@ from __future__ import annotations
 from typing import Any
 
 from assessment.models import (
-    CODING_COUNT,
     DEFAULT_PASSING_SCORE,
-    MCQ_COUNT,
     QuestionType,
-    SQL_COUNT,
     TOTAL_GENERATED_QUESTIONS,
 )
 
@@ -76,9 +73,6 @@ def validate_generate_payload(data: dict[str, Any]) -> dict[str, Any]:
         "passing_score": _optional_int(data.get("passing_score"), DEFAULT_PASSING_SCORE, minimum=1, maximum=100),
         "time_limit_minutes": _optional_int(data.get("time_limit_minutes"), 90, minimum=5, maximum=480),
         "title": _optional_str(data.get("title")),
-        "mcq_count": MCQ_COUNT,
-        "coding_count": CODING_COUNT,
-        "sql_count": SQL_COUNT,
         "total_questions": TOTAL_GENERATED_QUESTIONS,
     }
 
