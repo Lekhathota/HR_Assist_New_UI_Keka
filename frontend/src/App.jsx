@@ -24,6 +24,7 @@ const HiringPipeline = lazy(() => import('./pages/Interviews.jsx'));
 const Reports = lazy(() => import('./pages/Reports.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const CandidateAssessment = lazy(() => import('./pages/CandidateAssessment.jsx'));
+const InterviewResponse = lazy(() => import('./pages/InterviewResponse.jsx'));
 const AssessmentBuilder = lazy(() => import('./pages/AssessmentBuilder.jsx'));
 
 
@@ -52,6 +53,7 @@ function App() {
 
         <Route path="/login" element={<Login />} />
         <Route path="/assessment/:token" element={<CandidateAssessment />} />
+        <Route path="/interview/:token" element={<InterviewResponse />} />
         <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Navigate to="/welcome" replace /></ProtectedRoute>} />
 

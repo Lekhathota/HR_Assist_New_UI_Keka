@@ -2505,6 +2505,145 @@ body.frontend-polish .enterprise-toast {
     color: #687089;
 }
 
+/* Automated interview recovery (reschedule / no-show) */
+.interview-status-warn {
+    background: #fff1e3;
+    color: #b45309;
+}
+
+.interview-status-row .recovery-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.32rem 0.6rem;
+    border: 0;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.recovery-escalations {
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #f5cdc7;
+    border-radius: 12px;
+    background: #fff6f4;
+}
+
+.recovery-escalations h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+    color: #a42c24;
+    width: auto;
+    border: 0;
+    text-align: left;
+    padding: 0;
+}
+
+.recovery-escalations > p {
+    margin: 0 0 0.75rem;
+    color: #687089;
+    font-size: 0.9rem;
+}
+
+.recovery-escalations ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.recovery-escalations li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.recovery-escalations li > div:first-child {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.recovery-escalations li span,
+.recovery-escalations li em {
+    font-size: 0.88rem;
+    color: #4b5563;
+    overflow-wrap: anywhere;
+}
+
+.recovery-escalation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.recovery-modal-note {
+    color: #4b5563;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.recovery-modal-alert {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: #fff6f4;
+    color: #a42c24;
+}
+
+.recovery-history {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: grid;
+    gap: 0.4rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.recovery-history li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 8px;
+    background: #f7f9fb;
+    font-size: 0.88rem;
+}
+
+.recovery-history li > span:not(.recovery-history-time):not(.recovery-history-action):not(.recovery-history-error) {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.recovery-history-time {
+    color: #687089;
+    font-variant-numeric: tabular-nums;
+}
+
+.recovery-history-action {
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.recovery-history-error {
+    flex-basis: 100%;
+    color: #a42c24;
+    overflow-wrap: anywhere;
+}
+
 .interviews-empty {
     padding: 2rem;
     border-radius: 8px;

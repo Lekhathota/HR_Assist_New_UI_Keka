@@ -1,0 +1,33 @@
+/* Public candidate interview page (reschedule / no-show response). Builds on assessment_candidate.css. */
+.ir-card { max-width: 640px; margin: 40px auto; padding: 32px; background: #fff; border: 1px solid #e9edf2; border-radius: 20px; box-shadow: 0 5px 25px rgb(22 32 49 / 3%); }
+.ir-logo { width: 170px; height: auto; display: block; margin-bottom: 24px; }
+#ca-root .ir-card h1 { font-size: 24px; font-weight: 650; margin: 0 0 6px; }
+.ir-meta { margin: 0; color: #465166; font-size: 16px; line-height: 1.5; }
+.ir-tz { margin: 4px 0 0; color: #6a7483; font-size: 13px; }
+.ir-banner { margin: 20px 0 0; padding: 14px 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; }
+.ir-banner-info { background: #fff4ec; color: #8a3d00; border: 1px solid #ffd9bd; }
+.ir-banner-good { background: #e8f5ee; color: #1f6e4a; border: 1px solid #bfe3cf; }
+.ir-banner-muted { background: #f3f5f8; color: #556073; border: 1px solid #e2e7ee; }
+.ir-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.ir-card .ca-btn { min-height: 50px; padding: 12px 22px; font-size: 16px; }
+.ir-slots { border: 0; padding: 0; margin: 22px 0 0; display: grid; gap: 10px; min-width: 0; }
+.ir-slots legend { font-weight: 650; margin-bottom: 10px; color: #162031; }
+.ir-slot { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 18px; border: 1px solid #e2e7ee; border-radius: 12px; background: #fff; color: #162031; font-family: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.ir-slot:hover:not(:disabled) { border-color: #ff6a00; background: #fff4ec; }
+.ir-slot i { color: #ff6a00; }
+.ir-wide { width: 100%; margin-top: 18px; }
+.ir-request { display: grid; gap: 10px; margin-top: 20px; }
+.ir-request label { font-weight: 650; color: #162031; }
+#ca-root .ir-request textarea, #ca-root .ir-window input { border: 1px solid #dce3ec; border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 15px; background: #fff; color: #162031; }
+.ir-help { margin: 0; color: #6a7483; font-size: 14px; }
+.ir-window { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.ir-window .ca-icon-button { width: 40px; height: 40px; }
+.ir-link { justify-self: start; background: none; border: 0; padding: 4px 0; color: #ff6a00; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.ir-decline { display: block; margin-top: 22px; color: #697587; text-decoration: underline; font-weight: 500; }
+.ir-slot:disabled, .ir-link:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 560px) {
+  .ir-card { margin: 12px auto; padding: 20px 16px; border-radius: 16px; }
+  .ir-window { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .ir-window input[type="date"] { grid-column: 1 / -1; }
+  .ir-actions .ca-btn { flex: 1 1 100%; }
+}

@@ -39,6 +39,39 @@ function statusClass(value) {
   return 'interview-status-muted';
 }
 
+// Automated reschedule / no-show recovery case shown on an interview card.
+function recoveryLabel(recovery) {
+  if (!recovery) return null;
+  const noShow = recovery.recovery_type === 'NO_SHOW';
+  switch (recovery.status) {
+    case 'PENDING':
+    case 'PROCESSING':
+      return { text: noShow ? 'No-show follow-up in progress' : 'Reschedule requested', tone: 'warn' };
+    case 'RETRY_SCHEDULED':
+      return { text: noShow ? 'No-show follow-up in progress' : 'Searching for available slots', tone: 'warn' };
+    case 'AWAITING_RESPONSE':
+      return { text: 'No-show follow-up: awaiting candidate', tone: 'warn' };
+    case 'SLOT_PROPOSED':
+      return { text: 'Awaiting candidate slot choice', tone: 'warn' };
+    case 'RESCHEDULED':
+      return { text: 'New slot confirmed', tone: 'good' };
+    case 'RECOVERED':
+      return { text: 'Recovery completed', tone: 'good' };
+    case 'ESCALATED':
+      return { text: 'Escalation required', tone: 'bad' };
+    case 'CLOSED':
+      return recovery.outcome === 'candidate_declined' ? { text: 'Candidate withdrew', tone: 'bad' } : null;
+    default:
+      return null;
+  }
+}
+
+const RECOVERY_TONE_CLASS = { good: 'interview-status-good', bad: 'interview-status-bad', warn: 'interview-status-warn' };
+
+function isRecoveryOpen(recovery) {
+  return Boolean(recovery) && !['RESCHEDULED', 'RECOVERED', 'CLOSED'].includes(recovery.status);
+}
+
 function prettyStatus(value) {
   return String(value || '').replace(/_/g, ' ');
 }
@@ -215,6 +248,12 @@ function HiringPipeline() {
   const [generatingScheduleEmail, setGeneratingScheduleEmail] = useState(false);
   const [scheduleBusy, setScheduleBusy] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
+  const [escalations, setEscalations] = useState([]);
+  const [recoveryCase, setRecoveryCase] = useState(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [logRequestActive, setLogRequestActive] = useState(null);
+  const [logRequestReason, setLogRequestReason] = useState('');
+  const [attendanceBusyId, setAttendanceBusyId] = useState(null);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const timeOptions = useMemo(() => buildTimeOptions(blockedSlots), [blockedSlots]);
 
@@ -242,10 +281,87 @@ function HiringPipeline() {
     }
   };
 
+  const loadEscalations = async () => {
+    try {
+      const data = await apiGet('/api/interview-recovery/cases?status=ESCALATED');
+      setEscalations(data.cases || []);
+    } catch {
+      setEscalations([]);
+    }
+  };
+
   useEffect(() => {
     loadInterviews();
     loadAssessments();
+    loadEscalations();
   }, []);
+
+  const refreshRecovery = async () => {
+    await Promise.all([loadInterviews(), loadEscalations()]);
+  };
+
+  const openRecoveryCase = async (caseId) => {
+    setRecoveryBusy(true);
+    try {
+      const data = await apiGet(`/api/interview-recovery/cases/${caseId}`);
+      setRecoveryCase(data.case || null);
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Could not load recovery history.' });
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const recoveryAction = async (caseId, action) => {
+    setRecoveryBusy(true);
+    try {
+      const { ok, data } = await apiPost(`/api/interview-recovery/cases/${caseId}/${action}`, {});
+      if (!ok || !data.success) throw new Error(data.error || 'Recovery action failed.');
+      setRecoveryCase(data.case || null);
+      toast({ type: 'success', message: action === 'retry' ? 'Automated recovery restarted.' : 'Recovery case closed.' });
+      await refreshRecovery();
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Recovery action failed.' });
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const markAttendance = async (interview, attendance) => {
+    setAttendanceBusyId(interview.id);
+    try {
+      const { ok, data } = await apiPost(`/api/interviews/${interview.id}/attendance`, { attendance });
+      if (!ok || !data.success) throw new Error(data.error || 'Could not record attendance.');
+      toast({
+        type: 'success',
+        message: attendance === 'no_show' ? 'No-show recorded. The candidate is being contacted automatically.' : 'Attendance recorded.',
+      });
+      await refreshRecovery();
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Could not record attendance.' });
+    } finally {
+      setAttendanceBusyId(null);
+    }
+  };
+
+  const submitLoggedRequest = async () => {
+    if (!logRequestActive) return;
+    setRecoveryBusy(true);
+    try {
+      const { ok, data } = await apiPost(`/api/interviews/${logRequestActive.id}/recovery/reschedule-request`, {
+        reason: logRequestReason.trim(),
+      });
+      if (!ok || !data.success) throw new Error(data.error || 'Could not start automated rescheduling.');
+      setLogRequestActive(null);
+      setLogRequestReason('');
+      toast({ type: 'success', message: 'Automated rescheduling started. The candidate will receive available times.' });
+      await refreshRecovery();
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Could not start automated rescheduling.' });
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
 
   useEffect(() => {
     const activeDate = rescheduleActive ? rescheduleForm.interview_date : scheduleActive ? scheduleDate : '';
@@ -841,6 +957,34 @@ function HiringPipeline() {
 
         {activeTab === 'interviews' && (
           <>
+        {escalations.length > 0 && (
+          <section className="recovery-escalations" aria-label="Interview recovery needing attention">
+            <h2><i className="fas fa-triangle-exclamation"></i> Needs your attention ({escalations.length})</h2>
+            <p>Automated rescheduling could not finish for these interviews. Everything else is being handled automatically.</p>
+            <ul>
+              {escalations.map(entry => {
+                const interview = interviews.find(item => item.id === entry.interview_id);
+                return (
+                  <li key={entry.id}>
+                    <div>
+                      <strong>{interview?.candidate_name || `Interview #${entry.interview_id}`}</strong>
+                      <span>{entry.recovery_type === 'NO_SHOW' ? 'No-show' : 'Reschedule request'} - {entry.escalation_reason}</span>
+                      {entry.recommended_action && <em>Next step: {entry.recommended_action}</em>}
+                    </div>
+                    <div className="recovery-escalation-actions">
+                      <button type="button" className="btn btn-secondary" onClick={() => openRecoveryCase(entry.id)} disabled={recoveryBusy}>
+                        <i className="fas fa-clock-rotate-left"></i> History
+                      </button>
+                      <button type="button" className="btn btn-primary" onClick={() => recoveryAction(entry.id, 'retry')} disabled={recoveryBusy}>
+                        <i className="fas fa-rotate"></i> Retry
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
         <div className="interviews-toolbar">
           <div className="interviews-tabs" role="tablist" aria-label="Interview filters">
             {[
@@ -874,6 +1018,7 @@ function HiringPipeline() {
               <option value="scheduled">Scheduled</option>
               <option value="rescheduled">Rescheduled</option>
               <option value="cancelled">Cancelled</option>
+              <option value="no show">No show</option>
               <option value="client interview pending">Client pending</option>
               <option value="rejected after interview">Rejected after interview</option>
             </select>
@@ -900,6 +1045,10 @@ function HiringPipeline() {
                     const past = isPastInterview(item);
                     const cancelled = isCancelled(item);
                     const lockedOutcome = isOutcomeLocked(item);
+                    const recovery = recoveryLabel(item.recovery);
+                    const recoveryOpen = isRecoveryOpen(item.recovery);
+                    const noShow = normalizeStatus(item.status) === 'no show';
+                    const canMarkAttendance = past && !cancelled && !lockedOutcome && !noShow && item.attendance_status !== 'attended';
                     return (
                       <article
                         key={item.id}
@@ -924,6 +1073,12 @@ function HiringPipeline() {
                             <span className={statusClass(textStatus)}>Text: {prettyStatus(textStatus || 'sent')}</span>
                             <span className={statusClass(item.followup_status)}>Follow-up: {prettyStatus(item.followup_status || 'not sent')}</span>
                             {item.cancellation_status === 'sent' && <span className={statusClass('sent')}>Cancellation: sent</span>}
+                            {recovery && (
+                              <button type="button" className={`recovery-chip ${RECOVERY_TONE_CLASS[recovery.tone]}`}
+                                onClick={() => openRecoveryCase(item.recovery.id)} title="View automated recovery history">
+                                <i className="fas fa-robot"></i> {recovery.text}
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="interview-card-actions">
@@ -931,6 +1086,22 @@ function HiringPipeline() {
                             <button type="button" className="btn btn-secondary" onClick={() => openReschedule(item)}>
                               <i className="fas fa-calendar-plus"></i> Reschedule
                             </button>
+                          )}
+                          {!past && !cancelled && !recoveryOpen && (
+                            <button type="button" className="btn btn-secondary" onClick={() => { setLogRequestActive(item); setLogRequestReason(''); }}
+                              title="The candidate asked to move this interview: offer them new times automatically">
+                              <i className="fas fa-wand-magic-sparkles"></i> Candidate asked to reschedule
+                            </button>
+                          )}
+                          {canMarkAttendance && (
+                            <>
+                              <button type="button" className="btn btn-secondary" onClick={() => markAttendance(item, 'attended')} disabled={attendanceBusyId === item.id}>
+                                <i className="fas fa-user-check"></i> Attended
+                              </button>
+                              <button type="button" className="btn btn-warning" onClick={() => markAttendance(item, 'no_show')} disabled={attendanceBusyId === item.id}>
+                                {attendanceBusyId === item.id ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-user-slash"></i> No-show</>}
+                              </button>
+                            </>
                           )}
                           <button type="button" className="btn btn-primary" onClick={() => openFollowup(item)} disabled={cancelled}>
                             <i className="fas fa-reply"></i> Follow-up
@@ -1121,6 +1292,92 @@ function HiringPipeline() {
                 >
                   {scheduleBusy ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send & Schedule</>}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {logRequestActive && (
+          <div className="jd-modal-backdrop" role="presentation">
+            <div className="jd-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="log-request-title">
+              <div className="jd-modal-header">
+                <div>
+                  <h2 id="log-request-title"><i className="fas fa-wand-magic-sparkles"></i> Automated Reschedule</h2>
+                  <p>{logRequestActive.candidate_name || logRequestActive.candidate_email} - {logRequestActive.job_role}</p>
+                </div>
+                <button type="button" className="jd-modal-close" onClick={() => setLogRequestActive(null)} disabled={recoveryBusy} aria-label="Close">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <p className="recovery-modal-note">
+                HR Assist will find times when you are free, email the candidate a link to choose one, and update this
+                interview once they confirm. You will only be contacted if it cannot be resolved.
+              </p>
+              <div className="form-group">
+                <label htmlFor="log-request-reason">What did the candidate say? (optional)</label>
+                <textarea id="log-request-reason" rows={3} value={logRequestReason} onChange={(event) => setLogRequestReason(event.target.value)} />
+              </div>
+              <div className="jd-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setLogRequestActive(null)} disabled={recoveryBusy}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={submitLoggedRequest} disabled={recoveryBusy}>
+                  {recoveryBusy ? <><i className="fas fa-spinner fa-spin"></i> Starting...</> : <><i className="fas fa-paper-plane"></i> Offer new times</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {recoveryCase && (
+          <div className="jd-modal-backdrop" role="presentation">
+            <div className="jd-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="recovery-case-title">
+              <div className="jd-modal-header">
+                <div>
+                  <h2 id="recovery-case-title"><i className="fas fa-robot"></i> Automated Recovery</h2>
+                  <p>
+                    {recoveryCase.recovery_type === 'NO_SHOW' ? 'No-show follow-up' : 'Reschedule request'} - {prettyStatus(recoveryCase.status).toLowerCase()}
+                    {' '}- attempt {recoveryCase.attempt_count} of {recoveryCase.max_attempts}
+                  </p>
+                </div>
+                <button type="button" className="jd-modal-close" onClick={() => setRecoveryCase(null)} aria-label="Close recovery history">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              {recoveryCase.escalation_reason && (
+                <div className="recovery-modal-alert">
+                  <strong>{recoveryCase.escalation_reason}</strong>
+                  {recoveryCase.recommended_action && <span>Next step: {recoveryCase.recommended_action}</span>}
+                </div>
+              )}
+              {recoveryCase.confirmed_slot && <p className="recovery-modal-note">Confirmed: {recoveryCase.confirmed_slot.label}</p>}
+              {recoveryCase.status === 'SLOT_PROPOSED' && (recoveryCase.proposed_slots || []).length > 0 && (
+                <div className="recovery-modal-note">
+                  Offered times:
+                  <ul>{recoveryCase.proposed_slots.map(slot => <li key={slot.id}>{slot.label}</li>)}</ul>
+                </div>
+              )}
+              <ol className="recovery-history">
+                {(recoveryCase.history || []).map(entry => (
+                  <li key={entry.id}>
+                    <span className="recovery-history-time">{formatDateTime(entry.created_at).date} {formatDateTime(entry.created_at).time}</span>
+                    <span className="recovery-history-action">{prettyStatus(entry.action)}</span>
+                    {entry.outcome && <span className={statusClass(entry.outcome === 'delivered' || entry.outcome === 'booked' ? 'sent' : entry.outcome === 'delivery_failed' ? 'failed' : '')}>{prettyStatus(entry.outcome)}</span>}
+                    {(entry.deliveries || []).filter(d => d.error).map((d, index) => (
+                      <span key={index} className="recovery-history-error">{d.channel}: {d.error}</span>
+                    ))}
+                  </li>
+                ))}
+              </ol>
+              <div className="jd-modal-actions">
+                {!['RESCHEDULED', 'RECOVERED', 'CLOSED'].includes(recoveryCase.status) && (
+                  <button type="button" className="btn btn-secondary" onClick={() => recoveryAction(recoveryCase.id, 'close')} disabled={recoveryBusy}>
+                    <i className="fas fa-circle-xmark"></i> Close case
+                  </button>
+                )}
+                {recoveryCase.status === 'ESCALATED' && (
+                  <button type="button" className="btn btn-primary" onClick={() => recoveryAction(recoveryCase.id, 'retry')} disabled={recoveryBusy}>
+                    <i className="fas fa-rotate"></i> Retry automation
+                  </button>
+                )}
               </div>
             </div>
           </div>

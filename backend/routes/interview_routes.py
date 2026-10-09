@@ -22,6 +22,43 @@ from services.interview_service import (
 interview_bp = Blueprint("interview_routes", __name__)
 
 
+def _candidate_manage_link() -> tuple[str, str]:
+    """New candidate token plus its public link, or ("", "") when no public URL is configured."""
+    import uuid
+
+    from interview_recovery.service import get_service
+
+    token = str(uuid.uuid4())
+    try:
+        return token, get_service().gateway.public_link(token)
+    except Exception:
+        return "", ""
+
+
+def _stop_interview_recovery(interview_id: int, outcome: str) -> None:
+    # A recruiter acting on the interview supersedes any automated recovery.
+    try:
+        from interview_recovery.service import get_service
+
+        get_service().close_for_interview(interview_id, outcome)
+    except Exception as exc:
+        db.log_audit("Interview Recovery Update Failed", "", f"Could not stop recovery for interview #{interview_id}: {exc}")
+
+
+def _with_recovery(rows: list[dict]) -> list[dict]:
+    try:
+        from interview_recovery.service import get_service
+
+        summaries = get_service().summaries_for_interviews([int(row["id"]) for row in rows if row.get("id")])
+    except Exception:
+        return rows
+    return [{**row, "recovery": summaries.get(int(row.get("id") or 0))} for row in rows]
+
+
+def _public_interview(row: dict) -> dict:
+    return {key: value for key, value in row.items() if key != "candidate_access_token"}
+
+
 # Purpose: Applies a configured hiring-process stage mapping, surfacing (not swallowing) failures.
 def _apply_stage_event(candidate_id: int, jd_id, event_key: str) -> str | None:
     try:
@@ -95,7 +132,7 @@ def api_interviews():
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
     rows = db.get_interviews({"recruiter_id": int(user["id"])})
-    rows = [_with_candidate_phone(row) for row in rows]
+    rows = _with_recovery([_public_interview(_with_candidate_phone(row)) for row in rows])
     return jsonify({"interviews": rows})
 
 
@@ -173,6 +210,9 @@ def api_schedule_interview():
         ctx = schedule_context(candidate_id, jd_id)
         from_email = default_from_email(user)
         to_email = ctx["candidate"].get("email") or ""
+        manage_token, manage_link = _candidate_manage_link()
+        if manage_link:
+            body = f"{body}\n\nNeed a different time? Request a reschedule here: {manage_link}"
         send_email(to_email, subject, body, from_email)
         text_error = ""
         if text_body:
@@ -208,6 +248,10 @@ def api_schedule_interview():
                 "status": "Scheduled",
             }
         )
+        if manage_token:
+            from interview_recovery.repository import set_interview_fields
+
+            set_interview_fields(interview_id, {"candidate_access_token": manage_token})
         db.update_candidate(candidate_id, {"hiring_stage": "Interview Scheduled"})
         stage_error = _apply_stage_event(candidate_id, jd_id, "scheduled")
         db.log_audit(
@@ -284,7 +328,8 @@ def api_reschedule_interview(interview_id: int):
         )
         db.update_candidate(int(interview.get("candidate_id") or 0), {"hiring_stage": "Interview Rescheduled"})
         stage_error = _apply_stage_event(int(interview.get("candidate_id") or 0), interview.get("jd_id"), "rescheduled")
-        updated = _with_candidate_phone(db.get_interview_by_id(interview_id) or {})
+        _stop_interview_recovery(interview_id, "rescheduled_by_recruiter")
+        updated = _public_interview(_with_candidate_phone(db.get_interview_by_id(interview_id) or {}))
         db.log_audit(
             "Interview Rescheduled",
             user.get("username") or "",
@@ -417,7 +462,8 @@ def _update_interview_outcome(interview_id: int, payload: dict | None = None):
     except Exception:
         pass
 
-    updated = _with_candidate_phone(db.get_interview_by_id(interview_id) or {**interview, "status": status})
+    _stop_interview_recovery(interview_id, "interview_completed")
+    updated = _public_interview(_with_candidate_phone(db.get_interview_by_id(interview_id) or {**interview, "status": status}))
     response = {"success": True, "interview": updated}
     if stage_error:
         response["stage_update_error"] = stage_error
@@ -471,7 +517,8 @@ def api_send_cancellation(interview_id: int):
         )
         db.update_candidate(int(interview.get("candidate_id") or 0), {"hiring_stage": "Interview Cancelled"})
         stage_error = _apply_stage_event(int(interview.get("candidate_id") or 0), interview.get("jd_id"), "cancelled")
-        updated = db.get_interview_by_id(interview_id) or {}
+        _stop_interview_recovery(interview_id, "cancelled_by_recruiter")
+        updated = _public_interview(db.get_interview_by_id(interview_id) or {})
         db.log_audit(
             "Interview Cancelled",
             user.get("username") or "",

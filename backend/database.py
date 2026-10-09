@@ -292,6 +292,9 @@ def _ensure_indexes() -> None:
     from assessment.repository import ensure_assessment_indexes
 
     ensure_assessment_indexes()
+    from interview_recovery.repository import ensure_indexes as ensure_interview_recovery_indexes
+
+    ensure_interview_recovery_indexes()
 
 
 # Purpose: Implements the sync counters backend behavior.

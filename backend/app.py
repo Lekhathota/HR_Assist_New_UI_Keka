@@ -36,6 +36,7 @@ from routes.candidate_routes import candidate_bp
 from routes.client_routes import client_bp
 from routes.dashboard_routes import dashboard_bp
 from routes.interview_routes import interview_bp
+from routes.interview_recovery_routes import interview_recovery_bp
 from routes.jd_routes import jd_bp
 from routes.matching_routes import matching_bp
 from routes.notification_routes import notification_bp
@@ -99,6 +100,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(jd_bp)
 app.register_blueprint(interview_bp)
+app.register_blueprint(interview_recovery_bp)
 app.register_blueprint(candidate_bp)
 app.register_blueprint(client_bp)
 app.register_blueprint(matching_bp)
