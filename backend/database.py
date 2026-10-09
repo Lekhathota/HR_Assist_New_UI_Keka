@@ -90,6 +90,9 @@ def init_pool() -> None:
         candidate_client.admin.command("ping")
         _client = candidate_client
         _db = candidate_db
+        # Keep cold starts lightweight; run existing maintenance explicitly.
+        if os.environ.get("VERCEL") and os.environ.get("RA_RUN_DB_MAINTENANCE", "").lower() != "true":
+            return
         _ensure_indexes()
         _sync_counters()
         backfill_workflow_defaults()
@@ -1635,6 +1638,20 @@ def jd_candidate_counts(jd_id: int) -> dict[str, int]:
     selected = db.comparisons.count_documents({**query, "status": "Selected"})
     rejected = db.comparisons.count_documents({**query, "status": "Rejected"})
     return {"selected_count": selected, "rejected_count": rejected, "total_resumes": total}
+
+
+def jd_candidate_counts_batch(jd_ids: list[int]) -> dict[int, dict[str, int]]:
+    counts = {int(jd_id): {"total_resumes": 0, "selected_count": 0, "rejected_count": 0} for jd_id in jd_ids}
+    if not counts:
+        return counts
+    for row in _database().comparisons.aggregate([
+        {"$match": {"jd_id": {"$in": list(counts)}}},
+        {"$group": {"_id": "$jd_id", "total_resumes": {"$sum": 1},
+                    "selected_count": {"$sum": {"$cond": [{"$eq": ["$status", "Selected"]}, 1, 0]}},
+                    "rejected_count": {"$sum": {"$cond": [{"$eq": ["$status", "Rejected"]}, 1, 0]}}}}
+    ]):
+        counts[int(row["_id"])] = {key: int(row[key]) for key in ("total_resumes", "selected_count", "rejected_count")}
+    return counts
 
 
 # Vendors and JD vendor assignments

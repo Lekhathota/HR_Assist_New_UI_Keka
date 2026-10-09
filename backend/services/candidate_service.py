@@ -434,7 +434,7 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
     filters = filters or {}
     if filters.get("jd_id") is not None:
         rows = db.get_candidates_for_jd(int(filters["jd_id"]), str(filters.get("status") or "").strip() or None)
-        rows = [normalize_candidate_record(row) for row in rows]
+        rows = [normalize_candidate_record(row, repair=False) for row in rows]
         for row in rows:
             row["screening_status"] = derive_screening_status(row, row.pop("_screening_comparison", None))
         search = str(filters.get("search") or "").strip().lower()
@@ -447,7 +447,7 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
         return rows
 
     db_filters = {k: v for k, v in filters.items() if k not in {"status"}}
-    rows = [normalize_candidate_record(row) for row in db.get_all_candidates(db_filters if db_filters else None)]
+    rows = [normalize_candidate_record(row, repair=False) for row in db.get_all_candidates(db_filters if db_filters else None)]
     for row in rows:
         row["screening_status"] = derive_screening_status(row, row.pop("_screening_comparison", None))
     status_filter = str(filters.get("status") or "").strip().lower()

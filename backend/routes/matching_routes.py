@@ -13,6 +13,7 @@ from security.policy import PolicyEngine, ToolRequest
 from services.auth_service import api_login_required, current_user, login_required
 from services.fulfilment_service import get_fulfilment, recalculate_fulfilment, run_automated_bench_workflow
 from services.jd_service import allowed_file, unique_upload_filename
+from services.upload_storage import save_upload
 
 matching_bp = Blueprint("matching_routes", __name__)
 
@@ -61,8 +62,7 @@ def _save_resume_items(resume_files) -> tuple[list[dict[str, str]], int]:
             skipped_bad_ext += 1
             continue
         filename = unique_upload_filename(rf.filename or "")
-        path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
-        rf.save(path)
+        path = save_upload(rf, current_app.config["UPLOAD_FOLDER"], filename)
         resume_items.append({"filename": filename, "original_filename": rf.filename or "", "path": path})
     return resume_items, skipped_bad_ext
 

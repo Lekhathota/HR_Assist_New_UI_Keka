@@ -17,6 +17,7 @@ from app.utils import clean_jd_text
 from services.candidate_service import candidates_payload
 from services.hiring_process_service import resolve_process
 from services.role_category_service import categorize_jd
+from services.upload_storage import save_upload
 
 ALLOWED_EXTENSIONS = {"pdf", "docx"}
 
@@ -60,8 +61,7 @@ def _apply_jd_category(row: dict[str, Any]) -> dict[str, Any]:
 def create_jd_from_upload(file: FileStorage, upload_folder: str, client_id: int | None = None, required_candidate_count: int | None = None, job_code: str | None = None, recruiter: str | None = None) -> dict[str, Any]:
     filename = unique_upload_filename(file.filename or "")
     os.makedirs(upload_folder, exist_ok=True)
-    filepath = os.path.join(upload_folder, filename)
-    file.save(filepath)
+    filepath = save_upload(file, upload_folder, filename)
 
     raw_text = extract_text(filepath)
     cleaned = clean_jd_text(raw_text)
@@ -141,8 +141,10 @@ def _candidate_counts_for_jd(jd_id: int) -> dict[str, int]:
 # Purpose: Implements the jd summary list payload backend behavior.
 def jd_summary_list_payload() -> list[dict[str, Any]]:
     out = []
-    for row in db.get_all_jds():
-        row = _apply_jd_category(db.get_jd_by_id(int(row["id"]), include_raw_text=True) or row)
+    rows = db.get_all_jds()
+    counts = db.jd_candidate_counts_batch([int(row["id"]) for row in rows])
+    for row in rows:
+        row = _apply_jd_category(row)
         created = row.get("created_at") or ""
         out.append(
             {
@@ -177,7 +179,7 @@ def jd_summary_list_payload() -> list[dict[str, Any]]:
                 "created": created,
                 "created_date": str(created)[:10],
                 "file": row.get("file_name", ""),
-                **_candidate_counts_for_jd(int(row["id"])),
+                **counts[int(row["id"])],
             }
         )
     return out

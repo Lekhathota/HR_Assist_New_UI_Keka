@@ -25,6 +25,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 import activity_feed
+from services.upload_storage import upload_directory, cleanup_processing_uploads
 import database as db
 from routes.activity_routes import activity_bp
 from routes.audit_routes import audit_bp
@@ -54,7 +55,7 @@ if not os.path.isfile(os.path.join(BUILD_DIR, "index.html")):
     BUILD_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "build"))
 
 app = Flask(__name__, template_folder="templates", static_folder="static", static_url_path="/static")
-app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "static", "uploads")
+app.config["UPLOAD_FOLDER"] = upload_directory()
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
 app.secret_key = (os.environ.get("SECRET_KEY") or "").strip() or token_hex(32)
 app.config.update(
@@ -232,7 +233,7 @@ _alias_endpoint("api_profile", "profile_routes.api_profile")
 # Purpose: Coordinates the teardown routine for this module.
 @app.teardown_appcontext
 def _teardown(_exc):
-    pass
+    cleanup_processing_uploads()
 
 
 # Purpose: Coordinates the ensure db routine for this module.

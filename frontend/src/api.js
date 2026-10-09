@@ -337,6 +337,9 @@ export async function apiPostForm(path, formData) {
   }
   redirectIfUnauthorized(path, res.status);
   if (res.ok) clearMutableCaches(path, Object.fromEntries(formData.entries()));
+  if (res.status === 413 && !data.error) {
+    data.error = 'The upload is too large for the deployed server. Upload fewer resumes at a time and keep the total below 4 MB.';
+  }
   return { ok: res.ok, status: res.status, data: unwrapAgentic(data) };
 }
 

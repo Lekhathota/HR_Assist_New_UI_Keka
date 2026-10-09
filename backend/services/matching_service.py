@@ -16,6 +16,7 @@ from app.utils import clean_resume_text
 from services.candidate_service import normalize_candidate_record
 from services.jd_service import allowed_file, unique_upload_filename
 from services.role_category_service import auto_categorize_candidate
+from services.upload_storage import save_upload
 
 
 # Purpose: Implements the fallback candidate name backend behavior.
@@ -162,8 +163,7 @@ def run_matching(jd_id: int, candidate_ids: list[str], resume_files: list[FileSt
         uploaded_count += 1
         os.makedirs(upload_folder, exist_ok=True)
         filename = unique_upload_filename(rf.filename or "")
-        resume_path = os.path.join(upload_folder, filename)
-        rf.save(resume_path)
+        resume_path = save_upload(rf, upload_folder, filename)
         raw_text = extract_text(resume_path)
         cleaned = clean_resume_text(raw_text)
         resume_json = extract_resume_json(cleaned)

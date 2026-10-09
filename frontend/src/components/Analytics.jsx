@@ -14,10 +14,17 @@ export function useAnalytics(endpoint) {
     setLoading(true); setError(''); setSnapshot(null);
     const home = endpoint === '/api/dashboard';
     // Keep the existing API URLs and contracts. Supplemental panels may fail independently.
-    Promise.allSettled([apiGet(endpoint), apiGet(home ? '/api/interviews' : '/api/dashboard'), apiGet('/api/jds')]).then(results => {
+    const primaryRequest = apiGet(endpoint);
+    const supplementaryRequests = Promise.allSettled([apiGet(home ? '/api/interviews' : '/api/dashboard'), apiGet('/api/jds')]);
+    primaryRequest.then(primary => {
+      if (!cancelled) {
+        setSnapshot({ dashboard: home ? primary : null, reports: home ? null : primary, interviews: null, jobs: [], warnings: [] });
+        setLoading(false);
+      }
+    }).catch(e => { if (!cancelled) { setError(e.message || 'Analytics unavailable.'); setLoading(false); } });
+    Promise.all([primaryRequest, supplementaryRequests]).then(([primary, extras]) => {
+      const results = [{ status: 'fulfilled', value: primary }, ...extras];
       if (cancelled) return;
-      if (results[0].status === 'rejected') throw results[0].reason;
-      const primary = results[0].value;
       const supplementary = results[1].status === 'fulfilled' ? results[1].value : null;
       setSnapshot({ dashboard: home ? primary : supplementary, reports: home ? null : primary,
         interviews: home ? supplementary : null, jobs: results[2].status === 'fulfilled' ? results[2].value : [],

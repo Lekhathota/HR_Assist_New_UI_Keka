@@ -10,6 +10,19 @@ function Probe() {
   const state = useAnalytics('/api/reports');
   return <><AnalyticsStatus {...state} /><output>{state.data?.metrics?.total_candidates}</output><button id="filter" onClick={() => state.setFilters(f => ({ ...f, job: '9' }))}>Change job</button></>;
 }
+
+test('primary dashboard renders while supplementary requests are pending', async () => {
+  apiGet.mockImplementation(path => path === '/api/dashboard'
+    ? Promise.resolve({ candidates: [{ id: 1 }], metrics: { total_candidates: 1 } })
+    : new Promise(() => {}));
+  function DashboardProbe() {
+    const state = useAnalytics('/api/dashboard');
+    return <><AnalyticsStatus {...state} /><output>{state.data?.metrics?.total_candidates}</output></>;
+  }
+  await act(async () => root.render(<DashboardProbe />));
+  expect(container.querySelector('output').textContent).toBe('1');
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
 test('failed primary analytics show retry rather than fabricated values', async () => {
   let failed = true;
   apiGet.mockImplementation(path => path === '/api/reports' ? (failed ? Promise.reject(new Error('Unavailable')) : Promise.resolve({ metrics: { total_candidates: 3 } })) : path === '/api/dashboard' ? Promise.resolve({ candidates: [{ id: 1 }, { id: 2 }, { id: 3 }], metrics: {} }) : Promise.resolve([]));

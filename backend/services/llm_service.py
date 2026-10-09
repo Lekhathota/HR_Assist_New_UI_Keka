@@ -8,8 +8,6 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(_BACKEND_ROOT, ".env"))
@@ -35,6 +33,7 @@ class LLMService:
         if not key:
             raise ValueError("OPENAI_API_KEY is not configured in the environment.")
         self._model_name = (model or os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+        from langchain_openai import ChatOpenAI
         self._llm = ChatOpenAI(
             api_key=key,
             model=self._model_name,
@@ -53,6 +52,7 @@ class LLMService:
         temperature: float | None = None,
     ) -> str:
         """Send a prompt to the LLM and return response text."""
+        from langchain_core.messages import HumanMessage, SystemMessage
         llm: Any = self._llm
         if temperature is not None:
             llm = self._llm.bind(temperature=temperature)

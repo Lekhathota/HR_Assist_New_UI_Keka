@@ -1,29 +1,30 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import Login from './pages/Login.jsx';
-import Welcome from './pages/Welcome.jsx';
-import JdList from './pages/JdList.jsx';
-import JdCreate from './pages/JdCreate.jsx';
-import JdDetails from './pages/JdDetails.jsx';
-import Comparison from './pages/Comparison.jsx';
-import Candidates from './pages/Candidates.jsx';
-import CandidateProfile from './pages/CandidateProfile.jsx';
-import Clients from './pages/Clients.jsx';
-import ClientProject from './pages/ClientProject.jsx';
-import Vendors from './pages/Vendors.jsx';
-import UserManagement from './pages/UserManagement.jsx';
-import HiringPipeline from './pages/Interviews.jsx';
-import Reports from './pages/Reports.jsx';
-import Profile from './pages/Profile.jsx';
-import CandidateAssessment from './pages/CandidateAssessment.jsx';
-import AssessmentBuilder from './pages/AssessmentBuilder.jsx';
 import { getToken } from './api.js';
 import { getCurrentRole, roleCanAccess } from './roleAccess.js';
 import { ConfirmProvider, ToastHost } from './components/EnterpriseFeedback.jsx';
 import { CommandPalette, FrontendPolishProvider } from './components/FrontendPolish.jsx';
 import { HireRedirect } from './components/HireNav.jsx';
 import './styles/style.css';
+
+const Welcome = lazy(() => import('./pages/Welcome.jsx'));
+const JdList = lazy(() => import('./pages/JdList.jsx'));
+const JdCreate = lazy(() => import('./pages/JdCreate.jsx'));
+const JdDetails = lazy(() => import('./pages/JdDetails.jsx'));
+const Comparison = lazy(() => import('./pages/Comparison.jsx'));
+const Candidates = lazy(() => import('./pages/Candidates.jsx'));
+const CandidateProfile = lazy(() => import('./pages/CandidateProfile.jsx'));
+const Clients = lazy(() => import('./pages/Clients.jsx'));
+const ClientProject = lazy(() => import('./pages/ClientProject.jsx'));
+const Vendors = lazy(() => import('./pages/Vendors.jsx'));
+const UserManagement = lazy(() => import('./pages/UserManagement.jsx'));
+const HiringPipeline = lazy(() => import('./pages/Interviews.jsx'));
+const Reports = lazy(() => import('./pages/Reports.jsx'));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const CandidateAssessment = lazy(() => import('./pages/CandidateAssessment.jsx'));
+const AssessmentBuilder = lazy(() => import('./pages/AssessmentBuilder.jsx'));
 
 
 function ProtectedRoute({ children }) {
@@ -44,6 +45,7 @@ function App() {
         <ConfirmProvider>
           <ToastHost />
           <CommandPalette />
+          <Suspense fallback={<div role="status" style={{ padding: 24 }}>Loading page...</div>}>
           <Routes>
 
         <Route path="/" element={<Navigate to={getToken() ? '/welcome' : '/login'} replace />} />
@@ -78,6 +80,7 @@ function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
 
           </Routes>
+          </Suspense>
         </ConfirmProvider>
       </FrontendPolishProvider>
     </Router>

@@ -72,6 +72,16 @@ npm start
 
 Keep secrets in `backend/.env`. Do not commit `.env`.
 
+## Vercel deployment
+
+Configure the existing MongoDB connection and application secrets in Vercel environment variables, then redeploy. Local `.env` files are excluded from the function bundle.
+
+On Vercel, uploaded resumes and JDs are persisted in MongoDB GridFS (`uploaded_documents`) while extraction uses temporary files that are removed after each request. Authenticated original-file access uses `/api/uploads/<filename>`. Local development continues to store files in `backend/static/uploads`.
+
+Vercel requests have a 4.5 MB payload limit; keep each upload batch below 4 MB including all files. Larger uploads require a separate direct-upload storage flow.
+
+Database migrations, index creation, and maintenance no longer run during every serverless cold start. Run `python backend/database/run_maintenance.py` once against the deployment database when setting up or upgrading it, using the same MongoDB configuration. Do not permanently enable `RA_RUN_DB_MAINTENANCE` in Vercel; it restores startup maintenance only when explicitly set to `true`.
+
 ## JD-based assessments
 
 Hiring Pipeline assessments generate 14 JD-based scenario questions in every assessment: 10 MCQs (4 moderate and 6 hard), 2 moderate coding questions, and 2 moderate SQL questions. Complexity is calibrated to JD experience. Coding uses a JD language/tool or pseudocode; SQL tasks use data relevant to JD responsibilities. Drafts can be replaced using **Regenerate from JD**. Candidate information is used only to assign and deliver an assessment.

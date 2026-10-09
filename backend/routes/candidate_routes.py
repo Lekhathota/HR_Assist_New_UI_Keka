@@ -188,8 +188,10 @@ def api_candidate_delete(candidate_id: int):
 
 # Purpose: Implements the uploaded file backend behavior.
 @candidate_bp.route("/static/uploads/<path:name>", endpoint="uploaded_file")
+@candidate_bp.route("/api/uploads/<path:name>")
 @api_login_required
 def uploaded_file(name: str):
     from flask import current_app
 
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], name, as_attachment=False)
+    from services.upload_storage import uploaded_file_response
+    return uploaded_file_response(name, current_app.config["UPLOAD_FOLDER"])

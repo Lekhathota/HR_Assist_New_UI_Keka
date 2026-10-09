@@ -11,6 +11,7 @@ from orchestration.main_orchestrator import run_main_orchestrator
 from schemas.agentic import validate_agentic_payload
 from services.auth_service import api_login_required, current_user
 from services.jd_service import allowed_file, unique_upload_filename
+from services.upload_storage import save_upload
 
 agentic_bp = Blueprint("agentic_routes", __name__)
 
@@ -37,8 +38,7 @@ def _save_resume_items() -> tuple[list[dict[str, str]], int]:
             skipped += 1
             continue
         filename = unique_upload_filename(rf.filename or "")
-        path = os.path.join(upload_folder, filename)
-        rf.save(path)
+        path = save_upload(rf, upload_folder, filename)
         items.append({"filename": filename, "original_filename": rf.filename or "", "path": path})
     return items, skipped
 
