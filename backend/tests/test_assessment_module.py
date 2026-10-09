@@ -91,7 +91,7 @@ class AssessmentUtilitiesTests(unittest.TestCase):
 
 
 class AssessmentEvaluationTests(unittest.TestCase):
-    def test_mcq_auto_scoring_passes_on_mcq_percentage(self) -> None:
+    def test_pending_coding_counts_in_overall_pass_decision(self) -> None:
         questions = [
             {"id": 1, "question_type": QuestionType.MCQ, "correct_answer": "A", "points": 10},
             {"id": 2, "question_type": QuestionType.MCQ, "correct_answer": "B", "points": 10},
@@ -100,7 +100,9 @@ class AssessmentEvaluationTests(unittest.TestCase):
         answers = {1: "A", 2: "B", 3: "print('hello')"}
         result = evaluate_assessment(questions, answers, passing_score=70)
         self.assertEqual(result["mcq_percentage"], 100.0)
-        self.assertTrue(result["passed"])
+        self.assertEqual(result["score_percentage"], 50.0)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["pass_basis"], "overall")
         self.assertEqual(result["pending_review_count"], 1)
         self.assertEqual(result["question_results"][2]["evaluation_status"], "pending_review")
 

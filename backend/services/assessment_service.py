@@ -795,7 +795,7 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
     final_status = AssessmentStatus.PASSED if passed else AssessmentStatus.FAILED
     pending_note = ""
     if int(scoring.get("pending_review_count") or 0) > 0:
-        pending_note = f" MCQ score: {scoring.get('mcq_percentage')}%. Coding/SQL pending review."
+        pending_note = f" MCQ score: {scoring.get('mcq_percentage')}%. Coding/SQL pending review (counted as 0 until reviewed)."
     summary = (
         f"Score: {scoring['score_percentage']}% ({scoring['earned_points']}/{scoring['total_points']} points). "
         f"Passing score: {passing_score}%.{pending_note}"

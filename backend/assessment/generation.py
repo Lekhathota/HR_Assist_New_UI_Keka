@@ -1,9 +1,12 @@
 """JD-only generation validation. No candidate data enters this module."""
 import json
 import re
+import random
 from difflib import SequenceMatcher
 from collections import Counter
 from assessment.models import TOTAL_GENERATED_QUESTIONS, MCQ_COUNT, CODING_COUNT, SQL_COUNT, MCQ_MEDIUM_COUNT, MCQ_HARD_COUNT
+
+_rng = random.SystemRandom()
 
 METADATA = ("difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement")
 
@@ -50,6 +53,28 @@ def requirement_catalog(jd):
                     fragments.append(line)
     collect(jd)
     return {f"R{i+1:03d}": line for i, line in enumerate(fragments)}
+
+
+def shuffle_mcq_options(rows, rng=None):
+    """Place each MCQ's correct option at an independently random position.
+
+    Models tend to list the best answer first, so the generated order is never
+    trusted. Target slots are a shuffled, near-even spread of A-D (no fixed
+    cycle, no long same-letter run); the distractors are shuffled around it.
+    correct_answer holds the option text, so it moves with its option.
+    """
+    rng = rng or _rng
+    mcqs = [row for row in rows if row["question_type"] == "mcq"]
+    slots = [i % 4 for i in range(len(mcqs))]
+    rng.shuffle(slots)
+    for row, slot in zip(mcqs, slots):
+        correct = row["correct_answer"]
+        distractors = [option for option in row["options"] if option != correct]
+        rng.shuffle(distractors)
+        row["options"] = distractors[:slot] + [correct] + distractors[slot:]
+        if row["options"].count(correct) != 1 or len(row["options"]) != 4:
+            raise ValueError("MCQ options lost their correct-answer mapping while shuffling.")
+    return rows
 
 
 def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=()):
@@ -133,4 +158,4 @@ def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=
     for index, row in enumerate(rows):
         row["sort_order"] = index
         row["question_id"] = f"Q{index+1:03d}"
-    return rows
+    return shuffle_mcq_options(rows)

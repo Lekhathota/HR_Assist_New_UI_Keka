@@ -36,14 +36,15 @@ def evaluate_assessment(
     questions: list[dict[str, Any]],
     answers_by_question: dict[int, str],
     *,
-    passing_score: int = 70,
+    passing_score: int,
     coding_evaluator: CodingEvaluator | None = None,
 ) -> dict[str, Any]:
     """
     Evaluate all answers and compute aggregate score, percentage, and pass/fail.
 
-    Pass/fail is based on auto-scored questions (MCQ block) when coding/SQL answers
-    are still pending review; otherwise uses the overall percentage.
+    Pass/fail always compares the reported overall percentage (points earned over
+    points possible, by each question's points) with the assessment's configured
+    passing score. Coding/SQL answers still pending review earn 0 until reviewed.
     """
     question_results: list[dict[str, Any]] = []
     total_points = 0
@@ -72,12 +73,10 @@ def evaluate_assessment(
     score_percentage = round((earned_points / total_points) * 100, 2) if total_points else 0.0
     mcq_percentage = round((auto_earned / auto_total) * 100, 2) if auto_total else 0.0
 
-    if pending_review_count > 0 and auto_total > 0:
-        passed = mcq_percentage >= passing_score
-        pass_basis = "mcq_auto"
-    else:
-        passed = score_percentage >= passing_score
-        pass_basis = "overall"
+    # Compare the same (rounded) percentage that is stored and shown, so a
+    # displayed 68.89% can never be reported as PASSED against a 70% bar.
+    passed = score_percentage >= float(passing_score)
+    pass_basis = "overall"
 
     return {
         "score": earned_points,

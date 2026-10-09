@@ -13,7 +13,7 @@ from flask import has_request_context, request
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from assessment.models import AssessmentStatus, QuestionType
+from assessment.models import DEFAULT_PASSING_SCORE, AssessmentStatus, QuestionType
 
 _CANDIDATE_TEST_PATH = "/assessment"
 _TOKEN_RE = re.compile(
@@ -178,7 +178,7 @@ def score_assessment(
     result = evaluate_assessment(
         questions,
         answers_by_question,
-        passing_score=passing_score if passing_score is not None else 70,
+        passing_score=passing_score if passing_score is not None else DEFAULT_PASSING_SCORE,
     )
     return {
         "total_points": result["total_points"],
