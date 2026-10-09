@@ -156,7 +156,7 @@ body.theme-shimento :is(.card, .jd-card, .candidate-card, .analytics-card, .acti
   .client-role-card, .client-metric-card, .client-info-item, .required-card,
   .workflow-admin-head, .workflow-admin-panel, .interview-card, .interviews-toolbar,
   .interviews-empty, .vendor-toolbar, .vendor-table-wrap, .vendors-empty,
-  .ab-question-card, .ab-settings, .ca-card, .ca-question-card, .ca-nav) {
+  .ab-question-card, .ab-settings) {
   color: var(--text-primary);
   background: var(--ui-surface);
   border: 1px solid var(--border-color);
@@ -209,7 +209,7 @@ body.theme-shimento :is(input, textarea)::placeholder { color: #74716c; }
 body.theme-shimento :is(input, textarea, select):focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, .13); }
 body.theme-shimento :is(input, textarea, select):focus-visible { outline: 2px solid #ea580c; outline-offset: 2px; }
 body.theme-shimento :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: #ea580c; }
-body.theme-shimento :is(.form-group label, .login-container label, .ab-label, .ca-code-label) { color: var(--text-primary); }
+body.theme-shimento :is(.form-group label, .login-container label, .ab-label) { color: var(--text-primary); }
 body.theme-shimento .jd-create-container .form-container select.jd-create-select,
 body.theme-shimento .jd-create-container .form-container select.jd-create-select option { color: var(--text-primary); background: #fff; border-color: #e5e7eb; color-scheme: light; }
 body.theme-shimento :is(.drop-zone, .upload-zone, .file-upload-area, .file-info,
@@ -228,24 +228,24 @@ body.theme-shimento :is(.drop-zone__thumb, .candidate-client-line, .welcome-eyeb
   .welcome-action-card i, .welcome-briefing-card i, .dashboard-metric-icon,
   .client-section-title h2, .client-metric-card i, .activity-card-title i) { color: var(--accent-dark); }
 
-body.theme-shimento :is(.btn, .ca-btn, .date-reset-btn, .login-container button[type="submit"]) {
+body.theme-shimento :is(.btn, .date-reset-btn, .login-container button[type="submit"]) {
   border-radius: 8px;
   font-weight: 600;
   text-shadow: none;
   box-shadow: none;
 }
-body.theme-shimento :is(.btn-primary, .ca-btn-primary, .date-reset-btn, .login-container button[type="submit"], .jd-create-container form button[type="submit"]) {
+body.theme-shimento :is(.btn-primary, .date-reset-btn, .login-container button[type="submit"], .jd-create-container form button[type="submit"]) {
   background: var(--ui-gradient);
   border-color: transparent;
   color: #fff;
   box-shadow: none;
 }
-body.theme-shimento :is(.btn-secondary, .ca-btn-secondary) { background: #fff; border: 1px solid #e5e7eb; color: var(--text-primary); }
-body.theme-shimento :is(.btn-success, .ca-btn-success) { background: #187554; border-color: #187554; color: #fff; }
+body.theme-shimento :is(.btn-secondary) { background: #fff; border: 1px solid #e5e7eb; color: var(--text-primary); }
+body.theme-shimento :is(.btn-success) { background: #187554; border-color: #187554; color: #fff; }
 body.theme-shimento .btn-danger { background: #b53028; border-color: #b53028; color: #fff; }
 body.theme-shimento .btn-warning { background: #fff0cf; border-color: #e0be80; color: #7c490c; }
 body.theme-shimento :is(.btn-info, .btn-outline-primary) { background: var(--ui-soft); border: 1px solid #fed7aa; color: var(--accent-dark); }
-body.theme-shimento :is(.btn, .ca-btn):hover:not(:disabled) { filter: brightness(.97); box-shadow: 0 4px 12px rgba(19, 17, 15, .08); }
+body.theme-shimento :is(.btn):hover:not(:disabled) { filter: brightness(.97); box-shadow: 0 4px 12px rgba(19, 17, 15, .08); }
 body.theme-shimento :is(.badge, .tag, .candidate-category-pill, .profile-skill-badge) { border-radius: 999px; }
 body.theme-shimento .badge-primary { background: var(--ui-soft); color: var(--accent-dark); }
 body.theme-shimento :is(.badge-success, .status-selected) { background: #eaf7f1; color: #187554; }
@@ -372,19 +372,6 @@ body.theme-shimento .login-container input:focus { color: var(--text-primary); b
 body.theme-shimento .login-startup { background: #111113; border-radius: 24px; }
 body.theme-shimento .login-startup-status { color: #ffc18b; }
 body.theme-shimento .login-auth-panel { min-height: 0; overflow: visible; }
-body.theme-shimento .ca-page { background: var(--light-bg); color: var(--text-primary); }
-body.theme-shimento :is(.ca-header, .ca-footer) { background: #111113; border-color: #34343a; color: #fff; }
-body.theme-shimento .ca-nav-item { color: var(--text-primary); border-radius: 10px; }
-body.theme-shimento .ca-nav-item.active { background: var(--ui-soft); border-color: #f97316; }
-body.theme-shimento .ca-nav-num { background: #eceef1; color: #111827; }
-body.theme-shimento .ca-nav-item.answered .ca-nav-num { background: #187554; color: #fff; }
-body.theme-shimento .ca-question-badge { background: var(--ui-soft); color: var(--accent-dark); border-radius: 999px; }
-body.theme-shimento .ca-code-input { background: #111827; color: #eceef1; border-color: #45454c; }
-body.theme-shimento .ca-code-input:focus { background: #111827; color: #eceef1; }
-body.theme-shimento .ca-option:hover { border-color: #f97316; background: var(--ui-soft); }
-body.theme-shimento .ca-brand i { color: #fb923c; }
-body.theme-shimento .ca-spinner { border-top-color: #f97316; }
-body.theme-shimento .ca-inline-error { background: #fceceb; color: #a42c24; border-color: #e8b5ae; }
 
 /* Page-specific details previously authored with fixed dark-theme colors. */
 body.theme-shimento :is(.analyze-jd-context, .analyze-result-card, .analyze-results-empty,
@@ -571,10 +558,6 @@ body .workspace-links::-webkit-scrollbar-button { display: none; width: 0; heigh
   .app-shell :is(.client-project-grid, .client-role-grid, .required-role-grid, .workflow-admin-action, .workflow-admin-item) { grid-template-columns: minmax(0, 1fr); }
   .app-shell :is(.clients-header, .vendors-header, .project-detail-header) { flex-wrap: wrap; }
   .app-shell :is(.profile-info, .profile-activity-grid) { grid-template-columns: minmax(0, 1fr); }
-  body.theme-shimento .ca-layout { grid-template-columns: minmax(0, 1fr); padding: 16px 14px 100px; }
-  body.theme-shimento .ca-nav { position: static; }
-  body.theme-shimento .ca-nav-list { flex-direction: row; flex-wrap: wrap; max-height: none; }
-  body.theme-shimento .ca-header { position: relative; }
 }
 @media (max-width: 480px) {
   .app-shell :is(.welcome-briefing-grid, .welcome-actions-grid, .welcome-pipeline-track, .kpi-container) { grid-template-columns: minmax(0, 1fr); }
@@ -582,7 +565,6 @@ body .workspace-links::-webkit-scrollbar-button { display: none; width: 0; heigh
   body.theme-shimento .welcome-module-panel { padding: 8px; }
   body.theme-shimento .welcome-module-row { gap: 8px; }
   body.theme-shimento .welcome-module-row em { font-size: 11px; }
-  body.theme-shimento .ca-card { margin: 24px 14px; }
 }
 
 /* Display the supplied PNG intact. Object-fit crops only its blank margins;
@@ -1218,16 +1200,12 @@ body.theme-shimento :is(.jd-empty-state, .jd-empty-card, .candidates-empty-state
 body.theme-shimento .results-section { margin-top: 24px; }
 body.theme-shimento .jd-list-section { margin-top: 24px; }
 body.theme-shimento .ab-container { padding-bottom: 0; }
-body.theme-shimento .ca-card { margin: 24px auto; padding: 24px; }
-body.theme-shimento .ca-question-card { padding: 20px; }
 /* Login keeps its dedicated two-panel layout and viewport centering. */
 body.theme-shimento .login-container .form-group { margin-bottom: 20px; }
 @media (max-width: 640px) {
   body.theme-shimento :is(.profile-box, .profile-section-box, .um-card,
-    .workflow-admin-head, .workflow-admin-panel, .ab-settings, .ab-question-card,
-    .ca-question-card) { padding: 16px; }
-  body.theme-shimento .ca-card { margin: 16px; padding: 20px; }
+    .workflow-admin-head, .workflow-admin-panel, .ab-settings, .ab-question-card) { padding: 16px; }
 }
 
 /* Reference theme: primary actions deepen on hover instead of dimming. */
-body.theme-shimento :is(.btn-primary, .ca-btn-primary, .date-reset-btn, .login-container button[type="submit"], .jd-create-container form button[type="submit"]):hover:not(:disabled) { background: var(--accent-dark); filter: none; }
+body.theme-shimento :is(.btn-primary, .date-reset-btn, .login-container button[type="submit"], .jd-create-container form button[type="submit"]):hover:not(:disabled) { background: var(--accent-dark); filter: none; }

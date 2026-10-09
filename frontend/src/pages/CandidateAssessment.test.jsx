@@ -20,6 +20,8 @@ let root, container;
 const $ = selector => container.querySelector(selector);
 const click = element => act(() => element.click());
 const answerCount = () => $('.ca-answered-count').textContent;
+const navItems = () => container.querySelectorAll('.ca-nav-item');
+const tab = name => [...container.querySelectorAll('.ca-tab')].find(el => el.textContent.startsWith(name));
 async function renderPayload(data) {
   publicApiGet.mockResolvedValue(data);
   await act(async () => root.render(
@@ -52,11 +54,17 @@ test.each([14, 20])('new %i-question assessment starts at zero despite starter c
   expect($('.ca-progress-track').getAttribute('aria-valuenow')).toBe('0');
   expect($('.ca-progress-track').getAttribute('aria-valuemax')).toBe(String(total));
   expect($('.ca-progress-track > span').style.width).toBe('0%');
-  expect(container.querySelectorAll('.ca-nav-item')).toHaveLength(total);
+  expect(navItems()).toHaveLength(total - 2);
+  expect(navItems()[0].textContent).toContain('Question 1');
+  expect(tab('Questions').getAttribute('aria-selected')).toBe('true');
+  expect(tab('Coding').textContent).toContain('0/2');
   expect($('.ca-logo').getAttribute('src')).toBe('/ShimentoX-Logo-Dark.png');
   expect($('.ca-assessment-title').textContent).toBe('Title received from API');
   expect($('.ca-candidate').textContent).toBe('Candidate received from API');
-  click(container.querySelectorAll('.ca-nav-item')[total - 2]);
+  click(tab('Coding'));
+  expect(navItems()).toHaveLength(2);
+  expect(navItems()[0].textContent).toContain(`Question ${total - 1}`);
+  expect($('#ca-question-position').textContent).toBe(`Question ${total - 1} of ${total}`);
   expect($('.ca-code-input').value).toBe('API supplied starter template\n');
   expect(answerCount()).toBe(`0 / ${total} answered`);
   expect(publicApiPost).not.toHaveBeenCalled();
@@ -65,14 +73,14 @@ test.each([14, 20])('new %i-question assessment starts at zero despite starter c
 test('actual responses update count, indicators and progress and survive navigation', async () => {
   await renderPayload(makePayload(20));
   for (let index = 0; index < 3; index += 1) {
-    click(container.querySelectorAll('.ca-nav-item')[index]);
+    click(navItems()[index]);
     click($('.ca-option input'));
   }
   expect(answerCount()).toBe('3 / 20 answered');
   expect(container.querySelectorAll('.ca-nav-item.answered')).toHaveLength(3);
   expect($('.ca-progress-track > span').style.width).toBe('15%');
   expect($('.ca-progress-ring').style.getPropertyValue('--ca-progress')).toBe('15%');
-  click(container.querySelectorAll('.ca-nav-item')[0]);
+  click(navItems()[0]);
   expect($('.ca-option input').checked).toBe(true);
   await act(async () => jest.advanceTimersByTime(600));
   expect(publicApiPost).toHaveBeenCalledWith('/api/assessment/save-answer', { token: 'test-token', question_id: 101, answer: 'First API option' });
@@ -86,7 +94,8 @@ test('restores only actual saved answers and ignores answers for absent question
   ]));
   expect(answerCount()).toBe('3 / 20 answered');
   expect(container.querySelectorAll('.ca-option input')[1].checked).toBe(true);
-  click(container.querySelectorAll('.ca-nav-item')[18]);
+  click(tab('Coding'));
+  click(navItems()[0]);
   expect($('.ca-code-input').value).toBe('Actual saved solution');
   await typeSolution('');
   expect($('.ca-code-input').value).toBe('');
@@ -99,7 +108,7 @@ test('question position, type, skill and editor content come from the active que
   await renderPayload(payload);
   expect($('.ca-step-actions button').disabled).toBe(true);
   expect($('.ca-question-footer .ca-btn-secondary').disabled).toBe(true);
-  click(container.querySelectorAll('.ca-nav-item')[12]);
+  click(tab('Coding'));
   expect($('#ca-question-position').textContent).toBe('Question 13 of 14');
   expect($('.ca-question-badge').textContent).toBe('Coding');
   expect($('.ca-skill-tag').textContent).toBe('Skill received 13');
@@ -129,7 +138,8 @@ test('timer uses the API duration and existing countdown state', async () => {
 test('submit uses existing API logic and sends actual responses only', async () => {
   await renderPayload(makePayload(14));
   click($('.ca-option input'));
-  click(container.querySelectorAll('.ca-nav-item')[13]);
+  click(tab('Coding'));
+  click(navItems()[1]);
   await typeSolution('SELECT value FROM actual_response;');
   await act(async () => $('.ca-question-footer .ca-btn-primary').click());
   const call = publicApiPost.mock.calls.find(([path]) => path === '/api/assessment/submit');

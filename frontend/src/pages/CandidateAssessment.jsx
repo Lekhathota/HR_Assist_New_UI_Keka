@@ -57,8 +57,11 @@ function CandidateAssessment() {
   const submitRef = useRef(null);
   answersRef.current = answers;
 
+  // Non-coding questions come first so each tab holds a contiguous number range.
   const sortedQuestions = useMemo(
-    () => [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    () => [...questions].sort((a, b) =>
+      Number(isCodeQuestion(a.question_type)) - Number(isCodeQuestion(b.question_type))
+      || (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [questions],
   );
 
@@ -70,7 +73,17 @@ function CandidateAssessment() {
   const editorLanguage = currentQuestion?.language || currentQuestion?.programming_language;
   const canGoBack = currentIndex > 0;
   const canGoForward = currentIndex < totalQuestions - 1;
-
+  const activeSection = currentQuestion && isCodeQuestion(currentQuestion.question_type) ? 'coding' : 'general';
+  const sections = useMemo(() => {
+    const general = [];
+    const coding = [];
+    sortedQuestions.forEach((q, index) => (isCodeQuestion(q.question_type) ? coding : general).push({ q, index }));
+    return [
+      { key: 'general', label: 'Questions', items: general },
+      { key: 'coding', label: 'Coding', items: coding },
+    ].filter(section => section.items.length);
+  }, [sortedQuestions]);
+  const visibleItems = sections.find(section => section.key === activeSection)?.items || [];
 
   const answeredCount = useMemo(
     () => sortedQuestions.filter(q => String(answers[q.id] || '').trim()).length,
@@ -220,7 +233,7 @@ function CandidateAssessment() {
 
   if (loading) {
     return (
-      <div className="ca-page">
+      <div className="ca-page" id="ca-root">
         <div className="ca-card ca-center">
           <div className="ca-spinner" aria-hidden="true" />
           <p>Loading your assessment…</p>
@@ -231,7 +244,7 @@ function CandidateAssessment() {
 
   if (error && !assessment) {
     return (
-      <div className="ca-page">
+      <div className="ca-page" id="ca-root">
         <div className="ca-card ca-center ca-error-card">
           <i className="fas fa-exclamation-circle" />
           <h1>Assessment Unavailable</h1>
@@ -243,7 +256,7 @@ function CandidateAssessment() {
 
   if (submitted) {
     return (
-      <div className="ca-page">
+      <div className="ca-page" id="ca-root">
         <div className="ca-card ca-center ca-success-card">
           <i className="fas fa-check-circle" />
           <h1>Assessment Submitted</h1>
@@ -254,7 +267,7 @@ function CandidateAssessment() {
   }
 
   return (
-    <div className="ca-page">
+    <div className="ca-page" id="ca-root">
       <header className="ca-header">
         <div className="ca-brand">
           <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX" className="ca-logo" />
@@ -286,9 +299,24 @@ function CandidateAssessment() {
 
       <div className="ca-layout">
         <aside className="ca-nav" aria-label="Question navigation">
-          <h2>Questions</h2>
+          {sections.length > 1 ? (
+            <div className="ca-tabs" role="tablist" aria-label="Question sections">
+              {sections.map(section => {
+                const done = section.items.filter(({ q }) => String(answers[q.id] || '').trim()).length;
+                return (
+                  <button key={section.key} type="button" role="tab" aria-selected={activeSection === section.key}
+                    className={`ca-tab ${activeSection === section.key ? 'active' : ''}`} disabled={submitting}
+                    onClick={() => { if (activeSection !== section.key) setCurrentIndex(section.items[0].index); }}>
+                    <i className={`fas ${section.key === 'coding' ? 'fa-code' : 'fa-list-ul'}`} aria-hidden="true" />
+                    {section.label}
+                    <span className="ca-tab-count">{done}/{section.items.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : <h2 className="ca-nav-title">Questions</h2>}
           <ul className="ca-nav-list">
-            {sortedQuestions.map((q, index) => {
+            {visibleItems.map(({ q, index }) => {
               const answered = Boolean(String(answers[q.id] || '').trim());
               const active = index === currentIndex;
               return (
@@ -299,6 +327,7 @@ function CandidateAssessment() {
                     aria-current={active ? 'step' : undefined}
                     aria-label={`Question ${index + 1}, ${questionLabel(q.question_type)}, ${answered ? 'answered' : 'unanswered'}`}>
                     <span className="ca-nav-num">{index + 1}</span>
+                    <span className="ca-nav-label">Question {index + 1}</span>
                     {answered && <span className="ca-nav-check" aria-hidden="true"><i className="fas fa-check" /></span>}
                   </button>
                 </li>
