@@ -4,11 +4,12 @@ import Layout from '../components/Layout.jsx';
 import { toast } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPost } from '../api.js';
 import {
-  assessmentBadgeClass,
   formatAssessmentDate,
   formatAssessmentStatus,
   isAssessmentScoreVisible,
 } from '../utils/assessmentDisplay.js';
+import { initials } from '../utils/userDisplay.js';
+import '../styles/hiring_pipeline.css';
 
 function formatDateTime(value) {
   if (!value) return { date: 'N/A', time: '' };
@@ -37,6 +38,46 @@ function statusClass(value) {
     lowered === 'rejected'
   ) return 'interview-status-bad';
   return 'interview-status-muted';
+}
+
+// Colour tone for a status pill: good / bad / warn / info / muted.
+function toneOf(value) {
+  const cls = statusClass(value);
+  if (cls === 'interview-status-good') return 'good';
+  if (/scheduled$/i.test(String(value || '').trim())) return 'good';
+  if (cls === 'interview-status-bad') return 'bad';
+  return 'muted';
+}
+
+const ASSESSMENT_TONE = {
+  NOT_CREATED: 'muted', DRAFT: 'info', SENT: 'warn', IN_PROGRESS: 'warn', COMPLETED: 'info', PASSED: 'good', FAILED: 'bad',
+};
+const ASSESSMENT_FILTERS = [
+  ['all', 'All'], ['NOT_CREATED', 'Not created'], ['DRAFT', 'Draft'], ['SENT', 'Sent'],
+  ['IN_PROGRESS', 'In progress'], ['PASSED', 'Passed'], ['FAILED', 'Failed'],
+];
+const INTERVIEW_VIEWS = [
+  ['upcoming', 'Upcoming'], ['needs_followup', 'Needs follow-up'], ['past', 'Past'], ['cancelled', 'Cancelled'], ['all', 'All'],
+];
+
+// "72.0912" -> "72.1%", "85" -> "85%".
+function pct(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return `${value}%`;
+  return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
+}
+
+// Hide template placeholders such as "[Phone]" that some resumes leave in.
+function realValue(value) {
+  const text = String(value || '').trim();
+  return text && !/^\[.*\]$/.test(text) ? text : '';
+}
+
+// "Scheduled" -> "Interview scheduled"; "Interview Scheduled" stays as is (no double prefix).
+function interviewLabel(value) {
+  const text = prettyStatus(value).trim();
+  const label = /^interview\b/i.test(text) ? text : `Interview ${text.toLowerCase()}`;
+  return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
 }
 
 function prettyStatus(value) {
@@ -300,6 +341,28 @@ function HiringPipeline() {
       return matchesSearch && matchesStatus && matchesView;
     });
   }, [interviews, searchTerm, statusFilter, viewFilter]);
+
+  const assessmentCounts = useMemo(() => {
+    const counts = { NOT_CREATED: 0, DRAFT: 0, SENT: 0, IN_PROGRESS: 0, COMPLETED: 0, PASSED: 0, FAILED: 0 };
+    assessmentRows.forEach(row => {
+      const status = String(row.assessment_status || 'NOT_CREATED');
+      counts[status] = (counts[status] || 0) + 1;
+    });
+    return counts;
+  }, [assessmentRows]);
+
+  const interviewViewCounts = useMemo(() => {
+    const counts = { upcoming: 0, needs_followup: 0, past: 0, cancelled: 0, all: interviews.length };
+    interviews.forEach(item => {
+      const past = isPastInterview(item);
+      const cancelled = isCancelled(item);
+      if (!past && !cancelled) counts.upcoming += 1;
+      if (past && !cancelled) counts.needs_followup += 1;
+      if (past) counts.past += 1;
+      if (cancelled) counts.cancelled += 1;
+    });
+    return counts;
+  }, [interviews]);
 
   const filteredAssessments = useMemo(() => {
     const query = assessmentSearch.trim().toLowerCase();
@@ -697,279 +760,249 @@ function HiringPipeline() {
 
   return (
     <Layout>
-      <div className="interviews-container">
-        <div className="interviews-header">
+      <div className="interviews-container hp-page">
+        <header className="hp-header">
           <div>
-            <h1><i className="fas fa-route"></i> Hiring Pipeline</h1>
-            <p>Manage assessments, candidate progress, interviews, follow-ups, and outcomes.</p>
+            <h1>Hiring Pipeline</h1>
+            <p>Move screened candidates through assessments and interviews to an outcome.</p>
           </div>
-          <button type="button" className="btn btn-secondary" onClick={refreshPipeline} disabled={loading || loadingAssessments}>
-            <i className="fas fa-rotate"></i> Refresh
+          <button type="button" className="hp-btn hp-btn-ghost" onClick={refreshPipeline} disabled={loading || loadingAssessments}>
+            <i className={`fas fa-rotate${loading || loadingAssessments ? ' fa-spin' : ''}`} aria-hidden="true"></i> Refresh
           </button>
-        </div>
+        </header>
 
-        <div className="interviews-toolbar hp-main-tabs" role="tablist" aria-label="Hiring pipeline sections">
+        <section className="hp-stats" aria-label="Pipeline summary">
           {[
-            ['assessments', 'Assessments'],
-            ['interviews', 'Interviews'],
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={activeTab === value ? 'active' : ''}
-              onClick={() => setActiveTab(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === 'assessments' && (
-          <>
-            <div className="interviews-toolbar">
-              <div className="interviews-tabs" role="tablist" aria-label="Assessment filters">
-                {[
-                  ['all', 'All'],
-                  ['NOT_CREATED', 'Not created'],
-                  ['DRAFT', 'Draft'],
-                  ['SENT', 'Sent'],
-                  ['IN_PROGRESS', 'In progress'],
-                  ['PASSED', 'Passed'],
-                  ['FAILED', 'Failed'],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={assessmentFilter === value ? 'active' : ''}
-                    onClick={() => setAssessmentFilter(value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="interviews-filter-controls">
-                <div className="interviews-search">
-                  <i className="fas fa-search"></i>
-                  <input
-                    value={assessmentSearch}
-                    onChange={(event) => setAssessmentSearch(event.target.value)}
-                    placeholder="Search assessments"
-                  />
-                </div>
-              </div>
+            ['fa-clipboard-list', 'To assess', assessmentCounts.NOT_CREATED + assessmentCounts.DRAFT, 'Assessment not created or still a draft'],
+            ['fa-paper-plane', 'With candidates', assessmentCounts.SENT + assessmentCounts.IN_PROGRESS, 'Assessment sent or in progress'],
+            ['fa-circle-check', 'Passed', assessmentCounts.PASSED, 'Passed the assessment'],
+            ['fa-calendar-day', 'Upcoming interviews', interviewViewCounts.upcoming, 'Scheduled and not yet held'],
+            ['fa-reply', 'Needs follow-up', interviewViewCounts.needs_followup, 'Interview held - record the outcome or follow up'],
+          ].map(([icon, label, value, hint]) => (
+            <div key={label} className="hp-stat" title={hint}>
+              <span className="hp-stat-icon"><i className={`fas ${icon}`} aria-hidden="true"></i></span>
+              <div><span>{label}</span><strong>{loading || loadingAssessments ? '—' : value}</strong></div>
             </div>
+          ))}
+        </section>
 
-            {loadingAssessments ? (
-              <div className="interviews-empty">Loading assessment pipeline...</div>
-            ) : filteredAssessments.length === 0 ? (
-              <div className="interviews-empty">No assessment candidates match this view.</div>
-            ) : (
-              <div className="interviews-days">
-                <section className="interviews-day">
-                  <div className="interviews-day-header">
-                    <h2>Assessment Queue</h2>
-                    <span>{filteredAssessments.length} candidate{filteredAssessments.length === 1 ? '' : 's'}</span>
-                  </div>
-                  <div className="interviews-list">
-                    {filteredAssessments.map(row => {
-                      const showScore = isAssessmentScoreVisible(row.assessment_status);
-                      const generatedKey = `${row.candidate_id}-${row.jd_id}`;
-                      const activeInterview = hasActiveInterview(row);
-                      return (
-                        <article key={generatedKey} className="interview-card">
-                          <div className="interview-card-time">
-                            <span className={`badge ${assessmentBadgeClass(row.assessment_status)}`}>
-                              {formatAssessmentStatus(row.assessment_status)}
-                            </span>
-                          </div>
-                          <div className="interview-card-main">
-                            <div className="interview-card-title-row">
-                              <h3>{row.candidate_name || row.candidate_email}</h3>
-                            </div>
-                            <p>{row.jd_title}</p>
-                            <div className="interview-detail-row">
-                              {row.candidate_email && <span><i className="fas fa-envelope"></i> {row.candidate_email}</span>}
-                              {row.candidate_phone && <span><i className="fas fa-phone"></i> {row.candidate_phone}</span>}
-                              {row.match_score != null && <span><i className="fas fa-gauge-high"></i> Match {row.match_score}%</span>}
-                              {row.sent_at && <span><i className="fas fa-paper-plane"></i> Sent {formatAssessmentDate(row.sent_at)}</span>}
-                              {row.started_at && <span><i className="fas fa-play"></i> Started {formatAssessmentDate(row.started_at)}</span>}
-                              {row.completed_at && <span><i className="fas fa-check-circle"></i> Completed {formatAssessmentDate(row.completed_at)}</span>}
-                            </div>
-                            <div className="interview-status-row">
-                              <span className={statusClass(row.assessment_status)}>{formatAssessmentStatus(row.assessment_status)}</span>
-                              <span className={statusClass(row.link_status)}>{row.link_status || 'Not Sent'}</span>
-                              {showScore && row.assessment_percentage != null && <span className={statusClass(row.assessment_result)}>{row.assessment_percentage}%</span>}
-                              {row.assessment_result && <span className={statusClass(row.assessment_result)}>{row.assessment_result}</span>}
-                              {activeInterview && <span className={statusClass(row.interview_status)}>Interview: {prettyStatus(row.interview_status)}</span>}
-                            </div>
-                          </div>
-                          <div className="interview-card-actions assessment-card-actions">
-                            <Link to={`/talent/${row.candidate_id}`} className="btn btn-primary">
-                              <i className="fas fa-eye"></i> Candidate
-                            </Link>
-                            {row.assessment_status === 'NOT_CREATED' && (
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                disabled={generatingAssessmentId === generatedKey}
-                                onClick={() => generateAssessment(row)}
-                              >
-                                <i className={`fas ${generatingAssessmentId === generatedKey ? 'fa-spinner fa-spin' : 'fa-magic'}`}></i>
-                                {generatingAssessmentId === generatedKey ? 'Generating...' : 'Generate Assessment'}
-                              </button>
-                            )}
-                            {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED'].includes(row.assessment_status) && (
-                              <button type="button" className="btn btn-secondary" onClick={() => reviewAssessment(row)}>
-                                <i className="fas fa-clipboard-check"></i> Review Assessment
-                              </button>
-                            )}
-                            {row.eligible_for_interview && !activeInterview && (
-                              <button type="button" className="btn btn-success" onClick={() => openSchedule(row)}>
-                                <i className="fas fa-calendar-check"></i> Schedule Interview
-                              </button>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'interviews' && (
-          <>
-        <div className="interviews-toolbar">
-          <div className="interviews-tabs" role="tablist" aria-label="Interview filters">
+        <section className="hp-panel">
+          <nav className="hp-tabs" role="tablist" aria-label="Hiring pipeline sections">
             {[
-              ['upcoming', 'Upcoming'],
-              ['needs_followup', 'Needs follow-up'],
-              ['past', 'Past'],
-              ['cancelled', 'Cancelled'],
-              ['all', 'All'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={viewFilter === value ? 'active' : ''}
-                onClick={() => setViewFilter(value)}
-              >
-                {label}
+              ['assessments', 'Assessments', 'fa-clipboard-check', assessmentRows.length],
+              ['interviews', 'Interviews', 'fa-calendar-check', interviews.length],
+            ].map(([value, label, icon, count]) => (
+              <button key={value} type="button" role="tab" aria-selected={activeTab === value}
+                className={`hp-tab${activeTab === value ? ' active' : ''}`} onClick={() => setActiveTab(value)}>
+                <i className={`fas ${icon}`} aria-hidden="true"></i> {label}<span>{count}</span>
               </button>
             ))}
-          </div>
-          <div className="interviews-filter-controls">
-            <div className="interviews-search">
-              <i className="fas fa-search"></i>
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search interviews"
-              />
-            </div>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">All statuses</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="rescheduled">Rescheduled</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="client interview pending">Client pending</option>
-              <option value="rejected after interview">Rejected after interview</option>
-            </select>
-          </div>
-        </div>
+          </nav>
 
-        {loading ? (
-          <div className="interviews-empty">Loading interviews...</div>
-        ) : grouped.length === 0 ? (
-          <div className="interviews-empty">No interviews match this view.</div>
-        ) : (
-          <div className="interviews-days">
-            {grouped.map(([date, rows]) => (
-              <section key={date} className="interviews-day">
-                <div className="interviews-day-header">
-                  <h2>{date}</h2>
-                  <span>{rows.length} interview{rows.length === 1 ? '' : 's'}</span>
+          {activeTab === 'assessments' && (
+            <>
+              <div className="hp-toolbar">
+                <div className="hp-chips" role="group" aria-label="Assessment filters">
+                  {ASSESSMENT_FILTERS.map(([value, label]) => (
+                    <button key={value} type="button" aria-pressed={assessmentFilter === value}
+                      className={`hp-chip${assessmentFilter === value ? ' active' : ''}`} onClick={() => setAssessmentFilter(value)}>
+                      {label}<span>{value === 'all' ? assessmentRows.length : assessmentCounts[value] || 0}</span>
+                    </button>
+                  ))}
                 </div>
-                <div className="interviews-list">
-                  {rows.map(item => {
-                    const stamp = formatDateTime(item.interview_start);
-                    const emailStatus = deliveryStatus(item, 'email_status');
-                    const textStatus = deliveryStatus(item, 'text_status');
-                    const past = isPastInterview(item);
-                    const cancelled = isCancelled(item);
-                    const lockedOutcome = isOutcomeLocked(item);
+                <label className="hp-search">
+                  <i className="fas fa-search" aria-hidden="true"></i>
+                  <input type="search" value={assessmentSearch} onChange={(event) => setAssessmentSearch(event.target.value)}
+                    placeholder="Search candidate or job" aria-label="Search assessments" />
+                </label>
+              </div>
+
+              {loadingAssessments ? (
+                <div className="hp-empty"><i className="fas fa-spinner fa-spin" aria-hidden="true"></i><p>Loading assessments…</p></div>
+              ) : filteredAssessments.length === 0 ? (
+                <div className="hp-empty"><i className="fas fa-clipboard" aria-hidden="true"></i><p>No candidates match this view.</p></div>
+              ) : (
+                <>
+                <div className="hp-row hp-row-head" aria-hidden="true">
+                  <span>Candidate</span><span>Contact</span><span>Scores</span><span>Status</span><span className="hp-head-actions">Actions</span>
+                </div>
+                <ul className="hp-list" aria-label="Assessment queue">
+                  {filteredAssessments.map(row => {
+                    const showScore = isAssessmentScoreVisible(row.assessment_status);
+                    const generatedKey = `${row.candidate_id}-${row.jd_id}`;
+                    const activeInterview = hasActiveInterview(row);
+                    const status = row.assessment_status || 'NOT_CREATED';
                     return (
-                      <article
-                        key={item.id}
-                        id={`interview-${item.id}`}
-                        className={`interview-card ${cancelled ? 'interview-card-cancelled' : ''} ${highlightedInterviewId === item.id ? 'interview-card-highlight' : ''}`}
-                      >
-                        <div className="interview-card-time">{stamp.time}</div>
-                        <div className="interview-card-main">
-                          <div className="interview-card-title-row">
-                            <h3>{item.candidate_name || item.candidate_email}</h3>
-                          </div>
-                          <p>{item.job_role}</p>
-                          <div className="interview-detail-row">
-                            {item.interviewer && <span><i className="fas fa-user-tie"></i> {item.interviewer}</span>}
-                            {item.interview_mode && <span><i className="fas fa-video"></i> {item.interview_mode}</span>}
-                            {item.meeting_link && <a href={item.meeting_link} target="_blank" rel="noreferrer"><i className="fas fa-link"></i> Meeting link</a>}
-                            {item.notes && <span><i className="fas fa-note-sticky"></i> {item.notes}</span>}
-                          </div>
-                          <div className="interview-status-row">
-                            <span className={statusClass(item.status)}>{prettyStatus(item.status || 'scheduled')}</span>
-                            <span className={statusClass(emailStatus)}>Email: {prettyStatus(emailStatus || 'sent')}</span>
-                            <span className={statusClass(textStatus)}>Text: {prettyStatus(textStatus || 'sent')}</span>
-                            <span className={statusClass(item.followup_status)}>Follow-up: {prettyStatus(item.followup_status || 'not sent')}</span>
-                            {item.cancellation_status === 'sent' && <span className={statusClass('sent')}>Cancellation: sent</span>}
+                      <li key={generatedKey} className="hp-row">
+                        <div className="hp-person">
+                          <span className="hp-avatar" aria-hidden="true">{initials(row.candidate_name || row.candidate_email || '?')}</span>
+                          <div>
+                            <Link to={`/talent/${row.candidate_id}`} className="hp-name">{row.candidate_name || row.candidate_email}</Link>
+                            <span className="hp-sub">{row.jd_title || 'No job'}</span>
                           </div>
                         </div>
-                        <div className="interview-card-actions">
-                          {!past && !cancelled && (
-                            <button type="button" className="btn btn-secondary" onClick={() => openReschedule(item)}>
-                              <i className="fas fa-calendar-plus"></i> Reschedule
+                        <div className="hp-meta">
+                          {row.candidate_email && <span><i className="fas fa-envelope" aria-hidden="true"></i>{row.candidate_email}</span>}
+                          {realValue(row.candidate_phone) && <span><i className="fas fa-phone" aria-hidden="true"></i>{realValue(row.candidate_phone)}</span>}
+                          {row.completed_at ? <span><i className="fas fa-flag-checkered" aria-hidden="true"></i>Completed {formatAssessmentDate(row.completed_at)}</span>
+                            : row.started_at ? <span><i className="fas fa-play" aria-hidden="true"></i>Started {formatAssessmentDate(row.started_at)}</span>
+                              : row.sent_at ? <span><i className="fas fa-paper-plane" aria-hidden="true"></i>Sent {formatAssessmentDate(row.sent_at)}</span> : null}
+                        </div>
+                        <div className="hp-score">
+                          {row.match_score != null && <span className="hp-match" title="Resume match score">{pct(row.match_score)}<small>match</small></span>}
+                          {showScore && row.assessment_percentage != null && <span className="hp-match hp-match-test" title="Assessment score">{pct(row.assessment_percentage)}<small>test</small></span>}
+                        </div>
+                        <div className="hp-pills">
+                          <span className={`hp-pill ${ASSESSMENT_TONE[status] || 'muted'}`}>{formatAssessmentStatus(status)}</span>
+                          {activeInterview
+                            ? <span className={`hp-pill ${toneOf(row.interview_status)}`}>{interviewLabel(row.interview_status)}</span>
+                            : status !== 'NOT_CREATED' && status !== 'DRAFT' && <span className={`hp-pill ${toneOf(row.link_status)}`}>Link {String(row.link_status || 'not sent').toLowerCase()}</span>}
+                        </div>
+                        <div className="hp-actions">
+                          {status === 'NOT_CREATED' && (
+                            <button type="button" className="hp-btn hp-btn-primary" disabled={generatingAssessmentId === generatedKey} onClick={() => generateAssessment(row)}>
+                              <i className={`fas ${generatingAssessmentId === generatedKey ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`} aria-hidden="true"></i>
+                              {generatingAssessmentId === generatedKey ? 'Generating…' : 'Generate assessment'}
                             </button>
                           )}
-                          <button type="button" className="btn btn-primary" onClick={() => openFollowup(item)} disabled={cancelled}>
-                            <i className="fas fa-reply"></i> Follow-up
-                          </button>
-                          {past && !cancelled && !lockedOutcome ? (
-                            <>
-                              <button type="button" className="btn btn-success" onClick={() => setInterviewOutcome(item, 'selected')} disabled={outcomeBusyId === item.id}>
-                                {outcomeBusyId === item.id ? (
-                                  <><i className="fas fa-spinner fa-spin"></i> Updating...</>
-                                ) : (
-                                  <><i className="fas fa-check"></i> Selected</>
-                                )}
-                              </button>
-                              <button type="button" className="btn btn-danger" onClick={() => setInterviewOutcome(item, 'rejected')} disabled={outcomeBusyId === item.id}>
-                                {outcomeBusyId === item.id ? (
-                                  <><i className="fas fa-spinner fa-spin"></i> Updating...</>
-                                ) : (
-                                  <><i className="fas fa-xmark"></i> Rejected</>
-                                )}
-                              </button>
-                            </>
-                          ) : (
-                            !past && !cancelled && (
-                              <button type="button" className="btn btn-danger" onClick={() => openCancel(item)}>
-                                <i className="fas fa-ban"></i> Cancel
-                              </button>
-                            )
+                          {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED'].includes(status) && (
+                            <button type="button" className={`hp-btn ${status === 'DRAFT' ? 'hp-btn-primary' : 'hp-btn-ghost'}`} onClick={() => reviewAssessment(row)}>
+                              <i className="fas fa-clipboard-check" aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'Review'}
+                            </button>
                           )}
+                          {row.eligible_for_interview && !activeInterview && (
+                            <button type="button" className="hp-btn hp-btn-success" onClick={() => openSchedule(row)}>
+                              <i className="fas fa-calendar-plus" aria-hidden="true"></i> Schedule interview
+                            </button>
+                          )}
+                          <Link to={`/talent/${row.candidate_id}`} className="hp-icon-btn" aria-label={`View ${row.candidate_name || 'candidate'}`} title="View candidate">
+                            <i className="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                          </Link>
                         </div>
-                      </article>
+                      </li>
                     );
                   })}
+                </ul>
+                </>
+              )}
+            </>
+          )}
+
+          {activeTab === 'interviews' && (
+            <>
+              <div className="hp-toolbar">
+                <div className="hp-chips" role="group" aria-label="Interview filters">
+                  {INTERVIEW_VIEWS.map(([value, label]) => (
+                    <button key={value} type="button" aria-pressed={viewFilter === value}
+                      className={`hp-chip${viewFilter === value ? ' active' : ''}`} onClick={() => setViewFilter(value)}>
+                      {label}<span>{interviewViewCounts[value]}</span>
+                    </button>
+                  ))}
                 </div>
-              </section>
-            ))}
-          </div>
-        )}
-          </>
-        )}
+                <div className="hp-toolbar-right">
+                  <label className="hp-search">
+                    <i className="fas fa-search" aria-hidden="true"></i>
+                    <input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Search candidate, job or interviewer" aria-label="Search interviews" />
+                  </label>
+                  <select className="hp-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Interview status">
+                    <option value="all">All statuses</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="rescheduled">Rescheduled</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="client interview pending">Client pending</option>
+                    <option value="rejected after interview">Rejected after interview</option>
+                  </select>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="hp-empty"><i className="fas fa-spinner fa-spin" aria-hidden="true"></i><p>Loading interviews…</p></div>
+              ) : grouped.length === 0 ? (
+                <div className="hp-empty"><i className="fas fa-calendar-xmark" aria-hidden="true"></i><p>No interviews match this view.</p></div>
+              ) : (
+                <>
+                <div className="hp-row hp-row-interview hp-row-head" aria-hidden="true">
+                  <span>Time</span><span>Candidate</span><span>Details</span><span>Status</span><span className="hp-head-actions">Actions</span>
+                </div>
+                <div className="hp-days">
+                  {grouped.map(([date, rows]) => (
+                    <section key={date} className="hp-day" aria-label={date}>
+                      <h2 className="hp-day-head"><i className="fas fa-calendar" aria-hidden="true"></i> {date}<span>{rows.length} interview{rows.length === 1 ? '' : 's'}</span></h2>
+                      <ul className="hp-list">
+                        {rows.map(item => {
+                          const stamp = formatDateTime(item.interview_start);
+                          const emailStatus = deliveryStatus(item, 'email_status');
+                          const textStatus = deliveryStatus(item, 'text_status');
+                          const past = isPastInterview(item);
+                          const cancelled = isCancelled(item);
+                          const lockedOutcome = isOutcomeLocked(item);
+                          return (
+                            <li key={item.id} id={`interview-${item.id}`}
+                              className={`hp-row hp-row-interview${cancelled ? ' is-cancelled' : ''}${highlightedInterviewId === item.id ? ' is-highlighted' : ''}`}>
+                              <div className="hp-time">
+                                <strong>{stamp.time || '—'}</strong>
+                                <small>{item.interview_mode || 'Interview'}</small>
+                              </div>
+                              <div className="hp-person">
+                                <span className="hp-avatar" aria-hidden="true">{initials(item.candidate_name || item.candidate_email || '?')}</span>
+                                <div>
+                                  {item.candidate_id
+                                    ? <Link to={`/talent/${item.candidate_id}`} className="hp-name">{item.candidate_name || item.candidate_email}</Link>
+                                    : <span className="hp-name">{item.candidate_name || item.candidate_email}</span>}
+                                  <span className="hp-sub">{item.job_role || 'No job'}</span>
+                                </div>
+                              </div>
+                              <div className="hp-meta">
+                                {item.interviewer && <span><i className="fas fa-user-tie" aria-hidden="true"></i>{item.interviewer}</span>}
+                                {item.meeting_link && <a href={item.meeting_link} target="_blank" rel="noreferrer"><i className="fas fa-video" aria-hidden="true"></i>Join meeting</a>}
+                                {item.notes && <span className="hp-note" title={item.notes}><i className="fas fa-note-sticky" aria-hidden="true"></i>{item.notes}</span>}
+                              </div>
+                              <div className="hp-pills">
+                                <span className={`hp-pill ${toneOf(item.status || 'scheduled')}`}>{prettyStatus(item.status || 'Scheduled')}</span>
+                                <span className="hp-delivery" title={`Email ${prettyStatus(emailStatus || 'sent')} · Text ${prettyStatus(textStatus || 'sent')} · Follow-up ${prettyStatus(item.followup_status || 'not sent')}`}>
+                                  <i className={`fas fa-envelope ${toneOf(emailStatus || 'sent')}`} aria-label={`Email ${prettyStatus(emailStatus || 'sent')}`}></i>
+                                  <i className={`fas fa-comment-sms ${toneOf(textStatus || 'sent')}`} aria-label={`Text ${prettyStatus(textStatus || 'sent')}`}></i>
+                                  <i className={`fas fa-reply ${toneOf(item.followup_status)}`} aria-label={`Follow-up ${prettyStatus(item.followup_status || 'not sent')}`}></i>
+                                </span>
+                              </div>
+                              <div className="hp-actions">
+                                {past && !cancelled && !lockedOutcome && (
+                                  <>
+                                    <button type="button" className="hp-btn hp-btn-success" onClick={() => setInterviewOutcome(item, 'selected')} disabled={outcomeBusyId === item.id}>
+                                      <i className={`fas ${outcomeBusyId === item.id ? 'fa-spinner fa-spin' : 'fa-check'}`} aria-hidden="true"></i> Selected
+                                    </button>
+                                    <button type="button" className="hp-btn hp-btn-danger" onClick={() => setInterviewOutcome(item, 'rejected')} disabled={outcomeBusyId === item.id}>
+                                      <i className={`fas ${outcomeBusyId === item.id ? 'fa-spinner fa-spin' : 'fa-xmark'}`} aria-hidden="true"></i> Rejected
+                                    </button>
+                                  </>
+                                )}
+                                {!past && !cancelled && (
+                                  <button type="button" className="hp-btn hp-btn-ghost" onClick={() => openReschedule(item)}>
+                                    <i className="fas fa-calendar-plus" aria-hidden="true"></i> Reschedule
+                                  </button>
+                                )}
+                                <button type="button" className="hp-btn hp-btn-ghost" onClick={() => openFollowup(item)} disabled={cancelled}>
+                                  <i className="fas fa-reply" aria-hidden="true"></i> Follow-up
+                                </button>
+                                {!past && !cancelled && (
+                                  <button type="button" className="hp-icon-btn hp-icon-danger" onClick={() => openCancel(item)} aria-label={`Cancel interview with ${item.candidate_name || 'candidate'}`} title="Cancel interview">
+                                    <i className="fas fa-ban" aria-hidden="true"></i>
+                                  </button>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
+                </>
+              )}
+            </>
+          )}
+        </section>
 
         {scheduleActive && (
           <div className="jd-modal-backdrop" role="presentation">
