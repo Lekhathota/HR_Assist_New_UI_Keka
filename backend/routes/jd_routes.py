@@ -124,6 +124,8 @@ def api_create_jd():
         )
         workflow = run_automated_bench_workflow(created["id"], username=user["username"] if user else "")
         return jsonify({"success": True, "jd": created["jd"], "workflow": workflow})
+    except db.DuplicateJDNameError as exc:
+        return jsonify({"error": str(exc)}), 409
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -169,7 +171,10 @@ def api_jd_update(jd_id: int):
     if not patch:
         return jsonify({"error": "No editable fields provided."}), 400
 
-    db.update_jd(jd_id, patch)
+    try:
+        db.update_jd(jd_id, patch)
+    except db.DuplicateJDNameError as exc:
+        return jsonify({"error": str(exc)}), 409
     user = current_user()
     db.log_audit(
         "JD Updated",

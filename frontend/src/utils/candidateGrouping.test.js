@@ -1,4 +1,20 @@
-import { dedupeCandidates } from './candidateGrouping';
+import { dedupeCandidates, candidateMatchesSelection } from './candidateGrouping';
+
+test('mixed job outcomes appear in both relevant categories', () => {
+  const candidate = { status: 'Selected', job_applications: [{ status: 'Rejected' }] };
+  expect(candidateMatchesSelection(candidate, 'selected')).toBe(true);
+  expect(candidateMatchesSelection(candidate, 'rejected')).toBe(true);
+  expect(candidateMatchesSelection({ status: 'Pending' }, 'rejected')).toBe(false);
+});
+
+test('grouping retains rejected submission status even without job metadata', () => {
+  const [candidate] = dedupeCandidates([
+    { id: 1, email: 'person@example.com', status: 'Rejected' },
+    { id: 2, email: 'person@example.com', status: 'Selected' },
+  ]);
+  expect(candidateMatchesSelection(candidate, 'rejected')).toBe(true);
+  expect(candidateMatchesSelection(candidate, 'selected')).toBe(true);
+});
 
 test('groups job submissions and prefers the selected candidate profile', () => {
   const rows = [

@@ -32,6 +32,29 @@ DEFAULT_HIRING_STAGES = ["Sourced", "Screening", "Interview", "Offer", "Hired"]
 CLIENT_ROLE_LEVELS = {"Junior", "Mid", "Senior", "Lead"}
 
 
+class DuplicateJDNameError(ValueError):
+    pass
+
+
+def _normalized_jd_title(title: str) -> str:
+    return " ".join(str(title or "").split()).casefold()
+
+
+def _check_duplicate_jd_title(title: str, client_id: int | None, exclude_id: int | None = None) -> None:
+    normalized = _normalized_jd_title(title)
+    if not normalized:
+        return
+    # Match legacy records too, including case and whitespace differences.
+    pattern = r"^\s*" + r"\s+".join(re.escape(word) for word in str(title).split()) + r"\s*$"
+    query = {"client_id": client_id, "$or": [
+        {"normalized_title": normalized}, {"title": {"$regex": pattern, "$options": "i"}}
+    ]}
+    if exclude_id is not None:
+        query["id"] = {"$ne": int(exclude_id)}
+    if _database().job_descriptions.find_one(query, {"id": 1}):
+        raise DuplicateJDNameError(f'A JD named "{str(title).strip()}" already exists for this client. Use a different name or select a different client.')
+
+
 # Purpose: Fetches mongo uri from storage or service context.
 def get_mongo_uri() -> str:
     # Vercel's MongoDB integration commonly exposes MONGODB_URL, while the
@@ -195,6 +218,11 @@ def _ensure_indexes() -> None:
     db.job_descriptions.create_index([("id", ASCENDING)], unique=True)
     db.job_descriptions.create_index([("status", ASCENDING), ("created_at", DESCENDING)])
     db.job_descriptions.create_index([("client_id", ASCENDING)])
+    db.job_descriptions.create_index(
+        [("client_id", ASCENDING), ("normalized_title", ASCENDING)],
+        unique=True, name="unique_client_jd_title",
+        partialFilterExpression={"normalized_title": {"$type": "string"}},
+    )
     db.job_descriptions.create_index([("project_id", ASCENDING)])
     db.job_descriptions.create_index([("job_category", ASCENDING)])
     db.clients.create_index([("id", ASCENDING)], unique=True)
@@ -1426,10 +1454,12 @@ def create_jd(data: dict) -> int:
     new_id = _next_id("job_descriptions")
     now = _now()
     client_fields = _client_for_data(data)
+    _check_duplicate_jd_title(data.get("title") or "", client_fields.get("client_id"))
     project_fields = _project_for_data(data, client_fields)
     doc = {
         "id": new_id,
         "title": data.get("title") or "",
+        "normalized_title": _normalized_jd_title(data.get("title") or ""),
         "job_code": str(data.get("job_code") or "").strip() or generate_job_code(data.get("title") or ""),
         "recruiter": str(data.get("recruiter") or "").strip(),
         "department": data.get("department") or "",
@@ -1464,7 +1494,12 @@ def create_jd(data: dict) -> int:
         **client_fields,
         **project_fields,
     }
-    _database().job_descriptions.insert_one(doc)
+    try:
+        _database().job_descriptions.insert_one(doc)
+    except DuplicateKeyError as exc:
+        if "unique_client_jd_title" not in str(exc):
+            raise
+        raise DuplicateJDNameError("A JD with this name already exists for this client.") from exc
     refresh_dashboard_metrics()
     activity_feed.emit("jd_created", jd_id=new_id, jd_title=doc["title"])
     return new_id
@@ -1547,10 +1582,25 @@ def update_jd(jd_id: int, data: dict) -> bool:
         patch[col] = value
     if not patch:
         return False
+    if "title" in patch or "client_id" in patch:
+        existing_jd = _database().job_descriptions.find_one({"id": int(jd_id)})
+        if not existing_jd:
+            return False
+        title = patch.get("title", existing_jd.get("title") or "")
+        client_id = patch.get("client_id", existing_jd.get("client_id"))
+        if (_normalized_jd_title(title) != _normalized_jd_title(existing_jd.get("title"))
+                or client_id != existing_jd.get("client_id")):
+            _check_duplicate_jd_title(title, client_id, exclude_id=jd_id)
+            patch["normalized_title"] = _normalized_jd_title(title)
     watched = [col for col in patch if col == "status" or col in _JD_USER_FIELDS]
     before = _database().job_descriptions.find_one({"id": int(jd_id)}, {col: 1 for col in watched}) if watched else None
     patch["updated_at"] = _now()
-    result = _database().job_descriptions.update_one({"id": int(jd_id)}, {"$set": patch})
+    try:
+        result = _database().job_descriptions.update_one({"id": int(jd_id)}, {"$set": patch})
+    except DuplicateKeyError as exc:
+        if "unique_client_jd_title" not in str(exc):
+            raise
+        raise DuplicateJDNameError("A JD with this name already exists for this client.") from exc
     if result.modified_count:
         refresh_dashboard_metrics()
         if before is not None:

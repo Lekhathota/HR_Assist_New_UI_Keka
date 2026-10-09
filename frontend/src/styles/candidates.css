@@ -918,6 +918,12 @@
 
 
 /* Compact search on wide screens; the Filters button moves to the right. */
+.candidates-selection-categories { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #e5e7eb; background: #fff; border-radius: 14px 14px 0 0; }
+.candidates-selection-category { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 14px; font-weight: 600; }
+.candidates-selection-category.active { border-bottom-color: #f97316; color: #f97316; }
+.candidates-selection-category span { padding: 1px 8px; border-radius: 12px; background: #f3f2f1; font-size: 12px; font-weight: 400; }
+.candidates-selection-category.active span { background: #fff3e9; }
+.candidates-selection-category:focus-visible { outline: 2px solid #f97316; outline-offset: 3px; }
 .candidates-job-statuses {
     margin-top: 6px;
     color: #64748b;

@@ -1,6 +1,7 @@
 .env
 .venv/
 backend/.env
+backend/local_backups/
 backend/.venv/
 frontend/.env
 node_modules/

@@ -12,7 +12,7 @@ import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { currentReportId, issueReportId } from '../utils/reportId.js';
 import { useRoleCategories } from '../utils/useRoleCategories.js';
-import { dedupeCandidates } from '../utils/candidateGrouping.js';
+import { dedupeCandidates, candidateMatchesSelection } from '../utils/candidateGrouping.js';
 
 
 const ROLE_CATEGORY_FILTER_LABELS = {
@@ -40,6 +40,7 @@ function Candidates() {
   const roleCategories = useRoleCategories(candidates.map(candidate => candidate.primary_category));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [selectionCategory, setSelectionCategory] = useState('all');
 
   // --- TEMPORARY: bulk select + delete. Remove this whole block (and its
   // JSX usages) when no longer needed. ---
@@ -210,12 +211,18 @@ function Candidates() {
   }, []);
 
   const baseRows = serverFiltered ?? candidates;
-  const filtered = baseRows.filter(c => {
+  const matchingRows = baseRows.filter(c => {
     const haystack = `${c.name || ''} ${c.client_name || ''} ${c.primary_category || ''} ${(c.job_applications || []).map(job => job.jd_title).join(' ')}`.toLowerCase();
     const matchSearch = haystack.includes(searchTerm.toLowerCase());
     const matchCategory = !filterCategory || c.primary_category === filterCategory;
     return matchSearch && matchCategory;
   });
+  const categoryCounts = {
+    all: matchingRows.length,
+    selected: matchingRows.filter(c => candidateMatchesSelection(c, 'selected')).length,
+    rejected: matchingRows.filter(c => candidateMatchesSelection(c, 'rejected')).length,
+  };
+  const filtered = matchingRows.filter(c => candidateMatchesSelection(c, selectionCategory));
 
   // ============================================================
   // CANDIDATES STATISTICS
@@ -1321,6 +1328,15 @@ function Candidates() {
 
         {candidates.length > 0 ? (
           <>
+            <div className="candidates-selection-categories" role="group" aria-label="Candidate selection categories">
+              {[['selected', 'Selected'], ['rejected', 'Rejected'], ['all', 'All']].map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={selectionCategory === value}
+                  className={`candidates-selection-category${selectionCategory === value ? ' active' : ''}`}
+                  onClick={() => { setSelectionCategory(value); setSelectedIds(new Set()); }}>
+                  {label} <span>{categoryCounts[value]}</span>
+                </button>
+              ))}
+            </div>
             <div className="candidates-filter-bar">
               <input type="text" placeholder="Search candidates by name or client..." value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)} />

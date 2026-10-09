@@ -28,7 +28,14 @@
 }
 
 /* Setup column */
-.analyze-setup { display: grid; gap: 16px; }
+.analyze-setup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.analyze-layout > * { min-width: 0; }
+.analyze-setup > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .az-card {
   padding: 20px;
   background: #fff;
@@ -144,6 +151,10 @@
 .az-files li > i { font-size: 16px; color: #dc2626; }
 .az-files li > i.fa-file-word { color: #2563eb; }
 .az-file-name { display: grid; flex: 1; min-width: 0; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.az-file-name { grid-template-columns: minmax(0, 1fr); }
+.az-files { min-width: 0; }
+.az-files ul { grid-template-columns: minmax(0, 1fr); }
+.az-files li { min-width: 0; }
 .az-file-name small { font-size: 11px; font-weight: 400; color: var(--az-muted); }
 .analyze-page .az-files li button {
   display: grid;
