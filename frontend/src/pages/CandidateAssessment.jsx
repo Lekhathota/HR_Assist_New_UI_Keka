@@ -18,7 +18,7 @@ function formatTimer(totalSeconds) {
 
 function questionLabel(type) {
   const map = {
-    mcq: 'Multiple Choice',
+    mcq: 'MCQ',
     true_false: 'True / False',
     coding: 'Coding',
     sql: 'SQL',
@@ -48,6 +48,9 @@ function CandidateAssessment() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [editorExpanded, setEditorExpanded] = useState(false);
+  const editorGutterRef = useRef(null);
+  const activeNavRef = useRef(null);
 
   const saveTimersRef = useRef({});
   const answersRef = useRef(answers);
@@ -60,15 +63,38 @@ function CandidateAssessment() {
   );
 
   const currentQuestion = sortedQuestions[currentIndex] || null;
+  const totalQuestions = sortedQuestions.length;
+  const editorValue = currentQuestion
+    ? answers[currentQuestion.id] ?? currentQuestion.starter_code ?? ''
+    : '';
+  const editorLanguage = currentQuestion?.language || currentQuestion?.programming_language;
+  const canGoBack = currentIndex > 0;
+  const canGoForward = currentIndex < totalQuestions - 1;
+
 
   const answeredCount = useMemo(
     () => sortedQuestions.filter(q => String(answers[q.id] || '').trim()).length,
     [sortedQuestions, answers],
   );
 
+  const progressPercent = totalQuestions ? (answeredCount / totalQuestions) * 100 : 0;
+
+  useEffect(() => {
+    setEditorExpanded(false);
+    activeNavRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [currentIndex]);
+
+  useEffect(() => () => {
+    Object.values(saveTimersRef.current).forEach(timer => window.clearTimeout(timer));
+  }, []);
+
   const loadAssessment = useCallback(async () => {
     setLoading(true);
     setError('');
+    setRemainingSeconds(null);
+    setSubmitted(false);
+    setSubmitMessage('');
+    setEditorExpanded(false);
     try {
       const data = await publicApiGet(`/api/assessment/token/${encodeURIComponent(token)}`);
       setAssessment(data.assessment || null);
@@ -79,12 +105,9 @@ function CandidateAssessment() {
           initial[row.question_id] = row.answer || '';
         }
       });
-      (data.questions || []).forEach(q => {
-        if (initial[q.id] == null && q.starter_code && isCodeQuestion(q.question_type)) {
-          initial[q.id] = q.starter_code;
-        }
-      });
       setAnswers(initial);
+      setCurrentIndex(0);
+      setRemainingSeconds(null);
       if (typeof data.assessment?.remaining_seconds === 'number') {
         setRemainingSeconds(data.assessment.remaining_seconds);
       } else if (data.assessment?.time_limit_minutes) {
@@ -233,44 +256,36 @@ function CandidateAssessment() {
   return (
     <div className="ca-page">
       <header className="ca-header">
-        <div className="ca-header-main">
-          <div className="ca-brand">
-            <i className="fas fa-clipboard-check" />
-            <span>Recruitment Assessment</span>
-          </div>
-          <div className="ca-header-meta">
-            <div className="ca-meta-block">
-              <span className="ca-meta-label">Candidate</span>
-              <strong>{assessment?.candidate_name || 'Candidate'}</strong>
-            </div>
-            <div className="ca-meta-block">
-              <span className="ca-meta-label">Assessment</span>
-              <strong>{assessment?.title || assessment?.job_role || 'Technical Assessment'}</strong>
-            </div>
-          </div>
+        <div className="ca-brand">
+          <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX" className="ca-logo" />
+          <h1 className="ca-assessment-title" title={assessment?.title || assessment?.job_role}>
+            {assessment?.title || assessment?.job_role}
+          </h1>
         </div>
         <div className="ca-header-actions">
           {remainingSeconds != null && (
-            <div className={`ca-timer ${remainingSeconds <= 300 ? 'ca-timer-warning' : ''}`}>
-              <i className="fas fa-clock" />
+            <div className={`ca-timer ${remainingSeconds <= 300 ? 'ca-timer-warning' : ''}`} aria-label="Time remaining" role="timer">
+              <i className="far fa-clock" aria-hidden="true" />
               <span>{formatTimer(remainingSeconds)}</span>
             </div>
           )}
-          <div className="ca-progress-pill">
-            {answeredCount} / {sortedQuestions.length} answered
-          </div>
-          <div className={`ca-save-indicator ca-save-${saveState}`}>
-            {saveState === 'saving' && <><i className="fas fa-sync fa-spin" /> Saving…</>}
-            {saveState === 'saved' && <><i className="fas fa-check" /> Saved</>}
-            {saveState === 'error' && <><i className="fas fa-exclamation-triangle" /> Save failed</>}
+          {assessment?.candidate_name && (
+            <div className="ca-candidate" title={assessment.candidate_name}>
+              <i className="far fa-user" aria-hidden="true" />
+              <span>{assessment.candidate_name}</span>
+            </div>
+          )}
+          <div className="ca-progress-summary">
+            <span className="ca-progress-ring" style={{ '--ca-progress': `${progressPercent}%` }} aria-hidden="true" />
+            <span className="ca-answered-count">{answeredCount} / {totalQuestions} answered</span>
           </div>
         </div>
       </header>
 
-      {error && <div className="ca-inline-error">{error}</div>}
+      {error && <div className="ca-inline-error" role="alert">{error}</div>}
 
       <div className="ca-layout">
-        <aside className="ca-nav">
+        <aside className="ca-nav" aria-label="Question navigation">
           <h2>Questions</h2>
           <ul className="ca-nav-list">
             {sortedQuestions.map((q, index) => {
@@ -278,143 +293,129 @@ function CandidateAssessment() {
               const active = index === currentIndex;
               return (
                 <li key={q.id}>
-                  <button
-                    type="button"
+                  <button type="button" ref={active ? activeNavRef : null}
                     className={`ca-nav-item ${active ? 'active' : ''} ${answered ? 'answered' : ''}`}
-                    onClick={() => setCurrentIndex(index)}
-                  >
+                    onClick={() => setCurrentIndex(index)} disabled={submitting}
+                    aria-current={active ? 'step' : undefined}
+                    aria-label={`Question ${index + 1}, ${questionLabel(q.question_type)}, ${answered ? 'answered' : 'unanswered'}`}>
                     <span className="ca-nav-num">{index + 1}</span>
-                    <span className="ca-nav-type">{questionLabel(q.question_type)}</span>
+                    {answered && <span className="ca-nav-check" aria-hidden="true"><i className="fas fa-check" /></span>}
                   </button>
                 </li>
               );
             })}
           </ul>
+          <div className="ca-nav-progress">
+            <p><strong>{answeredCount} / {totalQuestions}</strong> answered</p>
+            <div className="ca-progress-track" role="progressbar" aria-label="Assessment completion"
+              aria-valuemin={0} aria-valuemax={totalQuestions} aria-valuenow={answeredCount}
+              aria-valuetext={`${answeredCount} of ${totalQuestions} questions answered`}>
+              <span style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
         </aside>
 
         <main className="ca-main">
           {currentQuestion ? (
-            <div className="ca-question-card">
+            <section className="ca-question-card" aria-labelledby="ca-question-position">
               <div className="ca-question-head">
-                <span className="ca-question-badge">{questionLabel(currentQuestion.question_type)}</span>
-                {currentQuestion.skill_tag && (
-                  <span className="ca-skill-tag">{currentQuestion.skill_tag}</span>
-                )}
-                <span className="ca-points">{currentQuestion.points} pts</span>
+                <div className="ca-question-tags">
+                  <span className="ca-question-badge">{questionLabel(currentQuestion.question_type)}</span>
+                  {currentQuestion.skill_tag && <span className="ca-skill-tag">{currentQuestion.skill_tag}</span>}
+                </div>
+                <div className="ca-question-position">
+                  <h2 id="ca-question-position">Question {currentIndex + 1} of {totalQuestions}</h2>
+                  <div className="ca-step-actions">
+                    <button type="button" className="ca-icon-button" aria-label="Previous question"
+                      disabled={!canGoBack || submitting} onClick={() => setCurrentIndex(i => i - 1)}>
+                      <i className="fas fa-chevron-left" aria-hidden="true" />
+                    </button>
+                    <button type="button" className="ca-icon-button" aria-label="Next question"
+                      disabled={!canGoForward || submitting} onClick={() => setCurrentIndex(i => i + 1)}>
+                      <i className="fas fa-chevron-right" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
               </div>
-              <h2 className="ca-question-title">
-                Question {currentIndex + 1} of {sortedQuestions.length}
-              </h2>
               <p className="ca-question-text">{currentQuestion.question_text}</p>
 
               {isChoiceQuestion(currentQuestion.question_type) && (
-                <div className="ca-options">
+                <fieldset className="ca-options">
+                  <legend className="ca-visually-hidden">Choose your answer</legend>
                   {(currentQuestion.options || []).map(option => (
-                    <label key={option} className="ca-option">
-                      <input
-                        type="radio"
-                        name={`question-${currentQuestion.id}`}
-                        value={option}
-                        checked={(answers[currentQuestion.id] || '') === option}
-                        onChange={() => handleAnswerChange(currentQuestion.id, option)}
-                      />
+                    <label key={option} className={`ca-option ${(answers[currentQuestion.id] || '') === option ? 'selected' : ''}`}>
+                      <input type="radio" name={`question-${currentQuestion.id}`} value={option}
+                        checked={(answers[currentQuestion.id] || '') === option} disabled={submitting}
+                        onChange={() => handleAnswerChange(currentQuestion.id, option)} />
                       <span>{option}</span>
                     </label>
                   ))}
-                </div>
+                </fieldset>
               )}
 
               {currentQuestion.question_type === 'short_answer' && (
-                <textarea
-                  className="ca-text-input"
-                  rows={4}
-                  value={answers[currentQuestion.id] || ''}
-                  onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)}
-                  placeholder="Type your answer here…"
-                />
-              )}
-
-              {currentQuestion.question_type === 'coding' && (
-                <div className="ca-code-block">
-                  <label className="ca-code-label" htmlFor={`code-${currentQuestion.id}`}>
-                    Your solution
-                  </label>
-                  <textarea
-                    id={`code-${currentQuestion.id}`}
-                    className="ca-code-input"
-                    rows={16}
-                    spellCheck={false}
-                    value={answers[currentQuestion.id] ?? currentQuestion.starter_code ?? ''}
-                    onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    placeholder="// Write your code here"
-                  />
+                <div className="ca-answer-block">
+                  <label className="ca-code-label" htmlFor={`answer-${currentQuestion.id}`}>Your answer</label>
+                  <textarea id={`answer-${currentQuestion.id}`} className="ca-text-input" rows={6}
+                    value={answers[currentQuestion.id] || ''} disabled={submitting}
+                    onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)} placeholder="Enter your answer" />
                 </div>
               )}
 
-              {currentQuestion.question_type === 'sql' && (
-                <div className="ca-code-block">
-                  <label className="ca-code-label" htmlFor={`sql-${currentQuestion.id}`}>
-                    Your SQL query
-                  </label>
-                  <textarea
-                    id={`sql-${currentQuestion.id}`}
-                    className="ca-code-input ca-sql-input"
-                    rows={12}
-                    spellCheck={false}
-                    value={answers[currentQuestion.id] || ''}
-                    onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    placeholder="-- Write your SQL here"
-                  />
+              {isCodeQuestion(currentQuestion.question_type) && (
+                <div className={`ca-code-block ${editorExpanded ? 'ca-editor-expanded' : ''}`}>
+                  <div className="ca-editor-toolbar">
+                    <label className="ca-code-label" htmlFor={`code-${currentQuestion.id}`}>Your solution</label>
+                    <i className="far fa-question-circle ca-editor-info" aria-hidden="true" title="Responses are saved automatically as you type" />
+                    <span className="ca-editor-language">{editorLanguage || questionLabel(currentQuestion.question_type)}</span>
+                    <button type="button" className="ca-icon-button ca-expand-editor" aria-pressed={editorExpanded}
+                      aria-label={editorExpanded ? 'Reduce editor' : 'Expand editor'} onClick={() => setEditorExpanded(value => !value)}>
+                      <i className={`fas ${editorExpanded ? 'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'}`} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="ca-editor-surface">
+                    <div className="ca-editor-lines" ref={editorGutterRef} aria-hidden="true">
+                      {String(editorValue).split('\n').map((_, index) => <span key={index}>{index + 1}</span>)}
+                    </div>
+                    <textarea id={`code-${currentQuestion.id}`} className="ca-code-input" rows={10}
+                      spellCheck={false} autoCapitalize="off" autoCorrect="off" disabled={submitting}
+                      value={editorValue} onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)}
+                      onScroll={e => { if (editorGutterRef.current) editorGutterRef.current.scrollTop = e.currentTarget.scrollTop; }}
+                      placeholder="Enter your solution" />
+                  </div>
                 </div>
               )}
 
               <div className="ca-question-footer">
-                <button
-                  type="button"
-                  className="ca-btn ca-btn-secondary"
-                  disabled={currentIndex === 0}
-                  onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
-                >
-                  <i className="fas fa-arrow-left" /> Previous
+                <button type="button" className="ca-btn ca-btn-secondary" disabled={!canGoBack || submitting}
+                  onClick={() => setCurrentIndex(i => i - 1)}>
+                  <i className="fas fa-arrow-left" aria-hidden="true" /> Previous
                 </button>
-                {currentIndex < sortedQuestions.length - 1 ? (
-                  <button
-                    type="button"
-                    className="ca-btn ca-btn-primary"
-                    onClick={() => setCurrentIndex(i => Math.min(sortedQuestions.length - 1, i + 1))}
-                  >
-                    Next <i className="fas fa-arrow-right" />
-                  </button>
+                <div className={`ca-save-indicator ca-save-${saveState}`} role="status" aria-live="polite">
+                  {saveState === 'saving' && <><i className="fas fa-sync fa-spin" aria-hidden="true" /> Saving...</>}
+                  {saveState === 'saved' && <><i className="fas fa-check" aria-hidden="true" /> Saved</>}
+                  {saveState === 'error' && <><i className="fas fa-exclamation-triangle" aria-hidden="true" /> Save failed</>}
+                </div>
+                {canGoForward ? (
+                  <button type="button" className="ca-btn ca-btn-primary" disabled={submitting}
+                    onClick={() => setCurrentIndex(i => i + 1)}>Next <i className="fas fa-arrow-right" aria-hidden="true" /></button>
                 ) : (
-                  <button
-                    type="button"
-                    className="ca-btn ca-btn-success"
-                    disabled={submitting}
-                    onClick={() => handleSubmit(false)}
-                  >
-                    {submitting ? 'Submitting…' : 'Submit Assessment'}
+                  <button type="button" className="ca-btn ca-btn-primary" disabled={submitting} onClick={() => handleSubmit(false)}>
+                    {submitting ? 'Submitting...' : 'Submit Assessment'}
                   </button>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="ca-card ca-center">
-              <p>No questions found for this assessment.</p>
-            </div>
-          )}
+            </section>
+          ) : <div className="ca-card ca-center"><p>No questions found for this assessment.</p></div>}
         </main>
       </div>
-
-      <footer className="ca-footer">
-        <button
-          type="button"
-          className="ca-btn ca-btn-success ca-submit-footer"
-          disabled={submitting}
-          onClick={() => handleSubmit(false)}
-        >
-          {submitting ? 'Submitting…' : 'Submit Assessment'}
-        </button>
-      </footer>
+      {currentQuestion && canGoForward && (
+        <footer className="ca-footer">
+          <button type="button" className="ca-submit-link" disabled={submitting} onClick={() => handleSubmit(false)}>
+            {submitting ? 'Submitting...' : 'Submit Assessment'}
+          </button>
+        </footer>
+      )}
     </div>
   );
 }
