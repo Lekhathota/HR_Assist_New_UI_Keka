@@ -24,13 +24,18 @@ jest.mock('./pages/AssessmentBuilder.jsx', () => () => <p>Builder fixture</p>);
 let root, container;
 beforeEach(() => { globalThis.IS_REACT_ACT_ENVIRONMENT = true; localStorage.clear(); localStorage.setItem('session_token', 'fixture'); localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'admin' })); container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); });
-function visit(path) { window.history.replaceState({}, '', path); act(() => root.render(<App />)); }
-test('old Dashboard bookmarks resolve to Home', () => { visit('/dashboard'); expect(window.location.pathname).toBe('/welcome'); expect(container.textContent).toContain('Home fixture'); });
-test('Home still requires login', () => { localStorage.removeItem('session_token'); visit('/welcome'); expect(window.location.pathname).toBe('/login'); });
-test('Reports access remains role-restricted', () => { localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'recruiter' })); visit('/insights'); expect(window.location.pathname).toBe('/welcome'); });
+// Pages are lazy-loaded, so let the dynamic imports resolve before asserting.
+async function visit(path) {
+  window.history.replaceState({}, '', path);
+  await act(async () => { root.render(<App />); });
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+}
+test('old Dashboard bookmarks resolve to Home', async () => { await visit('/dashboard'); expect(window.location.pathname).toBe('/welcome'); expect(container.textContent).toContain('Home fixture'); });
+test('Home still requires login', async () => { localStorage.removeItem('session_token'); await visit('/welcome'); expect(window.location.pathname).toBe('/login'); });
+test('Reports access remains role-restricted', async () => { localStorage.setItem('recruitment_assist_user', JSON.stringify({ role: 'recruiter' })); await visit('/insights'); expect(window.location.pathname).toBe('/welcome'); });
 test.each([
   ['/jobs', 'Jobs'], ['/jobs/14', 'Job detail'], ['/jobs/create', 'Create job'], ['/analyze', 'Analyze'],
   ['/talent', 'Talent'], ['/talent/2', 'Candidate'], ['/clients', 'Clients'], ['/clients/3/projects/4', 'Project'],
   ['/vendors', 'Vendors'], ['/admin/users', 'Users'], ['/hiring-pipeline', 'Pipeline'], ['/insights', 'Reports'],
   ['/profile', 'Profile'], ['/assessment/token', 'Public assessment'], ['/jobs/1/assessment/2', 'Builder'],
-])('existing destination %s retains its page', (path, expected) => { visit(path); expect(container.textContent).toContain(`${expected} fixture`); });
+])('existing destination %s retains its page', async (path, expected) => { await visit(path); expect(container.textContent).toContain(`${expected} fixture`); });
