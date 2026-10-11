@@ -40,39 +40,6 @@ function statusClass(value) {
   return 'interview-status-muted';
 }
 
-<<<<<<< HEAD
-// Automated reschedule / no-show recovery case shown on an interview card.
-function recoveryLabel(recovery) {
-  if (!recovery) return null;
-  const noShow = recovery.recovery_type === 'NO_SHOW';
-  switch (recovery.status) {
-    case 'PENDING':
-    case 'PROCESSING':
-      return { text: noShow ? 'No-show follow-up in progress' : 'Reschedule requested', tone: 'warn' };
-    case 'RETRY_SCHEDULED':
-      return { text: noShow ? 'No-show follow-up in progress' : 'Searching for available slots', tone: 'warn' };
-    case 'AWAITING_RESPONSE':
-      return { text: 'No-show follow-up: awaiting candidate', tone: 'warn' };
-    case 'SLOT_PROPOSED':
-      return { text: 'Awaiting candidate slot choice', tone: 'warn' };
-    case 'RESCHEDULED':
-      return { text: 'New slot confirmed', tone: 'good' };
-    case 'RECOVERED':
-      return { text: 'Recovery completed', tone: 'good' };
-    case 'ESCALATED':
-      return { text: 'Escalation required', tone: 'bad' };
-    case 'CLOSED':
-      return recovery.outcome === 'candidate_declined' ? { text: 'Candidate withdrew', tone: 'bad' } : null;
-    default:
-      return null;
-  }
-}
-
-const RECOVERY_TONE_CLASS = { good: 'interview-status-good', bad: 'interview-status-bad', warn: 'interview-status-warn' };
-
-function isRecoveryOpen(recovery) {
-  return Boolean(recovery) && !['RESCHEDULED', 'RECOVERED', 'CLOSED'].includes(recovery.status);
-=======
 // Colour tone for a status pill: good / bad / warn / info / muted.
 function toneOf(value) {
   const cls = statusClass(value);
@@ -111,7 +78,6 @@ function interviewLabel(value) {
   const text = prettyStatus(value).trim();
   const label = /^interview\b/i.test(text) ? text : `Interview ${text.toLowerCase()}`;
   return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
->>>>>>> acb8439f807499548dbc8d4144272bae1bb3f669
 }
 
 function prettyStatus(value) {
@@ -290,12 +256,6 @@ function HiringPipeline() {
   const [generatingScheduleEmail, setGeneratingScheduleEmail] = useState(false);
   const [scheduleBusy, setScheduleBusy] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
-  const [escalations, setEscalations] = useState([]);
-  const [recoveryCase, setRecoveryCase] = useState(null);
-  const [recoveryBusy, setRecoveryBusy] = useState(false);
-  const [logRequestActive, setLogRequestActive] = useState(null);
-  const [logRequestReason, setLogRequestReason] = useState('');
-  const [attendanceBusyId, setAttendanceBusyId] = useState(null);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const timeOptions = useMemo(() => buildTimeOptions(blockedSlots), [blockedSlots]);
 
@@ -323,87 +283,10 @@ function HiringPipeline() {
     }
   };
 
-  const loadEscalations = async () => {
-    try {
-      const data = await apiGet('/api/interview-recovery/cases?status=ESCALATED');
-      setEscalations(data.cases || []);
-    } catch {
-      setEscalations([]);
-    }
-  };
-
   useEffect(() => {
     loadInterviews();
     loadAssessments();
-    loadEscalations();
   }, []);
-
-  const refreshRecovery = async () => {
-    await Promise.all([loadInterviews(), loadEscalations()]);
-  };
-
-  const openRecoveryCase = async (caseId) => {
-    setRecoveryBusy(true);
-    try {
-      const data = await apiGet(`/api/interview-recovery/cases/${caseId}`);
-      setRecoveryCase(data.case || null);
-    } catch (err) {
-      toast({ type: 'error', message: err.message || 'Could not load recovery history.' });
-    } finally {
-      setRecoveryBusy(false);
-    }
-  };
-
-  const recoveryAction = async (caseId, action) => {
-    setRecoveryBusy(true);
-    try {
-      const { ok, data } = await apiPost(`/api/interview-recovery/cases/${caseId}/${action}`, {});
-      if (!ok || !data.success) throw new Error(data.error || 'Recovery action failed.');
-      setRecoveryCase(data.case || null);
-      toast({ type: 'success', message: action === 'retry' ? 'Automated recovery restarted.' : 'Recovery case closed.' });
-      await refreshRecovery();
-    } catch (err) {
-      toast({ type: 'error', message: err.message || 'Recovery action failed.' });
-    } finally {
-      setRecoveryBusy(false);
-    }
-  };
-
-  const markAttendance = async (interview, attendance) => {
-    setAttendanceBusyId(interview.id);
-    try {
-      const { ok, data } = await apiPost(`/api/interviews/${interview.id}/attendance`, { attendance });
-      if (!ok || !data.success) throw new Error(data.error || 'Could not record attendance.');
-      toast({
-        type: 'success',
-        message: attendance === 'no_show' ? 'No-show recorded. The candidate is being contacted automatically.' : 'Attendance recorded.',
-      });
-      await refreshRecovery();
-    } catch (err) {
-      toast({ type: 'error', message: err.message || 'Could not record attendance.' });
-    } finally {
-      setAttendanceBusyId(null);
-    }
-  };
-
-  const submitLoggedRequest = async () => {
-    if (!logRequestActive) return;
-    setRecoveryBusy(true);
-    try {
-      const { ok, data } = await apiPost(`/api/interviews/${logRequestActive.id}/recovery/reschedule-request`, {
-        reason: logRequestReason.trim(),
-      });
-      if (!ok || !data.success) throw new Error(data.error || 'Could not start automated rescheduling.');
-      setLogRequestActive(null);
-      setLogRequestReason('');
-      toast({ type: 'success', message: 'Automated rescheduling started. The candidate will receive available times.' });
-      await refreshRecovery();
-    } catch (err) {
-      toast({ type: 'error', message: err.message || 'Could not start automated rescheduling.' });
-    } finally {
-      setRecoveryBusy(false);
-    }
-  };
 
   useEffect(() => {
     const activeDate = rescheduleActive ? rescheduleForm.interview_date : scheduleActive ? scheduleDate : '';
@@ -903,123 +786,8 @@ function HiringPipeline() {
           ))}
         </section>
 
-<<<<<<< HEAD
-            {loadingAssessments ? (
-              <div className="interviews-empty">Loading assessment pipeline...</div>
-            ) : filteredAssessments.length === 0 ? (
-              <div className="interviews-empty">No assessment candidates match this view.</div>
-            ) : (
-              <div className="interviews-days">
-                <section className="interviews-day">
-                  <div className="interviews-day-header">
-                    <h2>Assessment Queue</h2>
-                    <span>{filteredAssessments.length} candidate{filteredAssessments.length === 1 ? '' : 's'}</span>
-                  </div>
-                  <div className="interviews-list">
-                    {filteredAssessments.map(row => {
-                      const showScore = isAssessmentScoreVisible(row.assessment_status);
-                      const generatedKey = `${row.candidate_id}-${row.jd_id}`;
-                      const activeInterview = hasActiveInterview(row);
-                      return (
-                        <article key={generatedKey} className="interview-card">
-                          <div className="interview-card-time">
-                            <span className={`badge ${assessmentBadgeClass(row.assessment_status)}`}>
-                              {formatAssessmentStatus(row.assessment_status)}
-                            </span>
-                          </div>
-                          <div className="interview-card-main">
-                            <div className="interview-card-title-row">
-                              <h3>{row.candidate_name || row.candidate_email}</h3>
-                            </div>
-                            <p>{row.jd_title}</p>
-                            <div className="interview-detail-row">
-                              {row.candidate_email && <span><i className="fas fa-envelope"></i> {row.candidate_email}</span>}
-                              {row.candidate_phone && <span><i className="fas fa-phone"></i> {row.candidate_phone}</span>}
-                              {row.match_score != null && <span><i className="fas fa-gauge-high"></i> Match {row.match_score}%</span>}
-                              {row.sent_at && <span><i className="fas fa-paper-plane"></i> Sent {formatAssessmentDate(row.sent_at)}</span>}
-                              {row.started_at && <span><i className="fas fa-play"></i> Started {formatAssessmentDate(row.started_at)}</span>}
-                              {row.completed_at && <span><i className="fas fa-check-circle"></i> Completed {formatAssessmentDate(row.completed_at)}</span>}
-                            </div>
-                            <div className="interview-status-row">
-                              <span className={statusClass(row.assessment_status)}>{formatAssessmentStatus(row.assessment_status)}</span>
-                              <span className={statusClass(row.link_status)}>{row.link_status || 'Not Sent'}</span>
-                              {showScore && row.assessment_percentage != null && <span className={statusClass(row.assessment_result)}>{row.assessment_percentage}%</span>}
-                              {row.assessment_result && <span className={statusClass(row.assessment_result)}>{row.assessment_result}</span>}
-                              {activeInterview && <span className={statusClass(row.interview_status)}>Interview: {prettyStatus(row.interview_status)}</span>}
-                            </div>
-                          </div>
-                          <div className="interview-card-actions assessment-card-actions">
-                            <Link to={`/talent/${row.candidate_id}`} className="btn btn-primary">
-                              <i className="fas fa-eye"></i> Candidate
-                            </Link>
-                            {row.assessment_status === 'NOT_CREATED' && (
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                disabled={generatingAssessmentId === generatedKey}
-                                onClick={() => generateAssessment(row)}
-                              >
-                                <i className={`fas ${generatingAssessmentId === generatedKey ? 'fa-spinner fa-spin' : 'fa-magic'}`}></i>
-                                {generatingAssessmentId === generatedKey ? 'Generating...' : 'Generate Assessment'}
-                              </button>
-                            )}
-                            {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED'].includes(row.assessment_status) && (
-                              <button type="button" className="btn btn-secondary" onClick={() => reviewAssessment(row)}>
-                                <i className="fas fa-clipboard-check"></i> Review Assessment
-                              </button>
-                            )}
-                            {row.eligible_for_interview && !activeInterview && (
-                              <button type="button" className="btn btn-success" onClick={() => openSchedule(row)}>
-                                <i className="fas fa-calendar-check"></i> Schedule Interview
-                              </button>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'interviews' && (
-          <>
-        {escalations.length > 0 && (
-          <section className="recovery-escalations" aria-label="Interview recovery needing attention">
-            <h2><i className="fas fa-triangle-exclamation"></i> Needs your attention ({escalations.length})</h2>
-            <p>Automated rescheduling could not finish for these interviews. Everything else is being handled automatically.</p>
-            <ul>
-              {escalations.map(entry => {
-                const interview = interviews.find(item => item.id === entry.interview_id);
-                return (
-                  <li key={entry.id}>
-                    <div>
-                      <strong>{interview?.candidate_name || `Interview #${entry.interview_id}`}</strong>
-                      <span>{entry.recovery_type === 'NO_SHOW' ? 'No-show' : 'Reschedule request'} - {entry.escalation_reason}</span>
-                      {entry.recommended_action && <em>Next step: {entry.recommended_action}</em>}
-                    </div>
-                    <div className="recovery-escalation-actions">
-                      <button type="button" className="btn btn-secondary" onClick={() => openRecoveryCase(entry.id)} disabled={recoveryBusy}>
-                        <i className="fas fa-clock-rotate-left"></i> History
-                      </button>
-                      <button type="button" className="btn btn-primary" onClick={() => recoveryAction(entry.id, 'retry')} disabled={recoveryBusy}>
-                        <i className="fas fa-rotate"></i> Retry
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-        <div className="interviews-toolbar">
-          <div className="interviews-tabs" role="tablist" aria-label="Interview filters">
-=======
         <section className="hp-panel">
           <nav className="hp-tabs" role="tablist" aria-label="Hiring pipeline sections">
->>>>>>> acb8439f807499548dbc8d4144272bae1bb3f669
             {[
               ['assessments', 'Assessments', 'fa-clipboard-check', assessmentRows.length],
               ['interviews', 'Interviews', 'fa-calendar-check', interviews.length],
@@ -1029,31 +797,7 @@ function HiringPipeline() {
                 <i className={`fas ${icon}`} aria-hidden="true"></i> {label}<span>{count}</span>
               </button>
             ))}
-<<<<<<< HEAD
-          </div>
-          <div className="interviews-filter-controls">
-            <div className="interviews-search">
-              <i className="fas fa-search"></i>
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search interviews"
-              />
-            </div>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">All statuses</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="rescheduled">Rescheduled</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="no show">No show</option>
-              <option value="client interview pending">Client pending</option>
-              <option value="rejected after interview">Rejected after interview</option>
-            </select>
-          </div>
-        </div>
-=======
           </nav>
->>>>>>> acb8439f807499548dbc8d4144272bae1bb3f669
 
           {activeTab === 'assessments' && (
             <>
@@ -1066,50 +810,6 @@ function HiringPipeline() {
                     </button>
                   ))}
                 </div>
-<<<<<<< HEAD
-                <div className="interviews-list">
-                  {rows.map(item => {
-                    const stamp = formatDateTime(item.interview_start);
-                    const emailStatus = deliveryStatus(item, 'email_status');
-                    const textStatus = deliveryStatus(item, 'text_status');
-                    const past = isPastInterview(item);
-                    const cancelled = isCancelled(item);
-                    const lockedOutcome = isOutcomeLocked(item);
-                    const recovery = recoveryLabel(item.recovery);
-                    const recoveryOpen = isRecoveryOpen(item.recovery);
-                    const noShow = normalizeStatus(item.status) === 'no show';
-                    const canMarkAttendance = past && !cancelled && !lockedOutcome && !noShow && item.attendance_status !== 'attended';
-                    return (
-                      <article
-                        key={item.id}
-                        id={`interview-${item.id}`}
-                        className={`interview-card ${cancelled ? 'interview-card-cancelled' : ''} ${highlightedInterviewId === item.id ? 'interview-card-highlight' : ''}`}
-                      >
-                        <div className="interview-card-time">{stamp.time}</div>
-                        <div className="interview-card-main">
-                          <div className="interview-card-title-row">
-                            <h3>{item.candidate_name || item.candidate_email}</h3>
-                          </div>
-                          <p>{item.job_role}</p>
-                          <div className="interview-detail-row">
-                            {item.interviewer && <span><i className="fas fa-user-tie"></i> {item.interviewer}</span>}
-                            {item.interview_mode && <span><i className="fas fa-video"></i> {item.interview_mode}</span>}
-                            {item.meeting_link && <a href={item.meeting_link} target="_blank" rel="noreferrer"><i className="fas fa-link"></i> Meeting link</a>}
-                            {item.notes && <span><i className="fas fa-note-sticky"></i> {item.notes}</span>}
-                          </div>
-                          <div className="interview-status-row">
-                            <span className={statusClass(item.status)}>{prettyStatus(item.status || 'scheduled')}</span>
-                            <span className={statusClass(emailStatus)}>Email: {prettyStatus(emailStatus || 'sent')}</span>
-                            <span className={statusClass(textStatus)}>Text: {prettyStatus(textStatus || 'sent')}</span>
-                            <span className={statusClass(item.followup_status)}>Follow-up: {prettyStatus(item.followup_status || 'not sent')}</span>
-                            {item.cancellation_status === 'sent' && <span className={statusClass('sent')}>Cancellation: sent</span>}
-                            {recovery && (
-                              <button type="button" className={`recovery-chip ${RECOVERY_TONE_CLASS[recovery.tone]}`}
-                                onClick={() => openRecoveryCase(item.recovery.id)} title="View automated recovery history">
-                                <i className="fas fa-robot"></i> {recovery.text}
-                              </button>
-                            )}
-=======
                 <label className="hp-search">
                   <i className="fas fa-search" aria-hidden="true"></i>
                   <input type="search" value={assessmentSearch} onChange={(event) => setAssessmentSearch(event.target.value)}
@@ -1139,7 +839,6 @@ function HiringPipeline() {
                           <div>
                             <Link to={`/talent/${row.candidate_id}`} className="hp-name">{row.candidate_name || row.candidate_email}</Link>
                             <span className="hp-sub">{row.jd_title || 'No job'}</span>
->>>>>>> acb8439f807499548dbc8d4144272bae1bb3f669
                           </div>
                         </div>
                         <div className="hp-meta">
@@ -1166,55 +865,10 @@ function HiringPipeline() {
                               {generatingAssessmentId === generatedKey ? 'Generating…' : 'Generate assessment'}
                             </button>
                           )}
-<<<<<<< HEAD
-                          {!past && !cancelled && !recoveryOpen && (
-                            <button type="button" className="btn btn-secondary" onClick={() => { setLogRequestActive(item); setLogRequestReason(''); }}
-                              title="The candidate asked to move this interview: offer them new times automatically">
-                              <i className="fas fa-wand-magic-sparkles"></i> Candidate asked to reschedule
-                            </button>
-                          )}
-                          {canMarkAttendance && (
-                            <>
-                              <button type="button" className="btn btn-secondary" onClick={() => markAttendance(item, 'attended')} disabled={attendanceBusyId === item.id}>
-                                <i className="fas fa-user-check"></i> Attended
-                              </button>
-                              <button type="button" className="btn btn-warning" onClick={() => markAttendance(item, 'no_show')} disabled={attendanceBusyId === item.id}>
-                                {attendanceBusyId === item.id ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-user-slash"></i> No-show</>}
-                              </button>
-                            </>
-                          )}
-                          <button type="button" className="btn btn-primary" onClick={() => openFollowup(item)} disabled={cancelled}>
-                            <i className="fas fa-reply"></i> Follow-up
-                          </button>
-                          {past && !cancelled && !lockedOutcome ? (
-                            <>
-                              <button type="button" className="btn btn-success" onClick={() => setInterviewOutcome(item, 'selected')} disabled={outcomeBusyId === item.id}>
-                                {outcomeBusyId === item.id ? (
-                                  <><i className="fas fa-spinner fa-spin"></i> Updating...</>
-                                ) : (
-                                  <><i className="fas fa-check"></i> Selected</>
-                                )}
-                              </button>
-                              <button type="button" className="btn btn-danger" onClick={() => setInterviewOutcome(item, 'rejected')} disabled={outcomeBusyId === item.id}>
-                                {outcomeBusyId === item.id ? (
-                                  <><i className="fas fa-spinner fa-spin"></i> Updating...</>
-                                ) : (
-                                  <><i className="fas fa-xmark"></i> Rejected</>
-                                )}
-                              </button>
-                            </>
-                          ) : (
-                            !past && !cancelled && (
-                              <button type="button" className="btn btn-danger" onClick={() => openCancel(item)}>
-                                <i className="fas fa-ban"></i> Cancel
-                              </button>
-                            )
-=======
                           {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED'].includes(status) && (
                             <button type="button" className={`hp-btn ${status === 'DRAFT' ? 'hp-btn-primary' : 'hp-btn-ghost'}`} onClick={() => reviewAssessment(row)}>
                               <i className="fas fa-clipboard-check" aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'Review'}
                             </button>
->>>>>>> acb8439f807499548dbc8d4144272bae1bb3f669
                           )}
                           {row.eligible_for_interview && !activeInterview && (
                             <button type="button" className="hp-btn hp-btn-success" onClick={() => openSchedule(row)}>
@@ -1500,92 +1154,6 @@ function HiringPipeline() {
                 >
                   {scheduleBusy ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send & Schedule</>}
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {logRequestActive && (
-          <div className="jd-modal-backdrop" role="presentation">
-            <div className="jd-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="log-request-title">
-              <div className="jd-modal-header">
-                <div>
-                  <h2 id="log-request-title"><i className="fas fa-wand-magic-sparkles"></i> Automated Reschedule</h2>
-                  <p>{logRequestActive.candidate_name || logRequestActive.candidate_email} - {logRequestActive.job_role}</p>
-                </div>
-                <button type="button" className="jd-modal-close" onClick={() => setLogRequestActive(null)} disabled={recoveryBusy} aria-label="Close">
-                  <i className="fas fa-times"></i>
-                </button>
-              </div>
-              <p className="recovery-modal-note">
-                HR Assist will find times when you are free, email the candidate a link to choose one, and update this
-                interview once they confirm. You will only be contacted if it cannot be resolved.
-              </p>
-              <div className="form-group">
-                <label htmlFor="log-request-reason">What did the candidate say? (optional)</label>
-                <textarea id="log-request-reason" rows={3} value={logRequestReason} onChange={(event) => setLogRequestReason(event.target.value)} />
-              </div>
-              <div className="jd-modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setLogRequestActive(null)} disabled={recoveryBusy}>Cancel</button>
-                <button type="button" className="btn btn-primary" onClick={submitLoggedRequest} disabled={recoveryBusy}>
-                  {recoveryBusy ? <><i className="fas fa-spinner fa-spin"></i> Starting...</> : <><i className="fas fa-paper-plane"></i> Offer new times</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {recoveryCase && (
-          <div className="jd-modal-backdrop" role="presentation">
-            <div className="jd-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="recovery-case-title">
-              <div className="jd-modal-header">
-                <div>
-                  <h2 id="recovery-case-title"><i className="fas fa-robot"></i> Automated Recovery</h2>
-                  <p>
-                    {recoveryCase.recovery_type === 'NO_SHOW' ? 'No-show follow-up' : 'Reschedule request'} - {prettyStatus(recoveryCase.status).toLowerCase()}
-                    {' '}- attempt {recoveryCase.attempt_count} of {recoveryCase.max_attempts}
-                  </p>
-                </div>
-                <button type="button" className="jd-modal-close" onClick={() => setRecoveryCase(null)} aria-label="Close recovery history">
-                  <i className="fas fa-times"></i>
-                </button>
-              </div>
-              {recoveryCase.escalation_reason && (
-                <div className="recovery-modal-alert">
-                  <strong>{recoveryCase.escalation_reason}</strong>
-                  {recoveryCase.recommended_action && <span>Next step: {recoveryCase.recommended_action}</span>}
-                </div>
-              )}
-              {recoveryCase.confirmed_slot && <p className="recovery-modal-note">Confirmed: {recoveryCase.confirmed_slot.label}</p>}
-              {recoveryCase.status === 'SLOT_PROPOSED' && (recoveryCase.proposed_slots || []).length > 0 && (
-                <div className="recovery-modal-note">
-                  Offered times:
-                  <ul>{recoveryCase.proposed_slots.map(slot => <li key={slot.id}>{slot.label}</li>)}</ul>
-                </div>
-              )}
-              <ol className="recovery-history">
-                {(recoveryCase.history || []).map(entry => (
-                  <li key={entry.id}>
-                    <span className="recovery-history-time">{formatDateTime(entry.created_at).date} {formatDateTime(entry.created_at).time}</span>
-                    <span className="recovery-history-action">{prettyStatus(entry.action)}</span>
-                    {entry.outcome && <span className={statusClass(entry.outcome === 'delivered' || entry.outcome === 'booked' ? 'sent' : entry.outcome === 'delivery_failed' ? 'failed' : '')}>{prettyStatus(entry.outcome)}</span>}
-                    {(entry.deliveries || []).filter(d => d.error).map((d, index) => (
-                      <span key={index} className="recovery-history-error">{d.channel}: {d.error}</span>
-                    ))}
-                  </li>
-                ))}
-              </ol>
-              <div className="jd-modal-actions">
-                {!['RESCHEDULED', 'RECOVERED', 'CLOSED'].includes(recoveryCase.status) && (
-                  <button type="button" className="btn btn-secondary" onClick={() => recoveryAction(recoveryCase.id, 'close')} disabled={recoveryBusy}>
-                    <i className="fas fa-circle-xmark"></i> Close case
-                  </button>
-                )}
-                {recoveryCase.status === 'ESCALATED' && (
-                  <button type="button" className="btn btn-primary" onClick={() => recoveryAction(recoveryCase.id, 'retry')} disabled={recoveryBusy}>
-                    <i className="fas fa-rotate"></i> Retry automation
-                  </button>
-                )}
               </div>
             </div>
           </div>
