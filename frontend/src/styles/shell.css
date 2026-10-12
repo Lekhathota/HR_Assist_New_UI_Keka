@@ -455,7 +455,8 @@ body.theme-shimento .empty-state-title { border: 0; padding: 0; margin: 12px 0 6
 
 /* KPI cards: icon and label share a top edge so titles line up across the row. */
 body.theme-shimento .insight-kpi { align-items: flex-start; }
-body.theme-shimento .insight-kpi small { margin-top: 6px; }
+body.theme-shimento .insight-kpi-content { flex: 1; min-width: 0; }
+body.theme-shimento .insight-kpi small { margin-top: 8px; min-height: 3em; line-height: 1.5; text-align: left; overflow-wrap: break-word; }
 
 /* Filter controls share one height, type size and weight. */
 body.theme-shimento .analytics-filter-bar select,

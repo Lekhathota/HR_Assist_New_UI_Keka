@@ -1,8 +1,11 @@
 // Frontend presentation adapter for existing, unmodified API contracts.
+import { dedupeCandidates } from './candidateGrouping.js';
 const list = value => Array.isArray(value) ? value : [];
 const numeric = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
 const date = value => value && Number.isFinite(Date.parse(value)) ? new Date(value) : null;
 const outcome = row => {
+  if (row.submission_statuses?.includes('Selected')) return 'Selected';
+  if (row.submission_statuses?.includes('Rejected')) return 'Rejected';
   const selection = row._screening_comparison?.selection_status || row.selection_status;
   const status = row._screening_comparison?.status || row.status;
   if (['selected_bench', 'accepted_vendor'].includes(selection) || status === 'Selected') return 'Selected';
@@ -29,7 +32,10 @@ export function buildAnalyticsView(snapshot, filters, now = new Date()) {
   const matchesSegment = row => (!filters.status || outcome(row) === filters.status) && (!filters.source || (row.candidate_source || 'Unknown') === filters.source);
   const segmentIds = new Set(candidates.filter(matchesSegment).map(r => String(r.id)));
   const matchesPerson = row => !(filters.status || filters.source) || segmentIds.has(String(row.candidate_id ?? row.id));
-  const scoped = candidates.filter(r => matchesJob(r) && matchesSegment(r) && inRange(r.uploaded_at || r.created_at));
+  // Filter submissions first so a person's other jobs/dates cannot hide a matching application.
+  const scopedSubmissions = candidates.filter(r => matchesJob(r) && matchesSegment(r) && inRange(r.uploaded_at || r.created_at))
+    .map(row => ({ ...row, status: outcome(row) }));
+  const scoped = dedupeCandidates(scopedSubmissions);
   const filtered = !filters.allTime || Boolean(selectedJobs.length || filters.status || filters.source);
   if (filtered && !Array.isArray(dashboard?.candidates)) throw new Error('Candidate records are unavailable. Retry before filtering analytics.');
   const byStatus = counts(scoped, outcome);
@@ -65,7 +71,7 @@ export function buildAnalyticsView(snapshot, filters, now = new Date()) {
   const scoreRows = scoped.filter(r => numeric(r.match_score) != null && Number(r.match_score) >= 0 && Number(r.match_score) <= 100);
   const scoreBands = ['0–20', '21–40', '41–60', '61–80', '81–100'].map((name, i) => ({ name, count: scoreRows.filter(r => Math.min(4, Math.max(0, Math.ceil(Number(r.match_score) / 20) - 1)) === i).length }));
   const jobReports = filtered ? options.filter(j => matchesJob({ jd_id: j.id })).map(j => {
-    const rows = scoped.filter(r => String(r.jd_id) === String(j.id));
+    const rows = dedupeCandidates(scopedSubmissions.filter(r => String(r.jd_id) === String(j.id)));
     const scores = rows.map(r => numeric(r.match_score)).filter(v => v != null);
     return { id: j.id, title: j.title, total_screened: rows.length, selected: rows.filter(r => outcome(r) === 'Selected').length, rejected: rows.filter(r => outcome(r) === 'Rejected').length, avg_match: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null };
   }) : list(reports?.jd_reports);
@@ -86,15 +92,15 @@ export function buildAnalyticsView(snapshot, filters, now = new Date()) {
   return {
     metrics, candidates: scoped, jd_reports: jobReports, skill_gaps: list(reports?.skill_gaps).filter(r => Number(r.jd_count) || Number(r.candidate_count)), funnel: pipeline,
     analytics: {
-      pipeline, kpis: [{ name: 'Total Candidates', count: numeric(metrics.total_candidates), detail: filtered ? 'Candidates in selected cohort' : 'Current candidate pool' },
-        { name: 'Screened', count: numeric(metrics.screened_candidates), detail: 'Candidates with a recorded decision' },
+      pipeline, kpis: [{ name: 'Total Candidates', count: numeric(metrics.total_candidates), detail: filtered ? 'People matching your filters' : 'Unique people in Talent' },
+        { name: 'Screened', count: numeric(metrics.screened_candidates), detail: 'People with screening decisions' },
         { name: filtered ? 'My Interviews' : 'Interviews', count: interviewCount, detail: filtered ? 'Scheduled events in this period' : 'Recorded interview events' },
-        { name: 'Selected', count: numeric(metrics.selected_candidates), detail: 'Screening selections, not hires' }],
+        { name: 'Selected', count: numeric(metrics.selected_candidates), detail: 'People selected in screening' }],
       sources, distribution: hasSources ? sources : byStatus, distribution_title: hasSources ? 'Candidates by Source' : 'Candidates by Status',
       trend, score_bands: scoreRows.length ? scoreBands : [], status_breakdown: byStatus,
       activities, upcoming_interviews: upcoming, interviews_error: warnings.find(w => w.startsWith('Interviews')) || '',
       jobs: options, filter_statuses: [...new Set(candidates.map(outcome))].sort(), filter_sources: [...new Set(candidates.map(r => r.candidate_source || 'Unknown'))].sort(), candidate_data_available: Array.isArray(dashboard?.candidates), filtered,
-      notes: [...warnings, filtered ? 'Date filters use candidate upload dates and current outcomes; job filters use the primary JD relationship.' : 'Candidate totals count unique records and their current primary-job screening outcomes. All-time operational comparison totals remain available in Job Analysis.',
+      notes: [...warnings, 'Candidate totals group submissions by email, then phone, just like Talent. Each person counts once; a selected submission takes priority when job outcomes differ.', filtered ? 'Filters apply to submissions before grouping people. Date filters use upload dates; job filters use the primary JD relationship.' : 'Job Analysis counts applications per job, so its totals can exceed the number of people in Talent.',
         'Selected and Rejected are screening outcomes, not consecutive hiring stages. No offer or hire stages are inferred.',
         'Upcoming interviews are your scheduled future interviews; job, status and source filters apply, but the date filter does not hide future appointments.',
         'Status and source filters narrow candidate analytics and linked interviews. Job-only activity is omitted when a candidate segment is selected.',

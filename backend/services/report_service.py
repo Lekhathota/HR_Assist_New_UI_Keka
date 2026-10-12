@@ -3,12 +3,30 @@ from __future__ import annotations
 
 import database as db
 from services.jd_service import jd_summary_list_payload
+from services.candidate_service import candidates_payload
 
 
 # Purpose: Implements the metrics with normalized candidates backend behavior.
 def _metrics_with_normalized_candidates(base: dict, candidates: list[dict]) -> dict:
-    selected = int(base.get("selected_candidates") or 0)
-    rejected = int(base.get("rejected_candidates") or 0)
+    # Use the same contact identity and selected-profile preference as Talent.
+    people = {}
+    for row in candidates:
+        email = str(row.get("email") or (row.get("structured_data") or {}).get("email") or "").strip().lower()
+        phone = str(row.get("phone") or "").strip()
+        key = f"email:{email}" if email else f"phone:{phone}" if phone else f"id:{row.get('id')}"
+        comparison = row.get("_screening_comparison") or {}
+        selection = comparison.get("selection_status") or row.get("selection_status")
+        status = comparison.get("status") or row.get("status") or "Pending"
+        if selection in {"selected_bench", "accepted_vendor"}:
+            status = "Selected"
+        elif selection == "rejected":
+            status = "Rejected"
+        priority = {"Selected": 2, "Rejected": 1}
+        if key not in people or priority.get(status, 0) > priority.get(people[key][1], 0):
+            people[key] = (row, status)
+    selected = sum(status == "Selected" for _, status in people.values())
+    rejected = sum(status == "Rejected" for _, status in people.values())
+    candidates = [row for row, _ in people.values()]
     applications = len(candidates)
     decision_total = selected + rejected
     avg_match = int(sum(int(row.get("match_score") or 0) for row in candidates) / applications) if applications else 0
@@ -29,7 +47,7 @@ def _metrics_with_normalized_candidates(base: dict, candidates: list[dict]) -> d
 def dashboard_payload() -> dict:
     metrics = db.get_dashboard_metrics()
     activity = db.recent_activity(5)
-    candidates = db.get_all_candidates()
+    candidates = candidates_payload()
     jd_summaries = {int(row["id"]): row for row in jd_summary_list_payload()}
     recent_jds = []
     for jd in activity["recent_jds"]:

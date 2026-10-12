@@ -10,6 +10,19 @@ export function useAnalytics(endpoint) {
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
   useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') setVersion(value => value + 1);
+    };
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
+  useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(''); setSnapshot(null);
     const home = endpoint === '/api/dashboard';
@@ -157,7 +170,7 @@ export function SourceTrend({ rows }) {
 export function Kpis({ data }) {
   return <div className="insight-kpis">{data.analytics.kpis.map((row, i) => <section className="insight-kpi" key={row.name}>
     <span className={`insight-kpi-icon tone-${i}`}><i className={`fas ${['fa-users', 'fa-file-lines', 'fa-calendar-check', 'fa-circle-check'][i]}`} aria-hidden="true" /></span>
-    <div><h2>{row.name}</h2><strong>{row.count ?? '?'}</strong><small>{row.count == null ? 'Not recorded' : row.detail}</small></div>
+    <div className="insight-kpi-content"><h2>{row.name}</h2><strong>{row.count ?? '?'}</strong></div>
   </section>)}</div>;
 }
 

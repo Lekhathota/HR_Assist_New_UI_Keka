@@ -31,6 +31,27 @@ test('deduplicates candidates and uses status distribution when sources are not 
   expect(result.analytics.distribution_title).toBe('Candidates by Status');
   expect(result.analytics.distribution).toEqual([{ name: 'Selected', count: 1 }]);
 });
+
+test('dashboard counts five people rather than ten job submissions', () => {
+  const submissions = Array.from({ length: 5 }, (_, i) => [
+    { id: i * 2 + 1, email: `Person${i}@example.com `, jd_id: 8, status: 'Rejected' },
+    { id: i * 2 + 2, email: `person${i}@example.com`, jd_id: 9, status: 'Selected' },
+  ]).flat();
+  const data = { dashboard: { candidates: submissions, metrics: { total_candidates: 10, screened_candidates: 10 } } };
+  const result = buildAnalyticsView(data, filters);
+  expect(result.metrics).toMatchObject({ total_candidates: 5, screened_candidates: 5, selected_candidates: 5, rejected_candidates: 0 });
+  expect(buildAnalyticsView(data, { ...filters, jobs: ['8'] }).metrics).toMatchObject({ total_candidates: 5, screened_candidates: 5, rejected_candidates: 5 });
+});
+
+test('pending uploads do not inflate screened people and repeated decisions count once', () => {
+  const result = buildAnalyticsView({ dashboard: { candidates: [
+    { id: 1, phone: '123', status: 'Pending' },
+    { id: 2, phone: '123', status: 'Rejected' },
+    { id: 3, status: 'Pending' },
+    { id: 4, status: 'Pending', _screening_comparison: { status: 'Selected' } },
+  ] } }, filters);
+  expect(result.metrics).toMatchObject({ total_candidates: 3, screened_candidates: 2, selected_candidates: 1, rejected_candidates: 1 });
+});
 test('missing supporting data never becomes a filtered zero or fabricated skill', () => {
   expect(() => buildAnalyticsView({ reports: { metrics: {} } }, { ...filters, allTime: false })).toThrow('unavailable');
   const result = buildAnalyticsView({ reports: { metrics: {}, skill_gaps: [{ name: 'Python', jd_count: 0, candidate_count: 0 }] } }, filters);

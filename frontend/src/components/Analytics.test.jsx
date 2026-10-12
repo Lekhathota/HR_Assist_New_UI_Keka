@@ -41,6 +41,20 @@ test('job filtering uses loaded records without requiring new backend parameters
   expect(container.querySelector('output').textContent).toBe('1');
   expect(apiGet.mock.calls.map(call => call[0])).toEqual(['/api/reports', '/api/dashboard', '/api/jds']);
 });
+
+test('returning to the dashboard refreshes candidate data', async () => {
+  let candidates = [{ id: 1 }];
+  apiGet.mockImplementation(path => Promise.resolve(path === '/api/dashboard' ? { candidates, metrics: {} } : []));
+  function DashboardProbe() {
+    const state = useAnalytics('/api/dashboard');
+    return <output>{state.data?.metrics?.total_candidates}</output>;
+  }
+  await act(async () => root.render(<DashboardProbe />));
+  expect(container.querySelector('output').textContent).toBe('1');
+  candidates = [{ id: 1 }, { id: 2 }];
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(container.querySelector('output').textContent).toBe('2');
+});
 test('charts expose accessible descriptions and distinguish unavailable stages', () => {
   act(() => root.render(<Chart rows={[{ name: 'Uploaded', count: 4 }, { name: 'Hired', count: null, reason: 'No hire dates' }]} label="Pipeline" />));
   expect(container.querySelector('svg').getAttribute('aria-label')).toBe('Pipeline');
