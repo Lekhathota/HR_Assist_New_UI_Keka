@@ -201,6 +201,7 @@ def recruiter_question_payload(question: dict[str, Any]) -> dict[str, Any]:
         **{key: question.get(key) for key in ("question_id", "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement") if question.get(key) is not None},
         **{key: question.get(key) for key in ("test_cases", "sql_schema", "order_matters", "input_format", "output_format",
                                                "allowed_languages", "default_language", "tests_verified") if question.get(key) is not None},
+        **_reference_fields(question),
         "skill_tag": question.get("skill_tag") or "",
         "sort_order": int(question.get("sort_order") or 0),
         "created_at": question.get("created_at"),
@@ -208,11 +209,21 @@ def recruiter_question_payload(question: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _reference_fields(question: dict[str, Any]) -> dict[str, Any]:
+    if str(question.get("question_type") or "") not in {QuestionType.CODING.value, QuestionType.SQL.value}:
+        return {}
+    from assessment.code_execution.verification import reference_language, verification_view
+
+    return {"reference_language": reference_language(question), "verification": verification_view(question)}
+
+
 def candidate_question_payload(question: dict[str, Any]) -> dict[str, Any]:
     payload = recruiter_question_payload(question)
-    for key in ("correct_answer", "explanation", "evaluation_focus", "jd_requirement", "test_cases", "tests_verified"):
+    for key in ("correct_answer", "explanation", "evaluation_focus", "jd_requirement", "test_cases", "tests_verified",
+                "verification", "reference_language", "config_fingerprint"):
         payload.pop(key, None)
-    cases = [c for c in question.get("test_cases") or [] if isinstance(c, dict)]
+    # Disabled tests are not used for grading, so candidates do not see them either.
+    cases = [c for c in question.get("test_cases") or [] if isinstance(c, dict) and c.get("enabled", True) is not False]
     if cases:
         # Hidden tests stay on the server: the candidate only learns how many exist.
         visible = [c for c in cases if not c.get("hidden")]

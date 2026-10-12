@@ -296,6 +296,7 @@ def delete_assessment_cascade(assessment_id: int) -> None:
 EXECUTABLE_QUESTION_FIELDS = (
     "test_cases", "sql_schema", "order_matters", "input_format", "output_format",
     "allowed_languages", "default_language", "tests_verified",
+    "reference_language", "verification", "config_fingerprint",
 )
 
 
@@ -362,6 +363,17 @@ def update_question(question_id: int, patch: dict[str, Any]) -> bool:
     update_doc["updated_at"] = _now()
     result = _database().questions.update_one({"id": int(question_id)}, {"$set": update_doc})
     return result.modified_count > 0
+
+
+def update_question_if_unchanged(question_id: int, expected_fingerprint: str, patch: dict[str, Any]) -> bool:
+    """Write verification results only if the solution/tests were not edited meanwhile."""
+    result = _database().questions.update_one(
+        {"id": int(question_id), "$or": [{"config_fingerprint": expected_fingerprint},
+                                         {"config_fingerprint": {"$exists": False}},
+                                         {"config_fingerprint": None}]},
+        {"$set": {**patch, "updated_at": _now()}},
+    )
+    return result.matched_count > 0
 
 
 def delete_question(question_id: int) -> bool:

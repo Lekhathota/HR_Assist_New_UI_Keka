@@ -82,7 +82,7 @@ def resolve_language(question: dict, requested: object) -> str:
 
 
 def _cases(question: dict, include_hidden: bool) -> list[dict]:
-    cases = [c for c in question.get("test_cases") or [] if isinstance(c, dict)]
+    cases = [c for c in question.get("test_cases") or [] if isinstance(c, dict) and c.get("enabled", True) is not False]
     return cases if include_hidden else [c for c in cases if not c.get("hidden")]
 
 
@@ -146,7 +146,7 @@ def grade_code(question: dict, code: str, language: str, *, include_hidden: bool
 def grade_answer(question: dict, answer: str, language: object = "", *, include_hidden: bool = True,
                  runner: Any = _UNSET) -> GradeResult:
     qtype = _qtype(question)
-    has_tests = bool(question.get("test_cases"))
+    has_tests = bool(_cases(question, True))
     if qtype == "sql" and has_tests and question.get("sql_schema"):
         return grade_sql(question, answer, include_hidden=include_hidden)
     if qtype == "coding" and has_tests:

@@ -485,11 +485,107 @@ def update_question(question_id: int, patch: dict[str, Any]) -> dict[str, Any]:
         except ValueError as exc:
             raise AssessmentServiceError(f"The reference solution does not work with the test cases: {exc}") from exc
         patch = {**patch, "test_cases": prepared["test_cases"], "tests_verified": prepared.get("tests_verified", False)}
+    if merged.get("question_type") in {"sql", "coding"} and ({"correct_answer", "sql_schema", "test_cases"} & set(patch)):
+        from assessment.code_execution.verification import fingerprint
+
+        patch = {**patch, "verification": None, "config_fingerprint": fingerprint({**question, **patch})}
 
     if not assessment_repo.update_question(question_id, patch):
         raise AssessmentServiceError("No changes were applied to the question.")
     updated = assessment_repo.get_question_by_id(question_id) or {}
     return {"question": recruiter_question_payload(updated)}
+
+
+def _reference_question(question_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    question = assessment_repo.get_question_by_id(question_id)
+    if not question:
+        raise AssessmentServiceError("Question not found.", status_code=404)
+    if str(question.get("question_type") or "") not in {"coding", "sql"}:
+        raise AssessmentServiceError("Reference solutions apply to coding and SQL questions only.")
+    assessment = assessment_repo.get_assessment_by_id(int(question["assessment_id"])) or {}
+    return question, assessment
+
+
+def _reference_payload(question: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
+    from assessment.code_execution.verification import execution_status, reference_language, verification_view
+
+    return {
+        "question_id": question.get("id"),
+        "question_type": question.get("question_type"),
+        "reference_solution": question.get("correct_answer") or "",
+        "reference_language": reference_language(question),
+        "sql_schema": question.get("sql_schema") or "",
+        "order_matters": bool(question.get("order_matters")),
+        "test_cases": question.get("test_cases") or [],
+        "verification": verification_view(question),
+        "editable": assessment.get("status") in AssessmentStatus.editable_states(),
+        "execution": execution_status(),
+    }
+
+
+def get_reference_config(question_id: int) -> dict[str, Any]:
+    question, assessment = _reference_question(question_id)
+    return _reference_payload(question, assessment)
+
+
+def save_reference_config(question_id: int, data: dict[str, Any], *, actor: str = "") -> dict[str, Any]:
+    """Save the reference solution and test cases; any previous verification becomes stale."""
+    from assessment.code_execution.languages import normalize_language
+    from assessment.code_execution.verification import fingerprint, normalize_test_cases
+
+    question, assessment = _reference_question(question_id)
+    if assessment.get("status") not in AssessmentStatus.editable_states():
+        raise AssessmentServiceError("Reference solutions and test cases can only be edited while the assessment is in DRAFT status.", status_code=409)
+    if not isinstance(data, dict):
+        raise AssessmentServiceError("Request body must be a JSON object.")
+    qtype = str(question.get("question_type"))
+    reference = data.get("reference_solution")
+    if not isinstance(reference, str) or not reference.strip():
+        raise AssessmentServiceError("reference_solution is required.")
+    if len(reference) > 50_000:
+        raise AssessmentServiceError("reference_solution is too long (50,000 characters maximum).")
+    try:
+        cases = normalize_test_cases(qtype, data.get("test_cases", question.get("test_cases") or []))
+    except ValueError as exc:
+        raise AssessmentServiceError(str(exc)) from exc
+    patch: dict[str, Any] = {"correct_answer": reference, "test_cases": cases, "verification": None, "tests_verified": False}
+    if qtype == "coding":
+        language = normalize_language(data.get("reference_language") or question.get("reference_language") or "python")
+        if not language:
+            raise AssessmentServiceError("Unsupported reference language. Use Python, JavaScript, Java, C or C++.")
+        patch["reference_language"] = language
+    else:
+        schema = data.get("sql_schema", question.get("sql_schema") or "")
+        if not isinstance(schema, str) or "create table" not in schema.lower():
+            raise AssessmentServiceError("sql_schema must contain CREATE TABLE statements.")
+        patch["sql_schema"] = schema
+        patch["order_matters"] = data.get("order_matters", question.get("order_matters")) is True
+    patch["config_fingerprint"] = fingerprint({**question, **patch})
+    assessment_repo.update_question(question_id, patch)
+    db.log_audit("Assessment Reference Updated", actor,
+                 f"Updated reference solution and {len(cases)} test case(s) for question #{question_id}.",
+                 int(assessment.get("jd_id") or 0) or None)
+    if data.get("verify") is True:
+        return verify_reference_solution(question_id, actor=actor)
+    updated = assessment_repo.get_question_by_id(question_id) or question
+    return _reference_payload(updated, assessment)
+
+
+def verify_reference_solution(question_id: int, *, actor: str = "") -> dict[str, Any]:
+    """Execute the reference against enabled tests and record the result."""
+    from assessment.code_execution.verification import fingerprint, verify_question
+
+    question, assessment = _reference_question(question_id)
+    current = fingerprint(question)
+    verification, test_cases = verify_question(question)
+    patch: dict[str, Any] = {"verification": verification, "tests_verified": verification["status"] == "verified",
+                             "config_fingerprint": current}
+    if str(question.get("question_type")) == "sql":
+        patch["test_cases"] = test_cases  # expected results computed from the reference query
+    if not assessment_repo.update_question_if_unchanged(question_id, question.get("config_fingerprint") or current, patch):
+        raise AssessmentServiceError("The solution or test cases changed while verifying. Verify again.", status_code=409)
+    updated = assessment_repo.get_question_by_id(question_id) or question
+    return _reference_payload(updated, assessment)
 
 
 def remove_question(question_id: int) -> dict[str, Any]:

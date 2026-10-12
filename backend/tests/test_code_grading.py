@@ -349,3 +349,137 @@ class LenientGenerationTests(unittest.TestCase):
         self.assertTrue(rows[1]["tests_verified"])
         with self.assertRaises(ValueError):
             prepare_executable_questions([make_bad()], runner=None, strict=True)
+
+
+from assessment.code_execution import verification as verify_mod  # noqa: E402
+
+
+class ReferenceVerificationTests(unittest.TestCase):
+    def test_statuses_come_from_real_execution(self):
+        q = coding_question()
+        ok, _ = verify_mod.verify_question(q, runner=FakeRunner(lambda s: f"{int(s) * 2}\n"))
+        self.assertEqual(ok["status"], "verified")
+        self.assertEqual(len(ok["results"]), 4)
+        bad, _ = verify_mod.verify_question(q, runner=FakeRunner(lambda s: f"{abs(int(s)) * 2}\n"))
+        self.assertEqual(bad["status"], "failed")
+        self.assertEqual([r["passed"] for r in bad["results"]], [True, True, True, False])
+        none, _ = verify_mod.verify_question(q, runner=None)
+        self.assertEqual(none["status"], "unavailable")
+        down, _ = verify_mod.verify_question(q, runner=FakeRunner(fail="Judge0 is unreachable"))
+        self.assertEqual(down["status"], "unavailable")
+
+    def test_disabled_tests_are_skipped_everywhere(self):
+        q = coding_question()
+        q["test_cases"][3]["enabled"] = False
+        result, _ = verify_mod.verify_question(q, runner=FakeRunner(lambda s: f"{abs(int(s)) * 2}\n"))
+        self.assertEqual(result["status"], "verified")
+        graded = grader.grade_answer(q, "code", "python", runner=FakeRunner(lambda s: f"{abs(int(s)) * 2}\n"))
+        self.assertEqual(graded.total, 3)
+        self.assertEqual(candidate_question_payload(q)["hidden_test_count"], 1)
+
+    def test_any_change_makes_verification_stale(self):
+        q = coding_question()
+        result, _ = verify_mod.verify_question(q, runner=FakeRunner(lambda s: f"{int(s) * 2}\n"))
+        q["verification"] = result
+        self.assertEqual(verify_mod.verification_view(q)["status"], "verified")
+        for change in ({"correct_answer": "print(1)"}, {"reference_language": "java"}):
+            self.assertEqual(verify_mod.verification_view({**q, **change})["status"], "not_verified")
+        edited = copy.deepcopy(q)
+        edited["test_cases"][0]["expected_output"] = "3\n"
+        self.assertTrue(verify_mod.verification_view(edited)["stale"])
+        renamed = copy.deepcopy(q)
+        renamed["test_cases"][0]["name"] = "renamed only"
+        self.assertEqual(verify_mod.verification_view(renamed)["status"], "verified")
+
+    def test_sql_verification_records_expected_results(self):
+        q = sql_question()
+        for case in q["test_cases"]:
+            case.pop("expected")
+        result, tests = verify_mod.verify_question(q)
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(tests[0]["expected"]["rows"], [["a", 15], ["b", 1]])
+
+    def test_normalize_keeps_ids_and_validates(self):
+        cases = verify_mod.normalize_test_cases("coding", [
+            {"id": "t1", "name": "basic", "input": "1\n", "expected_output": "2\n", "hidden": False},
+            {"input": "2\n", "expected_output": "4\n", "hidden": True, "enabled": False},
+        ])
+        self.assertEqual(cases[0]["id"], "t1")
+        self.assertTrue(cases[1]["id"].startswith("tc_"))
+        self.assertFalse(cases[1]["enabled"])
+        with self.assertRaises(ValueError):
+            verify_mod.normalize_test_cases("coding", [{"input": "1", "expected_output": "  "}])
+
+    def test_candidate_payload_never_contains_reference_or_verification(self):
+        q = coding_question(verification={"status": "verified"}, reference_language="java", config_fingerprint="x")
+        payload = candidate_question_payload(q)
+        for key in ("verification", "reference_language", "config_fingerprint", "correct_answer", "test_cases"):
+            self.assertNotIn(key, payload)
+
+
+class ReferenceServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.stack = ExitStack()
+        self.question = {**coding_question(), "assessment_id": 1}
+        self.stack.enter_context(patch.object(service.assessment_repo, "get_question_by_id", side_effect=lambda qid: copy.deepcopy(self.question)))
+        self.assessment = {"id": 1, "status": "DRAFT", "jd_id": 3}
+        self.stack.enter_context(patch.object(service.assessment_repo, "get_assessment_by_id", side_effect=lambda aid: self.assessment))
+        self.stack.enter_context(patch.object(service.db, "log_audit"))
+        self.stack.enter_context(patch.object(service.assessment_repo, "update_question", side_effect=self._apply))
+        self.guarded = self.stack.enter_context(patch.object(service.assessment_repo, "update_question_if_unchanged", side_effect=self._apply_guarded))
+        self.stack.enter_context(patch.object(verify_mod.Judge0Runner, "from_env", return_value=FakeRunner(lambda s: f"{int(s) * 2}\n")))
+
+    def tearDown(self):
+        self.stack.close()
+
+    def _apply(self, qid, patch_doc):
+        self.question.update(copy.deepcopy(patch_doc))
+        return True
+
+    def _apply_guarded(self, qid, expected, patch_doc):
+        if self.question.get("config_fingerprint") not in (None, expected):
+            return False
+        return self._apply(qid, patch_doc)
+
+    def _tests(self):
+        return [{k: v for k, v in c.items()} for c in self.question["test_cases"]]
+
+    def test_save_resets_then_verify_marks_verified(self):
+        self.question["verification"] = {"status": "verified", "fingerprint": "old"}
+        saved = service.save_reference_config(7, {"reference_solution": "print(int(input())*2)", "reference_language": "python",
+                                                  "test_cases": self._tests()})
+        self.assertEqual(saved["verification"]["status"], "not_verified")
+        verified = service.verify_reference_solution(7)
+        self.assertEqual(verified["verification"]["status"], "verified")
+        self.assertTrue(self.question["tests_verified"])
+
+    def test_save_with_verify_flag_and_language_validation(self):
+        out = service.save_reference_config(7, {"reference_solution": "x", "reference_language": "java",
+                                                "test_cases": self._tests(), "verify": True})
+        self.assertEqual(out["reference_language"], "java")
+        self.assertEqual(out["verification"]["status"], "verified")
+        with self.assertRaises(service.AssessmentServiceError):
+            service.save_reference_config(7, {"reference_solution": "x", "reference_language": "powershell", "test_cases": self._tests()})
+
+    def test_edits_blocked_after_sending_but_verify_allowed(self):
+        self.assessment["status"] = "SENT"
+        with self.assertRaises(service.AssessmentServiceError) as ctx:
+            service.save_reference_config(7, {"reference_solution": "x", "test_cases": self._tests()})
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertFalse(service.get_reference_config(7)["editable"])
+        self.assertEqual(service.verify_reference_solution(7)["verification"]["status"], "verified")
+
+    def test_concurrent_edit_discards_stale_verification(self):
+        self.question["config_fingerprint"] = "fp-before"
+        original = verify_mod.verify_question
+
+        def edited_meanwhile(question, **kwargs):
+            result = original(question, **kwargs)
+            self.question["config_fingerprint"] = "fp-after-another-save"  # a save lands mid-verification
+            return result
+
+        with patch.object(verify_mod, "verify_question", side_effect=edited_meanwhile):
+            with self.assertRaises(service.AssessmentServiceError) as ctx:
+                service.verify_reference_solution(7)
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertNotIn("verification", {k for k, v in self.question.items() if v})

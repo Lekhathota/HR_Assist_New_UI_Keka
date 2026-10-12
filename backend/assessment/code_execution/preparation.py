@@ -168,12 +168,14 @@ def _prepare_row(index: int, row: dict, runner: Any) -> None:
         if runner is None:
             return
         try:
-            results = runner.run("python", row["correct_answer"], row["test_cases"])
+            language = normalize_language(row.get("reference_language")) or DEFAULT_LANGUAGE
+            enabled = [c for c in row["test_cases"] if c.get("enabled", True) is not False]
+            results = runner.run(language, row["correct_answer"], enabled)
         except ExecutionUnavailable:
             return  # keep the generated tests; they are marked unverified
-        bad = [case["id"] for case, run in zip(row["test_cases"], results)
+        bad = [case["id"] for case, run in zip(enabled, results)
                if run.status != "ok" or not outputs_match(run.stdout, case["expected_output"])]
         if bad:
-            raise ValueError(f"Q{index}: the Python reference solution does not produce expected_output for tests "
+            raise ValueError(f"Q{index}: the reference solution does not produce expected_output for tests "
                              f"{', '.join(bad)}. Fix the reference program or the expected outputs.")
         row["tests_verified"] = True

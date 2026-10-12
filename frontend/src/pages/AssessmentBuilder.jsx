@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
+import ReferenceSolutionPanel from '../components/ReferenceSolutionPanel.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
 import '../styles/assessment_builder.css';
 
@@ -28,55 +29,6 @@ const METHOD_LABELS = {
   ai_estimated: 'AI-estimated (not executed)',
   pending_ai: 'Not graded',
 };
-
-function ResultRows({ data }) {
-  const columns = data?.columns || [];
-  const rows = data?.rows || [];
-  if (!columns.length && !rows.length) return <p className="ab-muted">No rows</p>;
-  return (
-    <table className="ab-result-table">
-      {columns.length > 0 && <thead><tr>{columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>}
-      <tbody>{rows.map((row, r) => <tr key={r}>{row.map((v, c) => <td key={c}>{v === null ? 'NULL' : String(v)}</td>)}</tr>)}</tbody>
-    </table>
-  );
-}
-
-// Reference solution and visible + hidden test cases for an auto-graded question (recruiter only).
-function TestCasePanel({ q }) {
-  const cases = q.test_cases || [];
-  if (!cases.length) return null;
-  const hidden = cases.filter(c => c.hidden).length;
-  return (
-    <details className="ab-tests">
-      <summary>
-        Reference solution &amp; test cases ({cases.length - hidden} visible, {hidden} hidden)
-        {q.question_type === 'coding' && (
-          <span className={`ab-test-flag ${q.tests_verified ? 'ok' : ''}`}>
-            {q.tests_verified ? 'Verified against reference' : 'Not verified (code execution not configured)'}
-          </span>
-        )}
-      </summary>
-      {q.sql_schema && (<><h4>Schema</h4><pre className="ab-code-preview">{q.sql_schema}</pre></>)}
-      {q.correct_answer && (<><h4>Reference {q.question_type === 'sql' ? 'query' : 'solution (Python)'}</h4><pre className="ab-code-preview">{q.correct_answer}</pre></>)}
-      {cases.map((c, i) => (
-        <div key={c.id || i} className="ab-test-case">
-          <h4>Test {i + 1} {c.hidden ? <span className="ab-hidden-badge">Hidden</span> : <span className="ab-visible-badge">Visible</span>}</h4>
-          {q.question_type === 'sql' ? (
-            <>
-              <pre className="ab-code-preview">{c.setup_sql}</pre>
-              <ResultRows data={c.expected} />
-            </>
-          ) : (
-            <div className="ab-test-io">
-              <div><span>Input</span><pre className="ab-code-preview">{c.input}</pre></div>
-              <div><span>Expected output</span><pre className="ab-code-preview">{c.expected_output}</pre></div>
-            </div>
-          )}
-        </div>
-      ))}
-    </details>
-  );
-}
 
 // Per-question coding / SQL grading from the stored assessment result.
 function CodingResultBreakdown({ result, questions }) {
@@ -711,7 +663,10 @@ function AssessmentBuilder() {
                       {q.question_type === 'sql' && q.correct_answer && !(q.test_cases || []).length && (
                         <pre className="ab-code-preview">{q.correct_answer}</pre>
                       )}
-                      <TestCasePanel q={q} />
+                      {(q.question_type === 'coding' || q.question_type === 'sql') && (
+                        <ReferenceSolutionPanel question={q}
+                          onChange={patch => setQuestions(prev => prev.map(item => (item.id === q.id ? { ...item, ...patch } : item)))} />
+                      )}
                     </>
                   )}
               </div>
