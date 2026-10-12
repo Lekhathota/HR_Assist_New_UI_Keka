@@ -193,6 +193,8 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
         "started_at",
         "completed_at",
         "candidate_email",
+        "terms_accepted_at",
+        "terms_version",
     }
     update_doc: dict[str, Any] = {}
     unset_doc: dict[str, int] = {}
@@ -224,6 +226,58 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
         if str(getattr(before.get("status"), "value", before.get("status"))) != new_status:
             activity_feed.emit("assessment", assessment_id=int(assessment_id), jd_id=before.get("jd_id"),
                                name=before.get("candidate_name") or "", status=new_status)
+    return result.modified_count > 0
+
+
+def begin_candidate_attempt(assessment_id: int) -> Optional[dict]:
+    """Only the first start sets the clock; concurrent starts cannot reset it."""
+    row = _database().assessments.find_one_and_update(
+        {"id": int(assessment_id), "status": AssessmentStatus.SENT},
+        {"$set": {"status": AssessmentStatus.IN_PROGRESS, "started_at": _now(), "updated_at": _now()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if row:
+        activity_feed.emit("assessment", assessment_id=int(assessment_id), jd_id=row.get("jd_id"),
+                           name=row.get("candidate_name") or "", status="IN_PROGRESS")
+    return _serialize_doc(row or _database().assessments.find_one({"id": int(assessment_id)}))
+
+
+def record_proctoring_violation(assessment_id: int, event_id: str, reason: str) -> Optional[dict]:
+    """Count each incident once and close the attempt atomically on incident two."""
+    now = _now()
+    row = _database().assessments.find_one_and_update(
+        {"id": int(assessment_id), "status": AssessmentStatus.IN_PROGRESS,
+         "proctoring_events.event_id": {"$ne": event_id}},
+        [
+            {"$set": {
+                "proctoring_violation_count": {"$add": [{"$ifNull": ["$proctoring_violation_count", 0]}, 1]},
+                "proctoring_events": {"$concatArrays": [{"$ifNull": ["$proctoring_events", []]},
+                    {"$literal": [{"event_id": event_id, "reason": reason, "recorded_at": now}]}]},
+                "updated_at": now,
+            }},
+            {"$set": {
+                "status": {"$cond": [{"$gte": ["$proctoring_violation_count", 2]},
+                    AssessmentStatus.TERMINATED, "$status"]},
+                "completed_at": {"$cond": [{"$gte": ["$proctoring_violation_count", 2]}, now, "$completed_at"]},
+                "termination_reason": {"$cond": [{"$gte": ["$proctoring_violation_count", 2]},
+                    "Two exam navigation or focus violations", "$termination_reason"]},
+            }},
+        ],
+        return_document=ReturnDocument.AFTER,
+    )
+    if row and row.get("status") == AssessmentStatus.TERMINATED:
+        activity_feed.emit("assessment", assessment_id=int(assessment_id), jd_id=row.get("jd_id"),
+                           name=row.get("candidate_name") or "", status="TERMINATED")
+    return _serialize_doc(row or _database().assessments.find_one({"id": int(assessment_id)}))
+
+
+def complete_candidate_attempt(assessment_id: int) -> bool:
+    """Submission cannot overwrite an attempt terminated by a concurrent violation."""
+    result = _database().assessments.update_one(
+        {"id": int(assessment_id), "status": AssessmentStatus.IN_PROGRESS,
+         "$or": [{"proctoring_violation_count": {"$lt": 2}}, {"proctoring_violation_count": {"$exists": False}}]},
+        {"$set": {"status": AssessmentStatus.COMPLETED, "completed_at": _now(), "updated_at": _now()}},
+    )
     return result.modified_count > 0
 
 

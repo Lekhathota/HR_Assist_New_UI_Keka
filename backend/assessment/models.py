@@ -19,15 +19,16 @@ class AssessmentStatus(str, Enum):
     COMPLETED = "COMPLETED"
     PASSED = "PASSED"
     FAILED = "FAILED"
+    TERMINATED = "TERMINATED"
 
     @classmethod
     def terminal_states(cls) -> frozenset[str]:
-        return frozenset({cls.PASSED, cls.FAILED})
+        return frozenset({cls.PASSED, cls.FAILED, cls.TERMINATED})
 
     @classmethod
     def submitted_states(cls) -> frozenset[str]:
         """States where the candidate can no longer access or edit answers."""
-        return frozenset({cls.COMPLETED, cls.PASSED, cls.FAILED})
+        return frozenset({cls.COMPLETED, cls.PASSED, cls.FAILED, cls.TERMINATED})
 
     @classmethod
     def editable_states(cls) -> frozenset[str]:

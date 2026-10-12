@@ -6,6 +6,7 @@ const STATUS_LABELS = {
   COMPLETED: 'Completed',
   PASSED: 'Passed',
   FAILED: 'Failed',
+  TERMINATED: 'Terminated',
 };
 
 export function formatAssessmentStatus(status) {
@@ -14,7 +15,7 @@ export function formatAssessmentStatus(status) {
 
 export function assessmentBadgeClass(status) {
   if (status === 'PASSED') return 'badge-success';
-  if (status === 'FAILED') return 'badge-danger';
+  if (status === 'FAILED' || status === 'TERMINATED') return 'badge-danger';
   if (status === 'SENT' || status === 'IN_PROGRESS') return 'badge-warning';
   if (status === 'DRAFT') return 'badge-primary';
   if (status === 'COMPLETED') return 'badge-primary';

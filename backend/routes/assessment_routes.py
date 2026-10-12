@@ -33,6 +33,8 @@ from services.assessment_service import (
     save_assessment_draft,
     send_assessment,
     submit_assessment,
+    start_candidate_assessment,
+    report_proctoring_violation,
     update_question,
 )
 from services.auth_service import api_login_required, current_user
@@ -286,6 +288,38 @@ def api_assessment_save_answer():
     except Exception:
         return _json_error("Could not save answer.", 500)
     return jsonify(result)
+
+
+@assessment_bp.route("/api/assessment/start", methods=["POST"])
+def api_assessment_start():
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _json_error("A JSON object is required.")
+        return jsonify(start_candidate_assessment(payload.get("token"), accepted_terms=payload.get("accepted_terms") is True))
+    except AssessmentServiceError as exc:
+        return _candidate_error(exc)
+    except Exception:
+        return _json_error("Could not start assessment.", 500)
+
+
+@assessment_bp.route("/api/assessment/proctoring-event", methods=["POST"])
+def api_assessment_proctoring_event():
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return _json_error("A JSON object is required.")
+    event_id = payload.get("event_id")
+    reason = payload.get("reason")
+    if not isinstance(event_id, str) or not (1 <= len(event_id) <= 80) or not all(c.isalnum() or c == '-' for c in event_id):
+        return _json_error("A valid event_id is required.")
+    if not isinstance(reason, str) or reason not in {"tab_hidden", "window_blur", "fullscreen_exit", "back_navigation", "navigation_attempt", "browser_shortcut", "page_unload"}:
+        return _json_error("Invalid proctoring event reason.")
+    try:
+        return jsonify(report_proctoring_violation(payload.get("token"), event_id, reason))
+    except AssessmentServiceError as exc:
+        return _candidate_error(exc)
+    except Exception:
+        return _json_error("Could not record exam violation.", 500)
 
 
 @assessment_bp.route("/api/assessment/submit", methods=["POST"], endpoint="api_assessment_submit")

@@ -384,12 +384,13 @@ export async function publicApiGet(path) {
   return data;
 }
 
-export async function publicApiPost(path, body) {
+export async function publicApiPost(path, body, { keepalive = false } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify(body),
+    keepalive,
   });
   let data = {};
   try {

@@ -50,11 +50,11 @@ function toneOf(value) {
 }
 
 const ASSESSMENT_TONE = {
-  NOT_CREATED: 'muted', DRAFT: 'info', SENT: 'warn', IN_PROGRESS: 'warn', COMPLETED: 'info', PASSED: 'good', FAILED: 'bad',
+  NOT_CREATED: 'muted', DRAFT: 'info', SENT: 'warn', IN_PROGRESS: 'warn', COMPLETED: 'info', PASSED: 'good', FAILED: 'bad', TERMINATED: 'bad',
 };
 const ASSESSMENT_FILTERS = [
   ['all', 'All'], ['NOT_CREATED', 'Not created'], ['DRAFT', 'Draft'], ['SENT', 'Sent'],
-  ['IN_PROGRESS', 'In progress'], ['PASSED', 'Passed'], ['FAILED', 'Failed'],
+  ['IN_PROGRESS', 'In progress'], ['PASSED', 'Passed'], ['FAILED', 'Failed'], ['TERMINATED', 'Terminated'],
 ];
 const INTERVIEW_VIEWS = [
   ['upcoming', 'Upcoming'], ['needs_followup', 'Needs follow-up'], ['past', 'Past'], ['cancelled', 'Cancelled'], ['all', 'All'],
@@ -343,7 +343,7 @@ function HiringPipeline() {
   }, [interviews, searchTerm, statusFilter, viewFilter]);
 
   const assessmentCounts = useMemo(() => {
-    const counts = { NOT_CREATED: 0, DRAFT: 0, SENT: 0, IN_PROGRESS: 0, COMPLETED: 0, PASSED: 0, FAILED: 0 };
+    const counts = { NOT_CREATED: 0, DRAFT: 0, SENT: 0, IN_PROGRESS: 0, COMPLETED: 0, PASSED: 0, FAILED: 0, TERMINATED: 0 };
     assessmentRows.forEach(row => {
       const status = String(row.assessment_status || 'NOT_CREATED');
       counts[status] = (counts[status] || 0) + 1;
@@ -865,7 +865,7 @@ function HiringPipeline() {
                               {generatingAssessmentId === generatedKey ? 'Generating…' : 'Generate assessment'}
                             </button>
                           )}
-                          {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED'].includes(status) && (
+                          {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(status) && (
                             <button type="button" className={`hp-btn ${status === 'DRAFT' ? 'hp-btn-primary' : 'hp-btn-ghost'}`} onClick={() => reviewAssessment(row)}>
                               <i className="fas fa-clipboard-check" aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'Review'}
                             </button>

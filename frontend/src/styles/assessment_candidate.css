@@ -82,6 +82,70 @@
 .ca-success-card > i { color: #278359; }
 .ca-spinner { width: 42px; height: 42px; border: 3px solid #e4e8ee; border-top-color: #ff6a00; border-radius: 50%; margin: 0 auto 20px; animation: caSpin .8s linear infinite; }
 .ca-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+#ca-root.ca-welcome-page { padding: 0; background: #fff; min-height: 100vh; min-height: 100dvh; }
+.ca-exam-rules { display: flex; flex-direction: column; width: 100%; max-width: none; min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0 clamp(24px, 4vw, 72px); background: #fff; line-height: 1.6; }
+.ca-exam-rules h1 { font-size: 24px; }
+.ca-welcome-logo { display: block; width: 200px; max-width: 48%; height: auto; margin: 0; }
+.ca-welcome-heading { text-align: left; margin: 0; padding: 32px 0 24px; border-bottom: 1px solid #e9edf2; background: radial-gradient(ellipse at 85% 20%, #fff2e5, transparent 58%); }
+.ca-welcome-heading h1 { margin: 0 0 8px; }
+.ca-welcome-heading p { margin: 0; }
+.ca-assessment-terms { margin-top: 22px; padding: 0; background: transparent; border: 0; border-radius: 0; }
+.ca-assessment-terms h2 { margin: 0 0 10px; font-size: 18px; }
+.ca-terms-consent { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; cursor: pointer; }
+.ca-terms-consent input { width: 18px; height: 18px; flex: 0 0 18px; margin: 3px 0 0; accent-color: #ff6900; }
+.ca-exam-rules li { margin-bottom: 10px; }
+.ca-exam-rules .ca-btn { margin-top: 16px; }
+.ca-welcome-topbar { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #edf0f4; }
+.ca-welcome-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #526073; background: #f7f9fb; border-radius: 999px; padding: 8px 14px; }
+.ca-welcome-badge i { color: #f97316; }
+.ca-welcome-eyebrow, .ca-section-eyebrow { display: block; font-size: 11px; font-weight: 700; letter-spacing: .13em; color: #d25d0d; margin-bottom: 12px; }
+#ca-root .ca-welcome-heading h1 { font-size: clamp(28px, 3vw, 44px); font-weight: 700; letter-spacing: -.035em; margin: 0 0 12px; overflow-wrap: anywhere; }
+.ca-welcome-heading > p { color: #637084; font-size: 16px; line-height: 1.7; }
+.ca-welcome-overview { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #e9e5df; }
+.ca-welcome-overview > div { display: grid; align-content: center; position: relative; padding-left: 28px; border-left: 1px solid #e9e5df; }
+.ca-welcome-overview > div:first-child { padding-left: 0; border-left: 0; }
+.ca-welcome-overview strong { font-size: 20px; font-weight: 650; overflow-wrap: anywhere; }
+.ca-welcome-overview span { font-size: 13px; color: #6a7483; }
+.ca-welcome-overview i { color: #ed741e; font-size: 16px; margin-bottom: 6px; }
+.ca-welcome-overview small { font-size: 13px; font-weight: 400; }
+.ca-welcome-assessment strong { margin-top: 5px; }
+.ca-welcome-columns { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(32px, 6vw, 100px); padding: 28px 0 32px; }
+#ca-root .ca-welcome-columns h2 { margin: 0 0 8px; font-size: 23px; font-weight: 650; letter-spacing: -.02em; }
+.ca-section-intro { margin: 0; color: #6a7483; font-size: 14px; }
+.ca-instruction-list { list-style: none; padding: 0; margin: 24px 0; display: grid; gap: 24px; }
+.ca-instruction-list li { display: flex; gap: 16px; margin: 0; }
+.ca-instruction-icon { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border-radius: 12px; background: #fff3e9; color: #e56b17; }
+.ca-instruction-list h3 { font-size: 15px; margin: 0 0 5px; font-weight: 650; }
+.ca-instruction-list p { margin: 0; color: #667286; font-size: 14px; line-height: 1.65; }
+.ca-welcome-start { border-left: 1px solid #edf0f4; padding-left: clamp(28px, 4vw, 64px); }
+#ca-root .ca-assessment-terms h2 { font-size: 15px; margin-bottom: 8px; }
+.ca-assessment-terms > p { font-size: 14px; color: #667286; margin: 0 0 22px; line-height: 1.75; }
+.ca-terms-consent { padding: 16px; border: 1px solid #e2e7ed; border-radius: 10px; background: #fafbfc; }
+.ca-terms-consent:has(input:checked) { border-color: #f5b685; background: #fff8f1; }
+.ca-welcome-start .ca-btn { width: 100%; min-height: 54px; font-size: 16px; justify-content: space-between; padding: 14px 20px; }
+.ca-welcome-start .ca-btn:disabled { opacity: 1; color: #8b95a3; background: #edf0f4; box-shadow: none; }
+.ca-start-note { display: flex; justify-content: center; align-items: center; gap: 8px; color: #7a8595; font-size: 12px; margin: 12px 0 0; }
+.ca-welcome-footer { margin-top: auto; border-top: 1px solid #edf0f4; display: flex; justify-content: space-between; gap: 12px; padding: 16px 0; background: #fff; color: #87909d; font-size: 12px; }
+@media (max-width: 800px) {
+  .ca-welcome-columns { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .ca-welcome-start { border-left: 0; border-top: 1px solid #edf0f4; padding: 28px 0 0; }
+  .ca-welcome-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .ca-welcome-overview .ca-welcome-assessment { grid-column: 1 / -1; }
+  .ca-welcome-overview > div:nth-child(2) { border-left: 0; padding-left: 0; }
+  .ca-welcome-overview > div { padding-left: 16px; }
+  .ca-welcome-overview strong { font-size: 17px; }
+  .ca-welcome-topbar { min-height: 76px; }
+  .ca-welcome-badge { font-size: 11px; padding: 6px 10px; }
+  .ca-welcome-footer { flex-direction: column; }
+}
+.ca-proctoring-status { font-size: 13px; color: #536174; white-space: nowrap; }
+.ca-proctoring-warning { color: #ad3628; font-weight: 600; }
+.ca-dialog-overlay { position: fixed; inset: 0; z-index: 10000; background: rgb(22 32 49 / 60%); display: grid; place-items: center; padding: 20px; overflow: auto; }
+.ca-exam-dialog { width: min(100%, 560px); margin: auto; line-height: 1.6; max-height: 90vh; overflow: auto; }
+.ca-exam-dialog h2 { margin: 0 0 16px; font-size: 24px; }
+.ca-exam-dialog .ca-btn { min-height: 48px; font-size: 16px; padding: 12px 20px; }
+.ca-dialog-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+@media (max-width: 900px) { .ca-header-actions { flex-wrap: wrap; gap: 12px; } .ca-proctoring-status { width: 100%; } }
 /* Section tabs: general questions and coding questions live in separate tabs. */
 .ca-nav-title { margin: 0 0 16px; }
 .ca-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 18px; background: #f0f3f7; border-radius: 12px; }

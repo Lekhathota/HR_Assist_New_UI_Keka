@@ -203,6 +203,7 @@ def build_notifications(events: list[dict], actor: str, titles: dict[int, str]) 
         "COMPLETED": ("Assessment submitted", "{name} submitted the assessment{jd}."),
         "PASSED": ("Assessment passed", "{name} passed the assessment{jd}."),
         "FAILED": ("Assessment failed", "{name} did not pass the assessment{jd}."),
+        "TERMINATED": ("Assessment terminated", "The assessment for {name}{jd} was terminated after two proctoring violations."),
     }
     for e in unique("assessment", lambda e: e.get("assessment_id")):
         text = assessment_text.get(str(e.get("status")).upper())

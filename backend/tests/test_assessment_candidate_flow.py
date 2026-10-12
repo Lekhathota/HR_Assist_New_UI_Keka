@@ -50,7 +50,7 @@ class CandidateFlowTests(unittest.TestCase):
             questions = [{'id': 2, 'question_type': 'mcq', 'correct_answer': 'A', 'points': 10}]
             with ExitStack() as stack:
                 for name, value in {'get_assessment_by_token': assessment, 'get_questions_for_assessment': questions,
-                                    'upsert_candidate_answer': 1, 'update_assessment': True,
+                                    'upsert_candidate_answer': 1, 'update_assessment': True, 'complete_candidate_attempt': True,
                                     'mark_answers_final': True, 'upsert_assessment_result': 1}.items():
                     stack.enter_context(patch.object(service.assessment_repo, name, return_value=value))
                 stack.enter_context(patch.object(service.db, 'update_candidate', return_value=True))
@@ -69,7 +69,7 @@ class CandidateFlowTests(unittest.TestCase):
             for name, value in {'get_assessment_by_token': assessment,
                                 'get_questions_for_assessment': [{'id': 2, 'question_type': 'mcq', 'correct_answer': 'A', 'points': 10}],
                                 'get_answers_for_assessment': [{'question_id': 2, 'answer': 'B'}],
-                                'update_assessment': True, 'mark_answers_final': True,
+                                'update_assessment': True, 'complete_candidate_attempt': True, 'mark_answers_final': True,
                                 'upsert_assessment_result': 1}.items():
                 stack.enter_context(patch.object(service.assessment_repo, name, return_value=value))
             save = stack.enter_context(patch.object(service.assessment_repo, 'upsert_candidate_answer'))

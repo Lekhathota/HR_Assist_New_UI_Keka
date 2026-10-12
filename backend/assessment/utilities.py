@@ -92,7 +92,7 @@ def assert_status_transition(current: str, target: str) -> None:
     allowed: dict[str, set[str]] = {
         AssessmentStatus.DRAFT: {AssessmentStatus.SENT},
         AssessmentStatus.SENT: {AssessmentStatus.IN_PROGRESS, AssessmentStatus.COMPLETED},
-        AssessmentStatus.IN_PROGRESS: {AssessmentStatus.COMPLETED, AssessmentStatus.PASSED, AssessmentStatus.FAILED},
+        AssessmentStatus.IN_PROGRESS: {AssessmentStatus.COMPLETED, AssessmentStatus.PASSED, AssessmentStatus.FAILED, AssessmentStatus.TERMINATED},
         AssessmentStatus.COMPLETED: {AssessmentStatus.PASSED, AssessmentStatus.FAILED},
     }
     if current == target:
@@ -242,6 +242,8 @@ def compute_link_status(assessment: dict[str, Any]) -> str:
         return "Not Sent"
     if status in {AssessmentStatus.COMPLETED, AssessmentStatus.PASSED, AssessmentStatus.FAILED}:
         return "Submitted"
+    if status == AssessmentStatus.TERMINATED:
+        return "Terminated"
     if token_is_expired(assessment.get("token_expires_at")):
         return "Expired"
     if assessment.get("access_token"):
@@ -295,6 +297,10 @@ def assessment_summary_payload(
         "created_at": assessment.get("created_at"),
         "updated_at": assessment.get("updated_at"),
         "question_count": len(questions or []),
+        "proctoring_violation_count": int(assessment.get("proctoring_violation_count") or 0),
+        "termination_reason": assessment.get("termination_reason") or "",
+        "terms_accepted_at": assessment.get("terms_accepted_at"),
+        "terms_version": assessment.get("terms_version") or "",
     }
     if include_token:
         token = normalize_access_token(str(assessment.get("access_token") or ""))

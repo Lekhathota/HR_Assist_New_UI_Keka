@@ -76,6 +76,7 @@
 .ab-status-draft { background: #fef3c7; color: #92400e; }
 .ab-status-sent { background: #dbeafe; color: #1d4ed8; }
 .ab-status-in_progress { background: #ffedd5; color: #ea580c; }
+.ab-status-terminated { background: #fee2e2; color: #b91c1c; }
 
 .ab-topbar-actions {
   display: flex;

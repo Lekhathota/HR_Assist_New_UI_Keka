@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { publicApiGet, publicApiPost } from '../api.js';
+import useAssessmentProctoring from '../hooks/useAssessmentProctoring.js';
 import '../styles/assessment_candidate.css';
 
 const AUTOSAVE_DELAY_MS = 600;
@@ -35,6 +36,23 @@ function isCodeQuestion(type) {
   return type === 'coding' || type === 'sql';
 }
 
+function ExamDialog({ title, children }) {
+  const dialogRef = useRef(null);
+  useEffect(() => { dialogRef.current?.querySelector('button')?.focus(); }, []);
+  const trapFocus = event => {
+    if (event.key !== 'Tab') return;
+    const buttons = [...dialogRef.current.querySelectorAll('button:not(:disabled)')];
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    if (!first) { event.preventDefault(); return; }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  };
+  return <div className="ca-dialog-overlay"><section className="ca-card ca-exam-dialog" role="alertdialog" aria-modal="true" aria-labelledby="ca-dialog-title" ref={dialogRef} onKeyDown={trapFocus}>
+    <h2 id="ca-dialog-title">{title}</h2>{children}
+  </section></div>;
+}
+
 function CandidateAssessment() {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
@@ -49,6 +67,9 @@ function CandidateAssessment() {
   const [submitted, setSubmitted] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [editorExpanded, setEditorExpanded] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const proctoring = useAssessmentProctoring(token, assessment);
   const editorGutterRef = useRef(null);
   const activeNavRef = useRef(null);
 
@@ -103,6 +124,7 @@ function CandidateAssessment() {
 
   const loadAssessment = useCallback(async () => {
     setLoading(true);
+    setTermsAccepted(false);
     setError('');
     setRemainingSeconds(null);
     setSubmitted(false);
@@ -138,7 +160,7 @@ function CandidateAssessment() {
   }, [loadAssessment]);
 
   useEffect(() => {
-    if (remainingSeconds == null || submitted) return undefined;
+    if (remainingSeconds == null || submitted || !proctoring.active) return undefined;
     if (remainingSeconds <= 0) {
       if (!submitting && submitRef.current) {
         submitRef.current(true);
@@ -149,7 +171,7 @@ function CandidateAssessment() {
       setRemainingSeconds(prev => (prev == null ? prev : Math.max(0, prev - 1)));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [remainingSeconds, submitted, submitting]);
+  }, [remainingSeconds, submitted, submitting, proctoring.active]);
 
   const persistAnswer = useCallback(async (questionId, answer) => {
     setSaveState('saving');
@@ -167,16 +189,17 @@ function CandidateAssessment() {
   }, [token]);
 
   const scheduleAutosave = useCallback((questionId, answer) => {
-    if (submitted) return;
+    if (submitted || proctoring.terminated || !proctoring.active) return;
     if (saveTimersRef.current[questionId]) {
       window.clearTimeout(saveTimersRef.current[questionId]);
     }
     saveTimersRef.current[questionId] = window.setTimeout(() => {
       persistAnswer(questionId, answer);
     }, AUTOSAVE_DELAY_MS);
-  }, [persistAnswer, submitted]);
+  }, [persistAnswer, submitted, proctoring.terminated, proctoring.active]);
 
   const handleAnswerChange = (questionId, value) => {
+    if (proctoring.warning || proctoring.terminated || proctoring.error || !proctoring.active) return;
     setAnswers(prev => ({ ...prev, [questionId]: value }));
     scheduleAutosave(questionId, value);
   };
@@ -196,12 +219,14 @@ function CandidateAssessment() {
     );
   };
 
-  const handleSubmit = async (autoSubmit = false) => {
-    if (submitting || submitted) return;
-    if (!autoSubmit && !window.confirm('Submit your assessment? You cannot change answers after submission.')) return;
+  const handleSubmit = async (autoSubmit = false, confirmed = false) => {
+    if (submitting || submitted || proctoring.terminated || !proctoring.active) return;
+    if (!autoSubmit && !confirmed) { setConfirmSubmit(true); return; }
+    setConfirmSubmit(false);
     setSubmitting(true);
     setError('');
     try {
+      if (!await proctoring.sync()) throw new Error('Exam monitoring must sync before submission. Please retry.');
       await flushPendingSaves();
       const payload = {
         token,
@@ -211,6 +236,7 @@ function CandidateAssessment() {
         })),
       };
       const result = await publicApiPost('/api/assessment/submit', payload);
+      proctoring.stop();
       setSubmitted(true);
       const status = result.result?.status || result.status || 'COMPLETED';
       setSubmitMessage(
@@ -231,6 +257,13 @@ function CandidateAssessment() {
 
   submitRef.current = handleSubmit;
 
+  useEffect(() => {
+    if (!proctoring.terminated) return;
+    Object.values(saveTimersRef.current).forEach(timer => window.clearTimeout(timer));
+    saveTimersRef.current = {};
+    setConfirmSubmit(false);
+  }, [proctoring.terminated]);
+
   if (loading) {
     return (
       <div className="ca-page" id="ca-root">
@@ -242,12 +275,12 @@ function CandidateAssessment() {
     );
   }
 
-  if (error && !assessment) {
+  if (error && !assessment && !proctoring.terminated) {
     return (
       <div className="ca-page" id="ca-root">
         <div className="ca-card ca-center ca-error-card">
           <i className="fas fa-exclamation-circle" />
-          <h1>Assessment Unavailable</h1>
+          <h1>{error.toLowerCase().includes('terminated') ? 'Assessment Terminated' : 'Assessment Unavailable'}</h1>
           <p>{error}</p>
         </div>
       </div>
@@ -266,8 +299,73 @@ function CandidateAssessment() {
     );
   }
 
+  if (proctoring.terminated) {
+    return <div className="ca-page" id="ca-root"><div className="ca-card ca-center ca-error-card">
+      <i className="fas fa-exclamation-circle" aria-hidden="true" />
+      <h1>Assessment Terminated</h1>
+      <p>Your exam ended after two navigation or focus violations. This attempt cannot be resumed.</p>
+      <p>Your previously saved answers are retained. Contact the recruiter if you need another attempt.</p>
+      {proctoring.error && <div role="alert"><p>{proctoring.error}</p><button className="ca-btn ca-btn-primary" disabled={proctoring.syncing} onClick={proctoring.sync}>Retry sync</button></div>}
+      {proctoring.syncing && <p role="status">Recording exam termination…</p>}
+    </div></div>;
+  }
+
+  if (!proctoring.active) {
+    return <div className="ca-page ca-welcome-page" id="ca-root"><section className="ca-exam-rules">
+      <div className="ca-welcome-topbar">
+        <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX" className="ca-welcome-logo" />
+        <span className="ca-welcome-badge"><i className="fas fa-shield-alt" aria-hidden="true" /> Candidate assessment</span>
+      </div>
+      <header className="ca-welcome-heading">
+        <span className="ca-welcome-eyebrow">LET’S GET YOU STARTED</span>
+        <h1>Welcome{assessment?.candidate_name?.trim() ? `, ${assessment.candidate_name.trim()}` : ''}!</h1>
+        <p>Take a moment to get comfortable and review the instructions.<br />When you’re ready, it’s your time to show what you can do.</p>
+        <div className="ca-welcome-overview">
+          <div className="ca-welcome-assessment"><span>Your assessment</span><strong>{assessment?.title || 'Your assessment'}</strong></div>
+          <div><i className="far fa-clock" aria-hidden="true" /><strong>{assessment?.time_limit_minutes || (remainingSeconds != null ? Math.ceil(remainingSeconds / 60) : '—')}<small> min</small></strong><span>Time limit</span></div>
+          <div><i className="far fa-file-alt" aria-hidden="true" /><strong>{totalQuestions}</strong><span>Questions</span></div>
+          <div><i className="fas fa-expand" aria-hidden="true" /><strong>Fullscreen</strong><span>Exam mode</span></div>
+        </div>
+      </header>
+      <div className="ca-welcome-columns">
+      <section className="ca-instructions" aria-labelledby="ca-instructions-title">
+      <span className="ca-section-eyebrow">01 · GET FAMILIAR</span>
+      <h2 id="ca-instructions-title">A few things before you begin</h2>
+      <p className="ca-section-intro">Follow these guidelines for a smooth assessment experience.</p>
+      <ol className="ca-instruction-list">
+        <li><span className="ca-instruction-icon"><i className="fas fa-expand" aria-hidden="true" /></span><div><h3>Stay focused, stay in fullscreen</h3><p>Do not switch browser tabs, leave fullscreen, or move to another window.</p></div></li>
+        <li><span className="ca-instruction-icon"><i className="fas fa-route" aria-hidden="true" /></span><div><h3>Use the exam’s navigation</h3><p>You can move between questions and the Questions / Coding sections inside this exam. Do not use browser Back, Forward, reload, or navigation shortcuts.</p></div></li>
+        <li><span className="ca-instruction-icon"><i className="far fa-clock" aria-hidden="true" /></span><div><h3>Keep an eye on your time</h3><p>The timer begins when you start. For an attempt already in progress, the original timer continues.</p></div></li>
+      </ol>
+      </section>
+      <div className="ca-welcome-start">
+      <span className="ca-section-eyebrow">02 · CONFIRM & BEGIN</span>
+      <h2>Ready when you are</h2>
+      <p className="ca-section-intro">Read and accept the terms below to unlock your assessment.</p>
+      <section className="ca-assessment-terms" aria-labelledby="ca-terms-title">
+        <h2 id="ca-terms-title">Terms and conditions</h2>
+        <p>Complete this assessment independently. By accepting, you agree to stay in the exam tab and follow the instructions above. Navigation and focus violations are recorded, and two violations end your attempt. Submitted answers cannot be changed.</p>
+        <label className="ca-terms-consent">
+          <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} disabled={proctoring.starting} />
+          <span>I have read and agree to the assessment terms and conditions.</span>
+        </label>
+      </section>
+      {proctoring.count > 0 && <p className="ca-proctoring-warning">Warning already recorded: {proctoring.count} / 2. One more violation will end your exam.</p>}
+      {proctoring.error && <p className="ca-inline-error" role="alert">{proctoring.error}</p>}
+      <button className="ca-btn ca-btn-primary" disabled={!termsAccepted || proctoring.starting || proctoring.syncing} onClick={async () => {
+        const started = await proctoring.start(termsAccepted);
+        if (typeof started?.remaining_seconds === 'number') setRemainingSeconds(started.remaining_seconds);
+      }}>{proctoring.starting ? 'Starting…' : assessment?.started_at ? 'Accept & resume assessment' : 'Accept & start assessment'} <i className="fas fa-arrow-right" aria-hidden="true" /></button>
+      <p className="ca-start-note"><i className="fas fa-expand" aria-hidden="true" /> Your exam opens in fullscreen after acceptance.</p>
+      </div>
+      </div>
+      <footer className="ca-welcome-footer"><span>ShimentoX · Candidate experience</span><span>Take your time to prepare. Do your best.</span></footer>
+    </section></div>;
+  }
+
   return (
     <div className="ca-page" id="ca-root">
+      <div inert={proctoring.warning || proctoring.error || confirmSubmit ? '' : undefined}>
       <header className="ca-header">
         <div className="ca-brand">
           <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX" className="ca-logo" />
@@ -276,6 +374,7 @@ function CandidateAssessment() {
           </h1>
         </div>
         <div className="ca-header-actions">
+          <span className="ca-proctoring-status">Exam monitoring · {proctoring.count} / 2 warnings</span>
           {remainingSeconds != null && (
             <div className={`ca-timer ${remainingSeconds <= 300 ? 'ca-timer-warning' : ''}`} aria-label="Time remaining" role="timer">
               <i className="far fa-clock" aria-hidden="true" />
@@ -445,6 +544,20 @@ function CandidateAssessment() {
           </button>
         </footer>
       )}
+      </div>
+      {(proctoring.warning || proctoring.error) && <ExamDialog title={proctoring.count ? 'Exam warning: 1 of 2' : 'Exam monitoring paused'}>
+        {proctoring.count > 0 && <p>You left the exam or tried to navigate away. Your exam will be ended if you do this again.</p>}
+        <p>Return to fullscreen and stay in this tab to continue.</p>
+        {proctoring.error && <p className="ca-inline-error" role="alert">{proctoring.error}</p>}
+        <button className="ca-btn ca-btn-primary" disabled={proctoring.syncing} onClick={proctoring.resume}>Return to exam</button>
+      </ExamDialog>}
+      {confirmSubmit && !proctoring.warning && !proctoring.error && <ExamDialog title="Submit your assessment?">
+        <p>You cannot change your answers after submission.</p>
+        <div className="ca-dialog-actions">
+          <button className="ca-btn ca-btn-secondary" onClick={() => setConfirmSubmit(false)}>Continue exam</button>
+          <button className="ca-btn ca-btn-primary" onClick={() => handleSubmit(false, true)}>Confirm submission</button>
+        </div>
+      </ExamDialog>}
     </div>
   );
 }

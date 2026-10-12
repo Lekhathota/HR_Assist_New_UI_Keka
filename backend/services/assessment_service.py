@@ -690,6 +690,9 @@ def _resolve_token_assessment(token: str, *, allow_time_expired: bool = False) -
         raise AssessmentServiceError("Assessment link has expired.", status_code=410)
 
     status = str(assessment.get("status") or "")
+    if status == AssessmentStatus.TERMINATED or int(assessment.get("proctoring_violation_count") or 0) >= 2:
+        raise AssessmentServiceError("Assessment terminated after two proctoring violations. This attempt cannot be resumed.", status_code=409)
+
     if status in AssessmentStatus.submitted_states():
         raise AssessmentServiceError("This assessment has already been submitted.", status_code=409)
 
@@ -707,22 +710,19 @@ def _resolve_token_assessment(token: str, *, allow_time_expired: bool = False) -
 
 
 def _begin_candidate_session(assessment: dict[str, Any]) -> dict[str, Any]:
-    """Mark assessment in progress when the candidate opens it."""
+    """Mark assessment in progress after the candidate accepts the exam rules."""
     assessment_id = int(assessment["id"])
     current_status = str(assessment.get("status") or "")
     if current_status == AssessmentStatus.SENT:
         assert_status_transition(current_status, AssessmentStatus.IN_PROGRESS)
-        assessment_repo.update_assessment(
-            assessment_id,
-            {"status": AssessmentStatus.IN_PROGRESS, "started_at": utc_now()},
-        )
-        assessment = assessment_repo.get_assessment_by_id(assessment_id) or assessment
+        assessment = assessment_repo.begin_candidate_attempt(assessment_id) or assessment
+    if assessment.get("status") != AssessmentStatus.IN_PROGRESS:
+        raise AssessmentServiceError("This assessment cannot be started.", status_code=409)
     return assessment
 
 
 def get_assessment_by_token(token: str) -> dict[str, Any]:
     assessment = _resolve_token_assessment(token)
-    assessment = _begin_candidate_session(assessment)
     questions = assessment_repo.get_questions_for_assessment(int(assessment["id"]))
     saved_answers = assessment_repo.get_answers_for_assessment(int(assessment["id"]))
     return {
@@ -739,6 +739,40 @@ def get_assessment_by_token(token: str) -> dict[str, Any]:
     }
 
 
+def start_candidate_assessment(token: str, *, accepted_terms: bool = False) -> dict[str, Any]:
+    assessment = _resolve_token_assessment(token)
+    if accepted_terms is not True:
+        raise AssessmentServiceError("Accept the assessment terms and conditions before starting.", status_code=400)
+    assessment = _begin_candidate_session(assessment)
+    acceptance = {"terms_accepted_at": utc_now(), "terms_version": "assessment-rules-v1"}
+    if not assessment_repo.update_assessment(int(assessment["id"]), acceptance):
+        raise AssessmentServiceError("Could not record terms acceptance. Please retry.", status_code=503)
+    assessment = {**assessment, **acceptance}
+    return {"success": True, "assessment": candidate_assessment_payload(assessment, questions=[])}
+
+
+def report_proctoring_violation(token: str, event_id: str, reason: str) -> dict[str, Any]:
+    # Idempotent retries remain valid even after this event terminates the attempt.
+    assessment = assessment_repo.get_assessment_by_token(str(token or "").strip())
+    if not assessment:
+        raise AssessmentServiceError("Invalid assessment token.", status_code=404)
+    if assessment.get("status") != AssessmentStatus.TERMINATED:
+        assessment = _resolve_token_assessment(token, allow_time_expired=True)
+        if assessment.get("status") != AssessmentStatus.IN_PROGRESS:
+            raise AssessmentServiceError("Start the assessment before reporting a violation.", status_code=409)
+        assessment = assessment_repo.record_proctoring_violation(int(assessment["id"]), event_id, reason)
+        if not assessment:
+            raise AssessmentServiceError("Could not record exam violation.", status_code=503)
+        if assessment.get("status") == AssessmentStatus.TERMINATED:
+            assessment_repo.mark_answers_final(int(assessment["id"]))
+            db.log_audit("Assessment Terminated", "",
+                f"Assessment #{assessment['id']} terminated after two proctoring violations.",
+                int(assessment.get("jd_id") or 0) or None)
+    return {"success": True, "status": assessment.get("status"),
+            "violation_count": int(assessment.get("proctoring_violation_count") or 0),
+            "terminated": assessment.get("status") == AssessmentStatus.TERMINATED}
+
+
 def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
     assessment = _resolve_token_assessment(token)
     assessment_id = int(assessment["id"])
@@ -748,11 +782,7 @@ def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
 
     current_status = str(assessment.get("status") or "")
     if current_status == AssessmentStatus.SENT:
-        assert_status_transition(current_status, AssessmentStatus.IN_PROGRESS)
-        assessment_repo.update_assessment(
-            assessment_id,
-            {"status": AssessmentStatus.IN_PROGRESS, "started_at": utc_now()},
-        )
+        raise AssessmentServiceError("Start the assessment before saving answers.", status_code=409)
 
     answer_id = assessment_repo.upsert_candidate_answer(
         assessment_id,
@@ -774,6 +804,8 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
     questions = assessment_repo.get_questions_for_assessment(assessment_id)
     if not questions:
         raise AssessmentServiceError("Assessment has no questions.")
+    if assessment.get("status") != AssessmentStatus.IN_PROGRESS:
+        raise AssessmentServiceError("Start the assessment before submitting answers.", status_code=409)
 
     answers_by_question: dict[int, str] = {}
     expired = remaining_seconds(assessment) == 0
@@ -802,20 +834,9 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
     )
 
     current_status = str(assessment.get("status") or AssessmentStatus.IN_PROGRESS)
-    if current_status == AssessmentStatus.SENT:
-        assessment_repo.update_assessment(
-            assessment_id,
-            {"status": AssessmentStatus.IN_PROGRESS, "started_at": utc_now()},
-        )
-        current_status = AssessmentStatus.IN_PROGRESS
     assert_status_transition(current_status, AssessmentStatus.COMPLETED)
-    assessment_repo.update_assessment(
-        assessment_id,
-        {
-            "status": AssessmentStatus.COMPLETED,
-            "completed_at": utc_now(),
-        },
-    )
+    if not assessment_repo.complete_candidate_attempt(assessment_id):
+        raise AssessmentServiceError("This assessment is closed and cannot be submitted.", status_code=409)
     assert_status_transition(AssessmentStatus.COMPLETED, final_status)
     assessment_repo.update_assessment(assessment_id, {"status": final_status})
     assessment_repo.mark_answers_final(assessment_id)
@@ -897,6 +918,8 @@ __all__ = [
     "remove_question",
     "send_assessment",
     "get_assessment_by_token",
+    "start_candidate_assessment",
+    "report_proctoring_violation",
     "save_answer",
     "submit_assessment",
     "get_assessment_result",

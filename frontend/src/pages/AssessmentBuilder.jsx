@@ -472,6 +472,11 @@ function AssessmentBuilder() {
           </div>
         </div>
 
+        {assessment?.status === 'TERMINATED' && <div className="ab-error" role="status">
+          <strong>Assessment terminated.</strong> {assessment.termination_reason || 'Two exam navigation or focus violations'}.
+          {' '}This attempt is closed. Saved answers are retained and no passing score is awarded.
+        </div>}
+
         {isReviewable && assessmentResult && (
           <div className={`ab-result-banner ab-result-${(assessmentResult.status || '').toLowerCase()}`}>
             <h2><i className="fas fa-chart-line" /> Assessment Result</h2>
