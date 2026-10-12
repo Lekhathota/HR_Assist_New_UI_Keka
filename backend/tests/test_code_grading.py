@@ -305,3 +305,47 @@ class RegradeTests(unittest.TestCase):
         with patch.object(service.assessment_repo, "get_assessment_by_id", return_value={"id": 1, "status": "IN_PROGRESS"}):
             with self.assertRaises(service.AssessmentServiceError):
                 service.regrade_assessment(1)
+
+
+class LenientGenerationTests(unittest.TestCase):
+    def test_sql_accepts_statement_lists_empty_datasets_and_missing_flags(self):
+        item = {"schema": SCHEMA, "test_cases": [
+            {"setup_sql": ["INSERT INTO orders VALUES (1,'a',10);", "INSERT INTO orders VALUES (2,'b',3);"]},
+            {"data": "INSERT INTO orders VALUES (1,'c',4);"},
+            {"setup_sql": "", "is_hidden": True},          # empty-table edge case
+            {"setup_sql": "INSERT INTO orders VALUES (1,'d',1),(2,'d',2);", "hidden": "true"},
+        ]}
+        fields = validate_test_fields(item, "sql", "Q13")
+        self.assertEqual(len(fields["test_cases"]), 4)
+        self.assertEqual([c["hidden"] for c in fields["test_cases"]], [False, True, True, True])
+        self.assertIn("INSERT INTO orders VALUES (2,'b',3);", fields["test_cases"][0]["setup_sql"])
+        prepared = prepare_executable_questions([{"question_type": "sql", "correct_answer": REFERENCE_SQL, **fields}], runner=None)
+        self.assertEqual(prepared[0]["test_cases"][2]["expected"]["rows"], [])
+
+    def test_coding_accepts_numeric_outputs_and_rebalances_flags(self):
+        item = {"test_cases": [{"input": f"{n}", "output": n * 2, "hidden": False} for n in range(1, 7)]}
+        fields = validate_test_fields(item, "coding", "Q11")
+        self.assertEqual(fields["test_cases"][0]["expected_output"], "2")
+        self.assertEqual(sum(c["hidden"] for c in fields["test_cases"]), 4)
+
+    def test_final_attempt_keeps_questions_whose_tests_are_unusable(self):
+        from assessment.generation import normalized_jd, validate_exam
+        from tests.test_assessment_generation import JD, exam
+
+        data = exam()
+        data["questions"][12]["test_cases"] = [{"setup_sql": "INSERT INTO requests VALUES (1, 1, 'x', 'y');"}]
+        with self.assertRaises(ValueError):
+            validate_exam(copy.deepcopy(data), normalized_jd(JD), total=14)
+        rows = validate_exam(data, normalized_jd(JD), total=14, require_tests=False)
+        self.assertNotIn("test_cases", rows[12])
+        self.assertIn("test_cases", rows[13])
+
+    def test_non_strict_preparation_drops_only_the_broken_question(self):
+        good = {"question_type": "sql", "correct_answer": REFERENCE_SQL, "sql_schema": SCHEMA,
+                "test_cases": [{"id": f"t{n}", "hidden": n > 1, "setup_sql": "INSERT INTO orders VALUES (1,'a',1);"} for n in range(1, 4)]}
+        make_bad = lambda: {**copy.deepcopy(good), "correct_answer": "SELECT nope FROM missing"}
+        rows = prepare_executable_questions([make_bad(), good], runner=None, strict=False)
+        self.assertNotIn("test_cases", rows[0])
+        self.assertTrue(rows[1]["tests_verified"])
+        with self.assertRaises(ValueError):
+            prepare_executable_questions([make_bad()], runner=None, strict=True)

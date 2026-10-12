@@ -78,7 +78,7 @@ def shuffle_mcq_options(rows, rng=None):
     return rows
 
 
-def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=()):
+def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=(), require_tests=True):
     if not isinstance(exam, dict):
         raise ValueError("Exam must be a JSON object.")
     items = exam.get("questions")
@@ -139,7 +139,14 @@ def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=
                 answer = options[ord(label.group(1).upper()) - ord("A")]
         if qtype == "mcq" and (len(options) != 4 or not all(isinstance(v, str) and v.strip() for v in options) or len({_text(v) for v in options}) != 4 or answer not in options):
             raise ValueError(f"Q{index+1}: MCQ requires four distinct options and correct_answer must be the full text of exactly one option.")
-        executable = validate_test_fields(item, qtype, f"Q{index+1}") if qtype in {"coding", "sql"} else {}
+        executable = {}
+        if qtype in {"coding", "sql"}:
+            try:
+                executable = validate_test_fields(item, qtype, f"Q{index+1}")
+            except ValueError:
+                if require_tests:
+                    raise
+                # Last attempt: keep the question; it is graded by AI against its reference answer.
         points = int(item.get("points") or (5 if qtype == "mcq" else 15))
         if not 1 <= points <= 100:
             raise ValueError("Question points must be between 1 and 100.")

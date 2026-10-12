@@ -275,8 +275,10 @@ def _generate_questions_with_ai(jd: dict, *, previous_questions=None):
                     if not isinstance(ref, str) or ref not in catalog:
                         raise ValueError("Each jd_requirement_id must reference the supplied JD catalog.")
                     question["jd_requirement"] = catalog[ref]
-            rows = validate_exam(exam, context, TOTAL_GENERATED_QUESTIONS, previous_questions or ())
-            rows = prepare_executable_questions(rows)
+            strict_tests = attempt < 2  # final attempt keeps questions whose tests are unusable
+            rows = validate_exam(exam, context, TOTAL_GENERATED_QUESTIONS, previous_questions or (),
+                                 require_tests=strict_tests)
+            rows = prepare_executable_questions(rows, strict=strict_tests)
             review = parse_json_response(llm.invoke(prompt_service.render(
                 "assessment_validate.jinja", jd_data=context, requirement_catalog=catalog, exam=exam,
             ), temperature=0.0))
