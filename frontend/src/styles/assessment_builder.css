@@ -428,3 +428,6 @@
 .ab-test-outcomes li.ok { background: #e8f5ee; color: #1f6e4a; }
 .ab-test-outcomes li.bad { background: #fff0ed; color: #ad3628; }
 @media (max-width: 640px) { .ab-test-io { grid-template-columns: minmax(0, 1fr); } }
+
+.ab-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ab-result-head h2 { margin: 0; }

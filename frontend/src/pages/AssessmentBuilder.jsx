@@ -188,6 +188,22 @@ function AssessmentBuilder() {
 
   const showNotice = (msg) => setNotice(msg);
 
+  const handleRegrade = async () => {
+    if (!window.confirm('Re-grade this assessment with the current automatic grading? The candidate answers are not changed; the score and pass/fail status may change.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/regrade`, {});
+      if (!ok) throw new Error(data.error || 'Could not re-grade assessment.');
+      await loadAssessment();
+      showNotice(`Re-graded: ${data.result?.status || data.status} (${data.percentage ?? data.result?.score_percentage}%).`);
+    } catch (err) {
+      setError(err.message || 'Could not re-grade assessment.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleRegenerate = async () => {
     if (!window.confirm('Replace this draft with 14 JD-based questions: 10 MCQs, 2 moderate coding and 2 moderate SQL questions?')) return;
     setBusy(true);
@@ -573,7 +589,13 @@ function AssessmentBuilder() {
 
         {isReviewable && assessmentResult && (
           <div className={`ab-result-banner ab-result-${(assessmentResult.status || '').toLowerCase()}`}>
-            <h2><i className="fas fa-chart-line" /> Assessment Result</h2>
+            <div className="ab-result-head">
+              <h2><i className="fas fa-chart-line" /> Assessment Result</h2>
+              <button type="button" className="btn btn-secondary" onClick={handleRegrade} disabled={busy}
+                title="Score the saved answers again with the current coding/SQL graders">
+                <i className="fas fa-rotate" /> Re-grade
+              </button>
+            </div>
             <p>
               <strong>Score:</strong> {assessmentResult.percentage ?? assessmentResult.score_percentage}%
               {' '}({assessmentResult.score ?? assessmentResult.earned_points}/{assessmentResult.total_points} points)
