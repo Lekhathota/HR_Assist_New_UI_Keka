@@ -30,8 +30,15 @@ SCENARIOS = [
     "Operations needs a SQL report counting completed requests for every registered customer including customers with none. Given customer and request schemas, explain the join and filtering needed.",
 ]
 
+CODING_TESTS = [{"input": f"{n}\n", "expected_output": f"{n * 2}\n", "hidden": n > 2} for n in range(1, 7)]
+SQL_SCHEMA = "CREATE TABLE requests (id INTEGER, customer_id INTEGER, status TEXT, updated_at TEXT);"
+SQL_TESTS = [{"setup_sql": f"INSERT INTO requests VALUES ({n}, 1, 'done', '2026-01-0{n}'), ({n + 10}, 2, 'open', '2026-02-0{n}');",
+              "hidden": n > 2} for n in range(1, 6)]
+SQL_REFERENCE = "SELECT customer_id, MAX(updated_at) FROM requests GROUP BY customer_id"
+
+
 def exam():
-    return {"exam_title": "JD-Based Assessment", "job_title": "Python Developer", "experience_required": "3-5 years",
+    data = {"exam_title": "JD-Based Assessment", "job_title": "Python Developer", "experience_required": "3-5 years",
             "total_questions": 14, "skills_covered": ["Python"],
             "questions": [{"question_id": f"Q{i+1:03d}", "question": text,
                 "question_type": "MCQ" if i < 10 else "CODING" if i < 12 else "SQL",
@@ -40,6 +47,12 @@ def exam():
                 "options": ["A", "B", "C", "D"] if i < 10 else [], "correct_answer": "B",
                 "explanation": "B addresses the stated failure with validation.",
                 "evaluation_focus": ["Practical application"]} for i, text in enumerate(SCENARIOS)]}
+    for question in data["questions"][10:12]:
+        question.update(correct_answer="print(int(input()) * 2)", test_cases=copy.deepcopy(CODING_TESTS),
+                        input_format="One integer n", output_format="2 * n", default_language="python")
+    for question in data["questions"][12:]:
+        question.update(correct_answer=SQL_REFERENCE, sql_schema=SQL_SCHEMA, test_cases=copy.deepcopy(SQL_TESTS))
+    return data
 
 class GenerationTests(unittest.TestCase):
     def test_complete_jd_does_not_mutate_structured_data(self):

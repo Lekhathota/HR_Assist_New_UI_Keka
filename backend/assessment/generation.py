@@ -4,6 +4,7 @@ import re
 import random
 from difflib import SequenceMatcher
 from collections import Counter
+from assessment.code_execution.preparation import validate_test_fields
 from assessment.models import TOTAL_GENERATED_QUESTIONS, MCQ_COUNT, CODING_COUNT, SQL_COUNT, MCQ_MEDIUM_COUNT, MCQ_HARD_COUNT
 
 _rng = random.SystemRandom()
@@ -138,13 +139,14 @@ def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=
                 answer = options[ord(label.group(1).upper()) - ord("A")]
         if qtype == "mcq" and (len(options) != 4 or not all(isinstance(v, str) and v.strip() for v in options) or len({_text(v) for v in options}) != 4 or answer not in options):
             raise ValueError(f"Q{index+1}: MCQ requires four distinct options and correct_answer must be the full text of exactly one option.")
+        executable = validate_test_fields(item, qtype, f"Q{index+1}") if qtype in {"coding", "sql"} else {}
         points = int(item.get("points") or (5 if qtype == "mcq" else 15))
         if not 1 <= points <= 100:
             raise ValueError("Question points must be between 1 and 100.")
         rows.append({"question_text": text, "question_type": qtype, "options": options if qtype == "mcq" else [],
                      "correct_answer": answer, "starter_code": str(item.get("starter_code") or ""),
                      "points": points, "skill_tag": skill, "sort_order": index,
-                     "question_id": f"Q{index+1:03d}", **{k: item[k] for k in METADATA}})
+                     "question_id": f"Q{index+1:03d}", **{k: item[k] for k in METADATA}, **executable})
     counts = Counter(q["question_type"] for q in rows)
     if counts != {"mcq": MCQ_COUNT, "coding": CODING_COUNT, "sql": SQL_COUNT}:
         raise ValueError("Every exam must contain exactly 10 MCQs, 2 coding questions and 2 SQL questions.")

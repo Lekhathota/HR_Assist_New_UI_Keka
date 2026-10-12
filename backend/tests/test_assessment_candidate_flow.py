@@ -77,4 +77,4 @@ class CandidateFlowTests(unittest.TestCase):
             stack.enter_context(patch.object(service.db, 'log_audit'))
             stack.enter_context(patch.object(service, 'get_assessment_result', return_value={}))
             service.submit_assessment(token, [{'question_id': 2, 'answer': 'A'}])
-            save.assert_called_once_with(1, 2, 'B', is_final=True)
+            save.assert_called_once_with(1, 2, 'B', is_final=True, language=None)

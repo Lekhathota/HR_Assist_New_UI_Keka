@@ -98,7 +98,8 @@ class AssessmentEvaluationTests(unittest.TestCase):
             {"id": 3, "question_type": QuestionType.CODING, "correct_answer": "", "points": 20},
         ]
         answers = {1: "A", 2: "B", 3: "print('hello')"}
-        result = evaluate_assessment(questions, answers, passing_score=70)
+        result = evaluate_assessment(questions, answers, passing_score=70,
+                                     coding_evaluator=StubCodingEvaluator())
         self.assertEqual(result["mcq_percentage"], 100.0)
         self.assertEqual(result["score_percentage"], 50.0)
         self.assertFalse(result["passed"])
