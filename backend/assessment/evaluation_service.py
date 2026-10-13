@@ -2,7 +2,8 @@
 Assessment evaluation orchestration.
 
 MCQ / true-false / short-answer questions are scored automatically on submit.
-Coding and SQL questions are routed through CodingEvaluator (stub until AI review is enabled).
+Coding and SQL questions are graded automatically against their visible and hidden
+test cases through CodingEvaluator (AutoCodingEvaluator by default).
 """
 
 from __future__ import annotations
@@ -23,12 +24,13 @@ def evaluate_question(
     question: dict[str, Any],
     answer: str,
     *,
+    language: str = "",
     coding_evaluator: CodingEvaluator | None = None,
 ) -> dict[str, Any]:
     question_type = _question_type_value(question)
     if question_type in {QuestionType.CODING.value, QuestionType.SQL.value}:
         evaluator = coding_evaluator or DEFAULT_CODING_EVALUATOR
-        return evaluator.evaluate(question, answer).to_dict()
+        return evaluator.evaluate(question, answer, language).to_dict()
     return evaluate_auto_scored_question(question, answer)
 
 
@@ -37,6 +39,7 @@ def evaluate_assessment(
     answers_by_question: dict[int, str],
     *,
     passing_score: int,
+    languages_by_question: dict[int, str] | None = None,
     coding_evaluator: CodingEvaluator | None = None,
 ) -> dict[str, Any]:
     """
@@ -56,7 +59,8 @@ def evaluate_assessment(
     for question in questions:
         question_id = int(question.get("id") or 0)
         answer = answers_by_question.get(question_id, "")
-        result = evaluate_question(question, answer, coding_evaluator=coding_evaluator)
+        language = (languages_by_question or {}).get(question_id, "")
+        result = evaluate_question(question, answer, language=language, coding_evaluator=coding_evaluator)
         question_results.append(result)
 
         points_possible = int(result.get("points_possible") or 0)

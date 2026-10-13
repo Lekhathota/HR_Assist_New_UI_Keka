@@ -152,6 +152,18 @@ def validate_save_answer_payload(data: dict[str, Any]) -> dict[str, Any]:
         "token": _require_str(data.get("token"), "token"),
         "question_id": _require_int(data.get("question_id"), "question_id"),
         "answer": _require_str(data.get("answer"), "answer", allow_empty=True),
+        "language": str(data.get("language") or "").strip()[:20],
+    }
+
+
+def validate_run_payload(data: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise SchemaValidationError("Request body must be a JSON object.")
+    return {
+        "token": _require_str(data.get("token"), "token"),
+        "question_id": _require_int(data.get("question_id"), "question_id"),
+        "code": _require_str(data.get("code"), "code", allow_empty=True),
+        "language": str(data.get("language") or "").strip()[:20],
     }
 
 
@@ -170,6 +182,7 @@ def validate_submit_payload(data: dict[str, Any]) -> dict[str, Any]:
                 {
                     "question_id": _require_int(item.get("question_id"), "question_id"),
                     "answer": _require_str(item.get("answer"), "answer", allow_empty=True),
+                    "language": str(item.get("language") or "").strip()[:20],
                 }
             )
     return {

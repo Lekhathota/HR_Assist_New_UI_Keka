@@ -58,6 +58,86 @@ function ExamDialog({ title, children }) {
   </section></div>;
 }
 
+function templateFor(question, language) {
+  return (question?.language_options || []).find(option => option.key === language)?.template || '';
+}
+
+function ResultTable({ data }) {
+  const columns = data?.columns || [];
+  const rows = data?.rows || [];
+  if (!columns.length && !rows.length) return <p className="ca-muted">No rows</p>;
+  return (
+    <div className="ca-table-wrap">
+      <table className="ca-result-table">
+        {columns.length > 0 && <thead><tr>{columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>}
+        <tbody>
+          {rows.map((row, r) => <tr key={r}>{row.map((v, c) => <td key={c}>{v === null ? 'NULL' : String(v)}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SampleTests({ question }) {
+  const samples = question.sample_tests || [];
+  if (question.question_type === 'sql') {
+    return (
+      <div className="ca-samples">
+        {question.sql_schema && (<><h3>Tables</h3><pre>{question.sql_schema}</pre></>)}
+        {samples.map((sample, index) => (
+          <div className="ca-sample" key={sample.id}>
+            <h3>Example {index + 1}</h3>
+            <span className="ca-sample-label">Data</span>
+            <pre>{sample.setup_sql}</pre>
+            <span className="ca-sample-label">Expected result</span>
+            <ResultTable data={sample.expected} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (!samples.length && !question.input_format && !question.output_format) return null;
+  return (
+    <div className="ca-samples">
+      {question.input_format && <p><strong>Input:</strong> {question.input_format}</p>}
+      {question.output_format && <p><strong>Output:</strong> {question.output_format}</p>}
+      {samples.map((sample, index) => (
+        <div className="ca-sample ca-sample-io" key={sample.id}>
+          <h3>Example {index + 1}</h3>
+          <div><span className="ca-sample-label">Input</span><pre>{sample.input}</pre></div>
+          <div><span className="ca-sample-label">Expected output</span><pre>{sample.expected_output}</pre></div>
+        </div>
+      ))}
+      <p className="ca-muted">Read from standard input and print to standard output. Java solutions must use <code>public class Main</code>.</p>
+    </div>
+  );
+}
+
+function RunResults({ result, sql }) {
+  if (result.error) return <div className="ca-run-results ca-run-error" role="alert">{result.error}</div>;
+  const allPassed = result.total > 0 && result.passed === result.total;
+  return (
+    <div className="ca-run-results" role="status" aria-live="polite">
+      <p className={`ca-run-summary ${allPassed ? 'ok' : 'bad'}`}>
+        <i className={`fas ${allPassed ? 'fa-check-circle' : 'fa-times-circle'}`} aria-hidden="true" />
+        {' '}Passed {result.passed} of {result.total} example test{result.total === 1 ? '' : 's'}
+        {result.hidden_test_count > 0 && ` · ${result.hidden_test_count} hidden tests run on submit`}
+      </p>
+      {result.method === 'ai_estimated' && <p className="ca-muted">Code execution is not available right now, so this result is an AI estimate.</p>}
+      {(result.tests || []).map((test, index) => (
+        <details key={test.id} className={`ca-test ${test.passed ? 'ok' : 'bad'}`} open={!test.passed}>
+          <summary>Example {index + 1}: {test.passed ? 'Passed' : test.status === 'failed' ? 'Wrong answer' : test.status.replace(/_/g, ' ')}</summary>
+          {test.error && <pre className="ca-test-error">{test.error}</pre>}
+          {!sql && test.actual != null && (<><span className="ca-sample-label">Your output</span><pre>{test.actual || '(no output)'}</pre></>)}
+          {!sql && !test.passed && test.expected != null && (<><span className="ca-sample-label">Expected output</span><pre>{test.expected}</pre></>)}
+          {sql && test.actual && (<><span className="ca-sample-label">Your result</span><ResultTable data={test.actual} /></>)}
+          {sql && !test.passed && test.expected && (<><span className="ca-sample-label">Expected result</span><ResultTable data={test.expected} /></>)}
+        </details>
+      ))}
+    </div>
+  );
+}
+
 function CandidateAssessment() {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
@@ -76,6 +156,9 @@ function CandidateAssessment() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [stage, setStage] = useState('terms');
   const [faceRecheck, setFaceRecheck] = useState('');
+  const [languages, setLanguages] = useState({});
+  const [runResults, setRunResults] = useState({});
+  const [running, setRunning] = useState(false);
   const proctoring = useAssessmentProctoring(token, assessment);
   const media = useMediaProctoring(token, {
     active: proctoring.active,
@@ -90,8 +173,10 @@ function CandidateAssessment() {
 
   const saveTimersRef = useRef({});
   const answersRef = useRef(answers);
+  const languagesRef = useRef(languages);
   const submitRef = useRef(null);
   answersRef.current = answers;
+  languagesRef.current = languages;
 
   // Non-coding questions come first so each tab holds a contiguous number range.
   const sortedQuestions = useMemo(
@@ -103,10 +188,15 @@ function CandidateAssessment() {
 
   const currentQuestion = sortedQuestions[currentIndex] || null;
   const totalQuestions = sortedQuestions.length;
-  const editorValue = currentQuestion
-    ? answers[currentQuestion.id] ?? currentQuestion.starter_code ?? ''
+  const languageOptions = currentQuestion?.language_options || [];
+  const currentLanguage = currentQuestion
+    ? languages[currentQuestion.id] || currentQuestion.default_language || languageOptions[0]?.key || ''
     : '';
-  const editorLanguage = currentQuestion?.language || currentQuestion?.programming_language;
+  const editorValue = currentQuestion
+    ? answers[currentQuestion.id] ?? (currentQuestion.starter_code || templateFor(currentQuestion, currentLanguage))
+    : '';
+  const editorLanguage = currentQuestion?.question_type === 'sql' ? 'SQL (SQLite)' : currentQuestion?.language || currentQuestion?.programming_language;
+  const currentRun = currentQuestion ? runResults[currentQuestion.id] : null;
   const canGoBack = currentIndex > 0;
   const canGoForward = currentIndex < totalQuestions - 1;
   const activeSection = currentQuestion && isCodeQuestion(currentQuestion.question_type) ? 'coding' : 'general';
@@ -151,12 +241,16 @@ function CandidateAssessment() {
       setAssessment(data.assessment || null);
       setQuestions(data.questions || []);
       const initial = {};
+      const savedLanguages = {};
       (data.saved_answers || []).forEach(row => {
         if (row.question_id != null) {
           initial[row.question_id] = row.answer || '';
+          if (row.language) savedLanguages[row.question_id] = row.language;
         }
       });
       setAnswers(initial);
+      setLanguages(savedLanguages);
+      setRunResults({});
       setCurrentIndex(0);
       setRemainingSeconds(null);
       if (typeof data.assessment?.remaining_seconds === 'number') {
@@ -196,6 +290,7 @@ function CandidateAssessment() {
         token,
         question_id: questionId,
         answer,
+        ...(languagesRef.current[questionId] ? { language: languagesRef.current[questionId] } : {}),
       });
       setSaveState('saved');
       window.setTimeout(() => setSaveState('idle'), 2000);
@@ -230,6 +325,7 @@ function CandidateAssessment() {
           token,
           question_id: q.id,
           answer: pending[q.id] || '',
+          ...(languagesRef.current[q.id] ? { language: languagesRef.current[q.id] } : {}),
         }).catch(() => null),
       ),
     );
@@ -249,6 +345,8 @@ function CandidateAssessment() {
         answers: sortedQuestions.map(q => ({
           question_id: q.id,
           answer: answersRef.current[q.id] || '',
+          ...(q.question_type === 'coding' && (languagesRef.current[q.id] || q.default_language)
+            ? { language: languagesRef.current[q.id] || q.default_language } : {}),
         })),
       };
       const result = await publicApiPost('/api/assessment/submit', payload);
@@ -275,6 +373,46 @@ function CandidateAssessment() {
   submitRef.current = handleSubmit;
 
   const finishMedia = media.finish;
+  const examLocked = submitting || submitted || examPaused || terminated || !proctoring.active;
+
+  const changeLanguage = (question, nextLanguage) => {
+    if (examLocked) return;
+    const previousTemplate = templateFor(question, languagesRef.current[question.id] || question.default_language);
+    const code = answersRef.current[question.id];
+    languagesRef.current = { ...languagesRef.current, [question.id]: nextLanguage };
+    setLanguages(prev => ({ ...prev, [question.id]: nextLanguage }));
+    setRunResults(prev => ({ ...prev, [question.id]: null }));
+    if (code == null || code === previousTemplate) {
+      // Untouched starter code follows the newly selected language.
+      setAnswers(prev => {
+        const next = { ...prev };
+        delete next[question.id];
+        return next;
+      });
+    } else {
+      scheduleAutosave(question.id, code);
+    }
+  };
+
+  const runCode = async () => {
+    if (!currentQuestion || examLocked || running) return;
+    const question = currentQuestion;
+    setRunning(true);
+    try {
+      const result = await publicApiPost('/api/assessment/run-code', {
+        token,
+        question_id: question.id,
+        code: editorValue,
+        language: question.question_type === 'coding' ? currentLanguage : '',
+      });
+      setRunResults(prev => ({ ...prev, [question.id]: result }));
+    } catch (err) {
+      setRunResults(prev => ({ ...prev, [question.id]: { error: err.message || 'Could not run the code.' } }));
+    } finally {
+      setRunning(false);
+    }
+  };
+
   useEffect(() => {
     if (!terminated) return;
     Object.values(saveTimersRef.current).forEach(timer => window.clearTimeout(timer));
@@ -538,11 +676,22 @@ function CandidateAssessment() {
               )}
 
               {isCodeQuestion(currentQuestion.question_type) && (
+                <SampleTests question={currentQuestion} />
+              )}
+
+              {isCodeQuestion(currentQuestion.question_type) && (
                 <div className={`ca-code-block ${editorExpanded ? 'ca-editor-expanded' : ''}`}>
                   <div className="ca-editor-toolbar">
                     <label className="ca-code-label" htmlFor={`code-${currentQuestion.id}`}>Your solution</label>
                     <i className="far fa-question-circle ca-editor-info" aria-hidden="true" title="Responses are saved automatically as you type" />
-                    <span className="ca-editor-language">{editorLanguage || questionLabel(currentQuestion.question_type)}</span>
+                    {currentQuestion.question_type === 'coding' && languageOptions.length > 0 ? (
+                      <select className="ca-language-select" aria-label="Programming language" value={currentLanguage}
+                        disabled={examLocked} onChange={e => changeLanguage(currentQuestion, e.target.value)}>
+                        {languageOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+                      </select>
+                    ) : (
+                      <span className="ca-editor-language">{editorLanguage || questionLabel(currentQuestion.question_type)}</span>
+                    )}
                     <button type="button" className="ca-icon-button ca-expand-editor" aria-pressed={editorExpanded}
                       aria-label={editorExpanded ? 'Reduce editor' : 'Expand editor'} onClick={() => setEditorExpanded(value => !value)}>
                       <i className={`fas ${editorExpanded ? 'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'}`} aria-hidden="true" />
@@ -558,6 +707,18 @@ function CandidateAssessment() {
                       onScroll={e => { if (editorGutterRef.current) editorGutterRef.current.scrollTop = e.currentTarget.scrollTop; }}
                       placeholder="Enter your solution" />
                   </div>
+                  {currentQuestion.runnable && (
+                    <div className="ca-run-row">
+                      <button type="button" className="ca-btn ca-btn-run" onClick={runCode} disabled={examLocked || running || !String(editorValue).trim()}>
+                        {running ? <><i className="fas fa-spinner fa-spin" aria-hidden="true" /> Running...</> : <><i className="fas fa-play" aria-hidden="true" /> Run</>}
+                      </button>
+                      <span className="ca-run-hint">
+                        Runs the {(currentQuestion.sample_tests || []).length} example test{(currentQuestion.sample_tests || []).length === 1 ? '' : 's'} above.
+                        {currentQuestion.hidden_test_count > 0 && ` ${currentQuestion.hidden_test_count} hidden tests are checked when you submit.`}
+                      </span>
+                    </div>
+                  )}
+                  {currentRun && <RunResults result={currentRun} sql={currentQuestion.question_type === 'sql'} />}
                 </div>
               )}
 

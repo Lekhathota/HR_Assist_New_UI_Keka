@@ -300,6 +300,13 @@ def delete_assessment_cascade(assessment_id: int) -> None:
 
 # Questions
 
+# Test-case data for automatically graded coding / SQL questions.
+EXECUTABLE_QUESTION_FIELDS = (
+    "test_cases", "sql_schema", "order_matters", "input_format", "output_format",
+    "allowed_languages", "default_language", "tests_verified",
+    "reference_language", "verification", "config_fingerprint",
+)
+
 
 def create_question(data: dict[str, Any]) -> int:
     question_id = _next_id("questions")
@@ -314,6 +321,7 @@ def create_question(data: dict[str, Any]) -> int:
         "points": int(data.get("points") or 10),
         "skill_tag": data.get("skill_tag") or "",
         **{key: data.get(key) for key in ("question_id", "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement") if data.get(key) is not None},
+        **{key: data.get(key) for key in EXECUTABLE_QUESTION_FIELDS if data.get(key) is not None},
         "sort_order": int(data.get("sort_order") or 0),
         "created_at": _now(),
         "updated_at": _now(),
@@ -352,6 +360,7 @@ def update_question(question_id: int, patch: dict[str, Any]) -> bool:
         "points",
         "skill_tag",
         "sort_order",
+        *EXECUTABLE_QUESTION_FIELDS,
     }
     update_doc: dict[str, Any] = {}
     for key, value in patch.items():
@@ -362,6 +371,17 @@ def update_question(question_id: int, patch: dict[str, Any]) -> bool:
     update_doc["updated_at"] = _now()
     result = _database().questions.update_one({"id": int(question_id)}, {"$set": update_doc})
     return result.modified_count > 0
+
+
+def update_question_if_unchanged(question_id: int, expected_fingerprint: str, patch: dict[str, Any]) -> bool:
+    """Write verification results only if the solution/tests were not edited meanwhile."""
+    result = _database().questions.update_one(
+        {"id": int(question_id), "$or": [{"config_fingerprint": expected_fingerprint},
+                                         {"config_fingerprint": {"$exists": False}},
+                                         {"config_fingerprint": None}]},
+        {"$set": {**patch, "updated_at": _now()}},
+    )
+    return result.matched_count > 0
 
 
 def delete_question(question_id: int) -> bool:
@@ -388,6 +408,7 @@ def upsert_candidate_answer(
     answer: str,
     *,
     is_final: bool = False,
+    language: Optional[str] = None,
 ) -> int:
     mongo = _database()
     existing = mongo.candidate_answers.find_one(
@@ -397,7 +418,8 @@ def upsert_candidate_answer(
     if existing:
         mongo.candidate_answers.update_one(
             {"id": int(existing["id"])},
-            {"$set": {"answer": answer, "is_final": is_final, "updated_at": now}},
+            {"$set": {"answer": answer, "is_final": is_final, "updated_at": now,
+                      **({"language": language} if language else {})}},
         )
         return int(existing["id"])
 
@@ -409,11 +431,27 @@ def upsert_candidate_answer(
             "question_id": int(question_id),
             "answer": answer,
             "is_final": is_final,
+            **({"language": language} if language else {}),
             "created_at": now,
             "updated_at": now,
         }
     )
     return answer_id
+
+
+def consume_code_run(assessment_id: int, question_id: int, limit: int) -> bool:
+    """Count one candidate "Run" for a question; False once the limit is reached."""
+    from pymongo.errors import DuplicateKeyError
+
+    try:
+        row = _database().assessment_code_runs.find_one_and_update(
+            {"_id": f"{int(assessment_id)}:{int(question_id)}", "count": {"$lt": int(limit)}},
+            {"$inc": {"count": 1}, "$set": {"updated_at": _now()}},
+            upsert=True, return_document=ReturnDocument.AFTER,
+        )
+    except DuplicateKeyError:
+        return False
+    return bool(row)
 
 
 def get_answers_for_assessment(assessment_id: int) -> list[dict]:

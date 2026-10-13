@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
+import ReferenceSolutionPanel from '../components/ReferenceSolutionPanel.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
 import ProctoringEvidence from '../components/ProctoringEvidence.jsx';
 import '../styles/assessment_builder.css';
@@ -22,6 +23,51 @@ const EMPTY_QUESTION = {
   points: 10,
   skill_tag: '',
 };
+
+const METHOD_LABELS = {
+  executed: 'Executed in sandbox',
+  sql_executed: 'Executed (SQLite)',
+  ai_estimated: 'AI-estimated (not executed)',
+  pending_ai: 'Not graded',
+};
+
+// Per-question coding / SQL grading from the stored assessment result.
+function CodingResultBreakdown({ result, questions }) {
+  const rows = (result?.question_results || []).filter(r => r.question_type === 'coding' || r.question_type === 'sql');
+  if (!rows.length) return null;
+  const position = new Map(questions.map((q, i) => [q.id, i + 1]));
+  return (
+    <div className="ab-coding-results">
+      <h3>Coding &amp; SQL grading</h3>
+      {rows.map(r => {
+        const meta = r.metadata || {};
+        return (
+          <details key={r.question_id} className="ab-coding-result">
+            <summary>
+              <span>Q{position.get(r.question_id) || '?'} · {r.question_type === 'sql' ? 'SQL' : 'Coding'}{meta.language && r.question_type === 'coding' ? ` (${meta.language})` : ''}</span>
+              <span>{r.points_earned}/{r.points_possible} pts</span>
+              {meta.tests_total > 0 && <span>{meta.tests_passed}/{meta.tests_total} tests · hidden {meta.hidden_passed}/{meta.hidden_total}</span>}
+              <span className={`ab-method ab-method-${r.evaluation_method}`}>{METHOD_LABELS[r.evaluation_method] || r.evaluation_method}</span>
+            </summary>
+            {r.feedback && <p>{r.feedback}</p>}
+            {r.review_notes && <p className="ab-muted">{r.review_notes}</p>}
+            {r.answer ? <pre className="ab-code-preview">{r.answer}</pre> : <p className="ab-muted">No answer submitted.</p>}
+            {(meta.tests || []).length > 0 && (
+              <ul className="ab-test-outcomes">
+                {meta.tests.map((t, i) => (
+                  <li key={t.id || i} className={t.passed ? 'ok' : 'bad'}>
+                    Test {i + 1}{t.hidden ? ' (hidden)' : ''}: {t.passed ? 'passed' : t.status.replace(/_/g, ' ')}
+                    {t.error && <pre className="ab-code-preview">{t.error}</pre>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
+        );
+      })}
+    </div>
+  );
+}
 
 function typeBadgeClass(type) {
   if (type === 'coding') return 'ab-badge-coding';
@@ -94,6 +140,22 @@ function AssessmentBuilder() {
   }, [notice]);
 
   const showNotice = (msg) => setNotice(msg);
+
+  const handleRegrade = async () => {
+    if (!window.confirm('Re-grade this assessment with the current automatic grading? The candidate answers are not changed; the score and pass/fail status may change.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/regrade`, {});
+      if (!ok) throw new Error(data.error || 'Could not re-grade assessment.');
+      await loadAssessment();
+      showNotice(`Re-graded: ${data.result?.status || data.status} (${data.percentage ?? data.result?.score_percentage}%).`);
+    } catch (err) {
+      setError(err.message || 'Could not re-grade assessment.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleRegenerate = async () => {
     if (!window.confirm('Replace this draft with 14 JD-based questions: 10 MCQs, 2 moderate coding and 2 moderate SQL questions?')) return;
@@ -480,13 +542,20 @@ function AssessmentBuilder() {
 
         {isReviewable && assessmentResult && (
           <div className={`ab-result-banner ab-result-${(assessmentResult.status || '').toLowerCase()}`}>
-            <h2><i className="fas fa-chart-line" /> Assessment Result</h2>
+            <div className="ab-result-head">
+              <h2><i className="fas fa-chart-line" /> Assessment Result</h2>
+              <button type="button" className="btn btn-secondary" onClick={handleRegrade} disabled={busy}
+                title="Score the saved answers again with the current coding/SQL graders">
+                <i className="fas fa-rotate" /> Re-grade
+              </button>
+            </div>
             <p>
               <strong>Score:</strong> {assessmentResult.percentage ?? assessmentResult.score_percentage}%
               {' '}({assessmentResult.score ?? assessmentResult.earned_points}/{assessmentResult.total_points} points)
             </p>
             <p><strong>Status:</strong> {assessmentResult.status}</p>
             {assessmentResult.summary && <p>{assessmentResult.summary}</p>}
+            <CodingResultBreakdown result={assessmentResult} questions={questions} />
           </div>
         )}
 
@@ -596,8 +665,12 @@ function AssessmentBuilder() {
                       {q.question_type === 'coding' && q.starter_code && (
                         <pre className="ab-code-preview">{q.starter_code}</pre>
                       )}
-                      {q.question_type === 'sql' && q.correct_answer && (
+                      {q.question_type === 'sql' && q.correct_answer && !(q.test_cases || []).length && (
                         <pre className="ab-code-preview">{q.correct_answer}</pre>
+                      )}
+                      {(q.question_type === 'coding' || q.question_type === 'sql') && (
+                        <ReferenceSolutionPanel question={q}
+                          onChange={patch => setQuestions(prev => prev.map(item => (item.id === q.id ? { ...item, ...patch } : item)))} />
                       )}
                     </>
                   )}

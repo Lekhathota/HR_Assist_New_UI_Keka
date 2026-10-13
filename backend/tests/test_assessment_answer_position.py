@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from assessment.evaluation_service import evaluate_assessment
+from assessment.evaluators.coding_evaluator import StubCodingEvaluator
 from assessment.generation import normalized_jd, shuffle_mcq_options, validate_exam
 from tests.test_assessment_generation import JD, exam
 
@@ -105,7 +106,8 @@ class ScoringTests(unittest.TestCase):
         # 62 / 90 = 68.89%: MCQs all right, coding still pending review.
         questions = [{"id": i, "question_type": "mcq", "correct_answer": "x", "points": 31} for i in (1, 2)]
         questions.append({"id": 3, "question_type": "coding", "points": 28})
-        result = evaluate_assessment(questions, {1: "x", 2: "x", 3: "def solve(): ..."}, passing_score=70)
+        result = evaluate_assessment(questions, {1: "x", 2: "x", 3: "def solve(): ..."}, passing_score=70,
+                                     coding_evaluator=StubCodingEvaluator())
         self.assertEqual(result["score_percentage"], 68.89)
         self.assertEqual(result["mcq_percentage"], 100.0)
         self.assertFalse(result["passed"])

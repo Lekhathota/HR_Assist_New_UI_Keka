@@ -21,6 +21,7 @@ from assessment.models import (
 )
 from assessment.schemas import SchemaValidationError
 from assessment.generation import normalized_jd, requirement_catalog, validate_exam
+from assessment.code_execution.preparation import prepare_executable_questions
 from assessment.evaluation_service import evaluate_assessment
 from assessment.utilities import (
     assert_status_transition,
@@ -276,7 +277,10 @@ def _generate_questions_with_ai(jd: dict, *, previous_questions=None):
                     if not isinstance(ref, str) or ref not in catalog:
                         raise ValueError("Each jd_requirement_id must reference the supplied JD catalog.")
                     question["jd_requirement"] = catalog[ref]
-            rows = validate_exam(exam, context, TOTAL_GENERATED_QUESTIONS, previous_questions or ())
+            strict_tests = attempt < 2  # final attempt keeps questions whose tests are unusable
+            rows = validate_exam(exam, context, TOTAL_GENERATED_QUESTIONS, previous_questions or (),
+                                 require_tests=strict_tests)
+            rows = prepare_executable_questions(rows, strict=strict_tests)
             review = parse_json_response(llm.invoke(prompt_service.render(
                 "assessment_validate.jinja", jd_data=context, requirement_catalog=catalog, exam=exam,
             ), temperature=0.0))
@@ -472,10 +476,118 @@ def update_question(question_id: int, patch: dict[str, Any]) -> dict[str, Any]:
     if assessment.get("status") not in AssessmentStatus.editable_states():
         raise AssessmentServiceError("Questions can only be edited while the assessment is in DRAFT status.")
 
+    merged = {**question, **patch}
+    if merged.get("test_cases") and merged.get("question_type") in {"sql", "coding"} and (
+            {"correct_answer", "sql_schema", "test_cases"} & set(patch)):
+        # Expected results must follow the edited reference solution.
+        import copy
+
+        try:
+            prepared = prepare_executable_questions([copy.deepcopy(merged)])[0]
+        except ValueError as exc:
+            raise AssessmentServiceError(f"The reference solution does not work with the test cases: {exc}") from exc
+        patch = {**patch, "test_cases": prepared["test_cases"], "tests_verified": prepared.get("tests_verified", False)}
+    if merged.get("question_type") in {"sql", "coding"} and ({"correct_answer", "sql_schema", "test_cases"} & set(patch)):
+        from assessment.code_execution.verification import fingerprint
+
+        patch = {**patch, "verification": None, "config_fingerprint": fingerprint({**question, **patch})}
+
     if not assessment_repo.update_question(question_id, patch):
         raise AssessmentServiceError("No changes were applied to the question.")
     updated = assessment_repo.get_question_by_id(question_id) or {}
     return {"question": recruiter_question_payload(updated)}
+
+
+def _reference_question(question_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    question = assessment_repo.get_question_by_id(question_id)
+    if not question:
+        raise AssessmentServiceError("Question not found.", status_code=404)
+    if str(question.get("question_type") or "") not in {"coding", "sql"}:
+        raise AssessmentServiceError("Reference solutions apply to coding and SQL questions only.")
+    assessment = assessment_repo.get_assessment_by_id(int(question["assessment_id"])) or {}
+    return question, assessment
+
+
+def _reference_payload(question: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
+    from assessment.code_execution.verification import execution_status, reference_language, verification_view
+
+    return {
+        "question_id": question.get("id"),
+        "question_type": question.get("question_type"),
+        "reference_solution": question.get("correct_answer") or "",
+        "reference_language": reference_language(question),
+        "sql_schema": question.get("sql_schema") or "",
+        "order_matters": bool(question.get("order_matters")),
+        "test_cases": question.get("test_cases") or [],
+        "verification": verification_view(question),
+        "editable": assessment.get("status") in AssessmentStatus.editable_states(),
+        "execution": execution_status(),
+    }
+
+
+def get_reference_config(question_id: int) -> dict[str, Any]:
+    question, assessment = _reference_question(question_id)
+    return _reference_payload(question, assessment)
+
+
+def save_reference_config(question_id: int, data: dict[str, Any], *, actor: str = "") -> dict[str, Any]:
+    """Save the reference solution and test cases; any previous verification becomes stale."""
+    from assessment.code_execution.languages import normalize_language
+    from assessment.code_execution.verification import fingerprint, normalize_test_cases
+
+    question, assessment = _reference_question(question_id)
+    if assessment.get("status") not in AssessmentStatus.editable_states():
+        raise AssessmentServiceError("Reference solutions and test cases can only be edited while the assessment is in DRAFT status.", status_code=409)
+    if not isinstance(data, dict):
+        raise AssessmentServiceError("Request body must be a JSON object.")
+    qtype = str(question.get("question_type"))
+    reference = data.get("reference_solution")
+    if not isinstance(reference, str) or not reference.strip():
+        raise AssessmentServiceError("reference_solution is required.")
+    if len(reference) > 50_000:
+        raise AssessmentServiceError("reference_solution is too long (50,000 characters maximum).")
+    try:
+        cases = normalize_test_cases(qtype, data.get("test_cases", question.get("test_cases") or []))
+    except ValueError as exc:
+        raise AssessmentServiceError(str(exc)) from exc
+    patch: dict[str, Any] = {"correct_answer": reference, "test_cases": cases, "verification": None, "tests_verified": False}
+    if qtype == "coding":
+        language = normalize_language(data.get("reference_language") or question.get("reference_language") or "python")
+        if not language:
+            raise AssessmentServiceError("Unsupported reference language. Use Python, JavaScript, Java, C or C++.")
+        patch["reference_language"] = language
+    else:
+        schema = data.get("sql_schema", question.get("sql_schema") or "")
+        if not isinstance(schema, str) or "create table" not in schema.lower():
+            raise AssessmentServiceError("sql_schema must contain CREATE TABLE statements.")
+        patch["sql_schema"] = schema
+        patch["order_matters"] = data.get("order_matters", question.get("order_matters")) is True
+    patch["config_fingerprint"] = fingerprint({**question, **patch})
+    assessment_repo.update_question(question_id, patch)
+    db.log_audit("Assessment Reference Updated", actor,
+                 f"Updated reference solution and {len(cases)} test case(s) for question #{question_id}.",
+                 int(assessment.get("jd_id") or 0) or None)
+    if data.get("verify") is True:
+        return verify_reference_solution(question_id, actor=actor)
+    updated = assessment_repo.get_question_by_id(question_id) or question
+    return _reference_payload(updated, assessment)
+
+
+def verify_reference_solution(question_id: int, *, actor: str = "") -> dict[str, Any]:
+    """Execute the reference against enabled tests and record the result."""
+    from assessment.code_execution.verification import fingerprint, verify_question
+
+    question, assessment = _reference_question(question_id)
+    current = fingerprint(question)
+    verification, test_cases = verify_question(question)
+    patch: dict[str, Any] = {"verification": verification, "tests_verified": verification["status"] == "verified",
+                             "config_fingerprint": current}
+    if str(question.get("question_type")) == "sql":
+        patch["test_cases"] = test_cases  # expected results computed from the reference query
+    if not assessment_repo.update_question_if_unchanged(question_id, question.get("config_fingerprint") or current, patch):
+        raise AssessmentServiceError("The solution or test cases changed while verifying. Verify again.", status_code=409)
+    updated = assessment_repo.get_question_by_id(question_id) or question
+    return _reference_payload(updated, assessment)
 
 
 def remove_question(question_id: int) -> dict[str, Any]:
@@ -735,6 +847,7 @@ def get_assessment_by_token(token: str) -> dict[str, Any]:
             {
                 "question_id": row.get("question_id"),
                 "answer": row.get("answer") or "",
+                "language": row.get("language") or "",
                 "updated_at": row.get("updated_at"),
             }
             for row in saved_answers
@@ -873,7 +986,7 @@ def get_recording_chunk(assessment_id: int, stream: str, session_id: str, sequen
     return chunk
 
 
-def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
+def save_answer(token: str, question_id: int, answer: str, language: str = "") -> dict[str, Any]:
     assessment = _resolve_token_assessment(token)
     assessment_id = int(assessment["id"])
     question = assessment_repo.get_question_by_id(question_id)
@@ -889,6 +1002,7 @@ def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
         question_id,
         answer,
         is_final=False,
+        language=_answer_language(question, language),
     )
     return {
         "success": True,
@@ -896,6 +1010,133 @@ def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
         "question_id": question_id,
         "status": AssessmentStatus.IN_PROGRESS,
     }
+
+
+def _answer_language(question: dict[str, Any], language: str) -> str | None:
+    if str(question.get("question_type") or "") != "coding" or not language:
+        return None
+    from assessment.code_execution.languages import normalize_language
+
+    normalized = normalize_language(language)
+    if not normalized:
+        raise AssessmentServiceError("Unsupported programming language.")
+    return normalized
+
+
+def run_candidate_code(token: str, question_id: int, code: str, language: str = "") -> dict[str, Any]:
+    """Run an answer against the question's visible sample tests only (the Run button)."""
+    from assessment.code_execution.grader import grade_answer, outcome_dicts
+    from assessment.code_execution.judge0 import ExecutionUnavailable
+
+    assessment = _resolve_token_assessment(token)
+    if assessment.get("status") != AssessmentStatus.IN_PROGRESS:
+        raise AssessmentServiceError("Start the assessment before running code.", status_code=409)
+    question = assessment_repo.get_question_by_id(question_id)
+    if not question or int(question.get("assessment_id") or 0) != int(assessment["id"]):
+        raise AssessmentServiceError("Question not found for this assessment.", status_code=404)
+    if str(question.get("question_type") or "") not in {"coding", "sql"}:
+        raise AssessmentServiceError("Only coding and SQL questions can be run.")
+    if not any(isinstance(c, dict) and not c.get("hidden") for c in question.get("test_cases") or []):
+        raise AssessmentServiceError("This question has no sample tests to run. Your answer will still be graded on submit.", status_code=409)
+    if not str(code or "").strip():
+        raise AssessmentServiceError("Write some code before running it.")
+    if len(code) > 50_000:
+        raise AssessmentServiceError("The answer is too long to run (50,000 characters maximum).")
+    limit = int(os.environ.get("ASSESSMENT_MAX_RUNS_PER_QUESTION") or 30)
+    if not assessment_repo.consume_code_run(int(assessment["id"]), int(question_id), limit):
+        raise AssessmentServiceError(f"Run limit reached for this question ({limit} runs). Your answer will still be graded on submit.", status_code=429)
+    try:
+        graded = grade_answer(question, code, language, include_hidden=False)
+    except ValueError as exc:
+        raise AssessmentServiceError(str(exc)) from exc
+    except ExecutionUnavailable as exc:
+        raise AssessmentServiceError(f"Code could not be run right now: {exc}", status_code=503) from exc
+    summary = graded.summary()
+    return {
+        "method": graded.method, "language": graded.language, "note": graded.note,
+        "passed": graded.passed, "total": graded.total, "tests": outcome_dicts(graded),
+        "hidden_test_count": sum(1 for c in question.get("test_cases") or [] if isinstance(c, dict) and c.get("hidden")),
+        "feedback": summary["feedback"],
+    }
+
+
+def _scoring_summary(scoring: dict[str, Any], passing_score: int) -> str:
+    pending_note = ""
+    coding_results = [r for r in scoring["question_results"] if r.get("question_type") in {"coding", "sql"}]
+    if coding_results:
+        passed_tests = sum(int((r.get("metadata") or {}).get("tests_passed") or 0) for r in coding_results)
+        total_tests = sum(int((r.get("metadata") or {}).get("tests_total") or 0) for r in coding_results)
+        if total_tests:
+            pending_note += f" Coding/SQL tests passed: {passed_tests}/{total_tests} (including hidden tests)."
+        if any(r.get("evaluation_method") == "ai_estimated" for r in coding_results):
+            pending_note += " Some coding answers were AI-estimated because code execution is not configured."
+    if int(scoring.get("pending_review_count") or 0) > 0:
+        pending_note += f" {scoring['pending_review_count']} coding/SQL answer(s) could not be graded automatically (counted as 0)."
+    return (
+        f"Score: {scoring['score_percentage']}% ({scoring['earned_points']}/{scoring['total_points']} points). "
+        f"Passing score: {passing_score}%.{pending_note}"
+    )
+
+
+def _result_document(assessment: dict[str, Any], scoring: dict[str, Any], final_status: str, summary: str) -> dict[str, Any]:
+    return {
+        "assessment_id": int(assessment["id"]),
+        "candidate_id": int(assessment.get("candidate_id") or 0),
+        "jd_id": int(assessment.get("jd_id") or 0),
+        "total_points": scoring["total_points"],
+        "earned_points": scoring["earned_points"],
+        "score": scoring["score"],
+        "score_percentage": scoring["score_percentage"],
+        "percentage": scoring["percentage"],
+        "mcq_percentage": scoring.get("mcq_percentage"),
+        "passed": bool(scoring["passed"]),
+        "status": final_status,
+        "question_results": scoring["question_results"],
+        "evaluation_breakdown": scoring.get("evaluation_breakdown"),
+        "pending_review_count": scoring.get("pending_review_count"),
+        "pass_basis": scoring.get("pass_basis"),
+        "summary": summary,
+        "scored_at": utc_now(),
+    }
+
+
+def regrade_assessment(assessment_id: int, *, actor: str = "") -> dict[str, Any]:
+    """Score a submitted assessment's saved final answers again with the current graders.
+
+    Used for results recorded before automatic coding/SQL grading existed, or after
+    code execution is configured. Answers are never changed; only the result is.
+    """
+    assessment = assessment_repo.get_assessment_by_id(int(assessment_id))
+    if not assessment:
+        raise AssessmentServiceError("Assessment not found.", status_code=404)
+    previous_status = str(assessment.get("status") or "")
+    if previous_status not in {AssessmentStatus.COMPLETED, AssessmentStatus.PASSED, AssessmentStatus.FAILED}:
+        raise AssessmentServiceError("Only submitted assessments can be re-graded.", status_code=409)
+    questions = assessment_repo.get_questions_for_assessment(int(assessment_id))
+    rows = assessment_repo.get_answers_for_assessment(int(assessment_id))
+    answers = {int(r.get("question_id") or 0): str(r.get("answer") or "") for r in rows}
+    languages = {int(r.get("question_id") or 0): str(r.get("language") or "") for r in rows}
+    passing_score = int(assessment.get("passing_score") or DEFAULT_PASSING_SCORE)
+    scoring = evaluate_assessment(questions, answers, passing_score=passing_score, languages_by_question=languages)
+    passed = bool(scoring["passed"])
+    final_status = AssessmentStatus.PASSED if passed else AssessmentStatus.FAILED
+    summary = _scoring_summary(scoring, passing_score) + " (Re-graded.)"
+    result_id = assessment_repo.upsert_assessment_result(_result_document(assessment, scoring, final_status, summary))
+
+    if final_status != previous_status:
+        assessment_repo.update_assessment(int(assessment_id), {"status": final_status})
+        candidate_id = int(assessment.get("candidate_id") or 0)
+        db.update_candidate(candidate_id, {"hiring_stage": "Assessment Passed" if passed else "Assessment Failed"})
+        if passed:
+            from services.hiring_process_service import advance_after_assessment
+            advance_after_assessment(candidate_id, int(assessment.get("jd_id") or 0))
+    db.log_audit(
+        "Assessment Re-graded",
+        actor,
+        f"Assessment #{assessment_id} re-graded: {previous_status} -> {final_status} ({scoring['score_percentage']}%).",
+        int(assessment.get("jd_id") or 0) or None,
+    )
+    return get_assessment_result(int(assessment_id), result_id=result_id)
 
 
 def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -908,30 +1149,35 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
         raise AssessmentServiceError("Start the assessment before submitting answers.", status_code=409)
 
     answers_by_question: dict[int, str] = {}
+    saved_rows = assessment_repo.get_answers_for_assessment(assessment_id)
+    languages_by_question: dict[int, str] = {
+        int(row.get("question_id") or 0): str(row.get("language") or "") for row in saved_rows
+    }
     expired = remaining_seconds(assessment) == 0
     if answers and not expired:
         for item in answers:
             answers_by_question[int(item["question_id"])] = str(item.get("answer") or "")
+            if item.get("language"):
+                languages_by_question[int(item["question_id"])] = str(item["language"])
     else:
-        for row in assessment_repo.get_answers_for_assessment(assessment_id):
+        for row in saved_rows:
             answers_by_question[int(row.get("question_id") or 0)] = str(row.get("answer") or "")
 
     for question in questions:
         qid = int(question.get("id") or 0)
         answer_text = answers_by_question.get(qid, "")
-        assessment_repo.upsert_candidate_answer(assessment_id, qid, answer_text, is_final=True)
+        try:
+            language = _answer_language(question, languages_by_question.get(qid, ""))
+        except AssessmentServiceError:
+            language = None
+        assessment_repo.upsert_candidate_answer(assessment_id, qid, answer_text, is_final=True, language=language)
 
     passing_score = int(assessment.get("passing_score") or DEFAULT_PASSING_SCORE)
-    scoring = evaluate_assessment(questions, answers_by_question, passing_score=passing_score)
+    scoring = evaluate_assessment(questions, answers_by_question, passing_score=passing_score,
+                                  languages_by_question=languages_by_question)
     passed = bool(scoring["passed"])
     final_status = AssessmentStatus.PASSED if passed else AssessmentStatus.FAILED
-    pending_note = ""
-    if int(scoring.get("pending_review_count") or 0) > 0:
-        pending_note = f" MCQ score: {scoring.get('mcq_percentage')}%. Coding/SQL pending review (counted as 0 until reviewed)."
-    summary = (
-        f"Score: {scoring['score_percentage']}% ({scoring['earned_points']}/{scoring['total_points']} points). "
-        f"Passing score: {passing_score}%.{pending_note}"
-    )
+    summary = _scoring_summary(scoring, passing_score)
 
     current_status = str(assessment.get("status") or AssessmentStatus.IN_PROGRESS)
     assert_status_transition(current_status, AssessmentStatus.COMPLETED)
@@ -941,27 +1187,7 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
     assessment_repo.update_assessment(assessment_id, {"status": final_status})
     assessment_repo.mark_answers_final(assessment_id)
 
-    result_id = assessment_repo.upsert_assessment_result(
-        {
-            "assessment_id": assessment_id,
-            "candidate_id": int(assessment.get("candidate_id") or 0),
-            "jd_id": int(assessment.get("jd_id") or 0),
-            "total_points": scoring["total_points"],
-            "earned_points": scoring["earned_points"],
-            "score": scoring["score"],
-            "score_percentage": scoring["score_percentage"],
-            "percentage": scoring["percentage"],
-            "mcq_percentage": scoring.get("mcq_percentage"),
-            "passed": passed,
-            "status": final_status,
-            "question_results": scoring["question_results"],
-            "evaluation_breakdown": scoring.get("evaluation_breakdown"),
-            "pending_review_count": scoring.get("pending_review_count"),
-            "pass_basis": scoring.get("pass_basis"),
-            "summary": summary,
-            "scored_at": utc_now(),
-        }
-    )
+    result_id = assessment_repo.upsert_assessment_result(_result_document(assessment, scoring, final_status, summary))
 
     db.update_candidate(
         int(assessment.get("candidate_id") or 0),

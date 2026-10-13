@@ -398,3 +398,62 @@ test('submission finishes the recording upload', async () => {
   await rerender();
   expect(container.textContent).toContain('Uploading your exam recording (3 parts left)');
 });
+
+const runnablePayload = () => {
+  const data = makePayload(14);
+  Object.assign(data.questions[12], {
+    starter_code: '', runnable: true, hidden_test_count: 5, default_language: 'python',
+    input_format: 'One integer n', output_format: 'Twice n',
+    sample_tests: [{ id: 't1', input: '2\n', expected_output: '4\n' }],
+    language_options: [
+      { key: 'python', label: 'Python 3', template: '# python template\n' },
+      { key: 'java', label: 'Java', template: '// java template\n' },
+    ],
+  });
+  Object.assign(data.questions[13], {
+    runnable: true, hidden_test_count: 3, sql_schema: 'CREATE TABLE t (a INTEGER);',
+    sample_tests: [{ id: 't1', setup_sql: 'INSERT INTO t VALUES (1);', expected: { columns: ['a'], rows: [[1]] } }],
+  });
+  return data;
+};
+
+test('coding questions offer a language choice with per-language starter templates', async () => {
+  await renderPayload(runnablePayload());
+  click(tab('Coding'));
+  expect($('.ca-code-input').value).toBe('# python template\n');
+  expect(container.textContent).toContain('Example 1');
+  expect(container.textContent).toContain('5 hidden tests are checked when you submit');
+  await act(async () => {
+    const select = $('.ca-language-select');
+    select.value = 'java';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect($('.ca-code-input').value).toBe('// java template\n');
+  expect(answerCount()).toBe('0 / 14 answered');
+});
+
+test('Run sends the code and language and shows example results', async () => {
+  publicApiPost.mockImplementation(path => Promise.resolve(path === '/api/assessment/run-code'
+    ? { method: 'executed', passed: 0, total: 1, hidden_test_count: 5,
+        tests: [{ id: 't1', hidden: false, passed: false, status: 'failed', actual: '5\n', expected: '4\n', error: '' }] }
+    : { success: true }));
+  await renderPayload(runnablePayload());
+  click(tab('Coding'));
+  await typeSolution('print(int(input()) + 3)');
+  await act(async () => $('.ca-btn-run').click());
+  expect(publicApiPost).toHaveBeenCalledWith('/api/assessment/run-code', {
+    token: 'test-token', question_id: 113, code: 'print(int(input()) + 3)', language: 'python',
+  });
+  expect(container.textContent).toContain('Passed 0 of 1 example test');
+  expect(container.textContent).toContain('Wrong answer');
+  expect($('.ca-run-results').textContent).toContain('5');
+});
+
+test('SQL questions show the tables and the expected sample result', async () => {
+  await renderPayload(runnablePayload());
+  click(tab('Coding'));
+  click(navItems()[1]);
+  expect(container.textContent).toContain('CREATE TABLE t (a INTEGER);');
+  expect($('.ca-result-table')).not.toBeNull();
+  expect($('.ca-editor-language').textContent).toBe('SQL (SQLite)');
+});

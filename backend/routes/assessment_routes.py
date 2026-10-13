@@ -13,6 +13,7 @@ from assessment.schemas import (
     validate_generate_payload,
     validate_question_create_payload,
     validate_question_update_payload,
+    validate_run_payload,
     validate_save_answer_payload,
     validate_save_draft_payload,
     validate_send_payload,
@@ -33,7 +34,12 @@ from services.assessment_service import (
     get_recording_chunk,
     lookup_assessment,
     preview_assessment,
+    regrade_assessment,
     remove_question,
+    get_reference_config,
+    save_reference_config,
+    verify_reference_solution,
+    run_candidate_code,
     save_answer,
     save_assessment_draft,
     send_assessment,
@@ -318,13 +324,77 @@ def api_assessment_save_answer():
     """Public candidate endpoint — secured by UUID access token in request body."""
     try:
         payload = validate_save_answer_payload(request.get_json(silent=True) or {})
-        result = save_answer(payload["token"], payload["question_id"], payload["answer"])
+        result = save_answer(payload["token"], payload["question_id"], payload["answer"], payload["language"])
     except SchemaValidationError as exc:
         return _json_error(str(exc), 400)
     except AssessmentServiceError as exc:
         return _candidate_error(exc)
     except Exception:
         return _json_error("Could not save answer.", 500)
+    return jsonify(result)
+
+
+@assessment_bp.route("/api/assessment/execution-status", methods=["GET"], endpoint="api_assessment_execution_status")
+@api_login_required
+def api_assessment_execution_status():
+    from assessment.code_execution.verification import execution_status
+
+    return jsonify(execution_status())
+
+
+@assessment_bp.route("/api/assessment/question/<int:question_id>/reference", methods=["GET", "PUT"], endpoint="api_assessment_reference")
+@api_login_required
+def api_assessment_reference(question_id: int):
+    """Recruiter: read or save a question's reference solution and test cases (incl. hidden)."""
+    user = current_user() or {}
+    try:
+        if request.method == "GET":
+            return jsonify(get_reference_config(question_id))
+        return jsonify(save_reference_config(question_id, request.get_json(silent=True) or {}, actor=user.get("username") or ""))
+    except AssessmentServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception:
+        return _json_error("Could not update the reference solution.", 500)
+
+
+@assessment_bp.route("/api/assessment/question/<int:question_id>/verify", methods=["POST"], endpoint="api_assessment_reference_verify")
+@api_login_required
+def api_assessment_reference_verify(question_id: int):
+    """Recruiter: execute the reference solution against the enabled test cases."""
+    user = current_user() or {}
+    try:
+        return jsonify(verify_reference_solution(question_id, actor=user.get("username") or ""))
+    except AssessmentServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception:
+        return _json_error("Could not verify the reference solution.", 500)
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/regrade", methods=["POST"], endpoint="api_assessment_regrade")
+@api_login_required
+def api_assessment_regrade(assessment_id: int):
+    """Recruiter: score the saved final answers again with the current coding/SQL graders."""
+    user = current_user() or {}
+    try:
+        return jsonify(regrade_assessment(assessment_id, actor=user.get("username") or ""))
+    except AssessmentServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception as exc:
+        return _json_error(f"Could not re-grade assessment: {exc}", 500)
+
+
+@assessment_bp.route("/api/assessment/run-code", methods=["POST"], endpoint="api_assessment_run_code")
+def api_assessment_run_code():
+    """Public candidate endpoint: run an answer against the visible sample tests only."""
+    try:
+        payload = validate_run_payload(request.get_json(silent=True) or {})
+        result = run_candidate_code(payload["token"], payload["question_id"], payload["code"], payload["language"])
+    except SchemaValidationError as exc:
+        return _json_error(str(exc), 400)
+    except AssessmentServiceError as exc:
+        return _candidate_error(exc)
+    except Exception:
+        return _json_error("Could not run the code.", 500)
     return jsonify(result)
 
 
