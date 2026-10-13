@@ -1051,7 +1051,7 @@ function HiringPipeline() {
                                 {item.attendance_status === 'attended' && <span className="hp-pill good">Attended</span>}
                                 {recovery && (
                                   <button type="button" className={`hp-pill hp-pill-btn ${recovery.tone}`} onClick={() => openRecoveryCase(item.recovery.id)}
-                                    disabled={recoveryBusy} title="View automatic follow-up history">
+                                    disabled={recoveryBusy} title={`${recovery.label} · view follow-up history`}>
                                     <i className="fas fa-robot" aria-hidden="true"></i> {recovery.label}
                                   </button>
                                 )}
