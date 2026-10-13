@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 import database as db
 from assessment import repository
+from assessment.proctoring_media import ensure_proctoring_indexes
 from assessment.utilities import generate_access_token, utc_now
 
 
@@ -41,12 +42,12 @@ QUESTION_BANK = [
 ]
 
 
-def create_demo_attempt(label: str) -> str:
+def create_demo_attempt(label: str, candidate_name: str) -> str:
     token = generate_access_token()
     now = utc_now()
     assessment_id = repository.create_assessment({
         "candidate_id": 1, "jd_id": 1, "recruiter_id": 1,
-        "candidate_name": "Demo Candidate", "candidate_email": "demo@example.invalid",
+        "candidate_name": candidate_name, "candidate_email": "demo@example.invalid",
         "job_role": "Practice assessment", "title": f"Proctoring test - {label}",
         "status": "SENT", "access_token": token,
         "token_expires_at": now + timedelta(days=1), "sent_at": now,
@@ -79,6 +80,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=5002)
     parser.add_argument("--database", default="recruitment_assist_proctoring_demo")
+    parser.add_argument("--candidate-name", default="Demo Candidate",
+                        help="Name stored with the demo attempt's photos and recordings")
     args = parser.parse_args()
     if args.database == db.get_db_name() or not args.database.endswith("_proctoring_demo"):
         raise SystemExit("Use a separate database ending in _proctoring_demo; the recruiting database is protected.")
@@ -96,8 +99,9 @@ def main() -> None:
     db._db.assessments.create_index("id", unique=True)
     db._db.assessments.create_index("access_token", unique=True, sparse=True)
     db._db.questions.create_index("id", unique=True)
+    ensure_proctoring_indexes()
     db._db.candidates.update_one({"id": 1}, {"$setOnInsert": {
-        "id": 1, "name": "Demo Candidate", "email": "demo@example.invalid", "jd_id": 1,
+        "id": 1, "name": args.candidate_name, "email": "demo@example.invalid", "jd_id": 1,
         "status": "Selected", "match_score": 90, "structured_data": {},
     }}, upsert=True)
     db._db.job_descriptions.update_one({"id": 1}, {"$setOnInsert": {
@@ -112,9 +116,10 @@ def main() -> None:
     app = module.app
     app.config["SESSION_COOKIE_SECURE"] = False
     for label in ("Primary", "Spare"):
-        token = create_demo_attempt(label)
+        token = create_demo_attempt(label, args.candidate_name)
         print(f"{label}: http://localhost:{args.port}/assessment/{token}", flush=True)
     print("Isolated demo database only. Links expire in 24 hours. No emails sent.", flush=True)
+    print(f"Photos: {args.database}.proctoring_snapshots | Recordings: {args.database}.proctoring_recordings (GridFS)", flush=True)
     app.run(host="127.0.0.1", port=args.port, debug=False, use_reloader=False)
 
 

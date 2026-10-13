@@ -2,9 +2,14 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams } from 'react-router-dom';
 import { publicApiGet, publicApiPost } from '../api.js';
 import useAssessmentProctoring from '../hooks/useAssessmentProctoring.js';
+import useMediaProctoring, { FACE_LIMIT } from '../hooks/useMediaProctoring.js';
+import ProctoringSetup from '../components/ProctoringSetup.jsx';
+import { CameraPreview } from '../components/ProctoringMedia.jsx';
+import { FACE_ISSUE_TEXT } from '../utils/faceCheck.js';
 import '../styles/assessment_candidate.css';
 
 const AUTOSAVE_DELAY_MS = 600;
+const DEVICE_NAMES = { camera: 'camera', mic: 'microphone', screen: 'screen sharing' };
 
 function formatTimer(totalSeconds) {
   const safe = Math.max(0, totalSeconds);
@@ -69,7 +74,17 @@ function CandidateAssessment() {
   const [editorExpanded, setEditorExpanded] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [stage, setStage] = useState('terms');
+  const [faceRecheck, setFaceRecheck] = useState('');
   const proctoring = useAssessmentProctoring(token, assessment);
+  const media = useMediaProctoring(token, {
+    active: proctoring.active,
+    initialFaceCount: assessment?.face_violation_count || 0,
+    onViolation: proctoring.report,
+    onTerminated: proctoring.markTerminated,
+  });
+  const examPaused = Boolean(proctoring.warning || proctoring.error || media.faceWarning || media.lost.length);
+  const terminated = proctoring.terminated || media.terminated;
   const editorGutterRef = useRef(null);
   const activeNavRef = useRef(null);
 
@@ -125,6 +140,7 @@ function CandidateAssessment() {
   const loadAssessment = useCallback(async () => {
     setLoading(true);
     setTermsAccepted(false);
+    setStage('terms');
     setError('');
     setRemainingSeconds(null);
     setSubmitted(false);
@@ -199,7 +215,7 @@ function CandidateAssessment() {
   }, [persistAnswer, submitted, proctoring.terminated, proctoring.active]);
 
   const handleAnswerChange = (questionId, value) => {
-    if (proctoring.warning || proctoring.terminated || proctoring.error || !proctoring.active) return;
+    if (examPaused || terminated || !proctoring.active) return;
     setAnswers(prev => ({ ...prev, [questionId]: value }));
     scheduleAutosave(questionId, value);
   };
@@ -237,6 +253,7 @@ function CandidateAssessment() {
       };
       const result = await publicApiPost('/api/assessment/submit', payload);
       proctoring.stop();
+      media.finish();
       setSubmitted(true);
       const status = result.result?.status || result.status || 'COMPLETED';
       setSubmitMessage(
@@ -257,12 +274,25 @@ function CandidateAssessment() {
 
   submitRef.current = handleSubmit;
 
+  const finishMedia = media.finish;
   useEffect(() => {
-    if (!proctoring.terminated) return;
+    if (!terminated) return;
     Object.values(saveTimersRef.current).forEach(timer => window.clearTimeout(timer));
     saveTimersRef.current = {};
     setConfirmSubmit(false);
-  }, [proctoring.terminated]);
+    finishMedia();
+  }, [terminated, finishMedia]);
+
+  useEffect(() => { setFaceRecheck(''); }, [media.faceWarning]);
+
+  const recheckFace = async () => {
+    setFaceRecheck('checking');
+    setFaceRecheck(await media.recheckFace() ? '' : 'failed');
+  };
+
+  const uploadNotice = media.pending > 0 && <p className="ca-upload-note" role="status">
+    <i className="fas fa-sync fa-spin" aria-hidden="true" /> Uploading your exam recording ({media.pending} part{media.pending === 1 ? '' : 's'} left). Keep this page open.
+  </p>;
 
   if (loading) {
     return (
@@ -294,20 +324,30 @@ function CandidateAssessment() {
           <i className="fas fa-check-circle" />
           <h1>Assessment Submitted</h1>
           <p>{submitMessage}</p>
+          {uploadNotice}
         </div>
       </div>
     );
   }
 
-  if (proctoring.terminated) {
+  if (terminated) {
     return <div className="ca-page" id="ca-root"><div className="ca-card ca-center ca-error-card">
       <i className="fas fa-exclamation-circle" aria-hidden="true" />
       <h1>Assessment Terminated</h1>
-      <p>Your exam ended after two navigation or focus violations. This attempt cannot be resumed.</p>
+      <p>{media.terminated
+        ? 'Your exam ended because your face was not detected on camera twice.'
+        : 'Your exam ended after two navigation, focus or recording violations.'} This attempt cannot be resumed.</p>
       <p>Your previously saved answers are retained. Contact the recruiter if you need another attempt.</p>
       {proctoring.error && <div role="alert"><p>{proctoring.error}</p><button className="ca-btn ca-btn-primary" disabled={proctoring.syncing} onClick={proctoring.sync}>Retry sync</button></div>}
       {proctoring.syncing && <p role="status">Recording exam termination…</p>}
+      {uploadNotice}
     </div></div>;
+  }
+
+  if (!proctoring.active && stage === 'setup') {
+    return <ProctoringSetup media={media} proctoring={proctoring} resuming={Boolean(assessment?.started_at)}
+      onBack={() => setStage('terms')}
+      onStarted={started => { if (typeof started.remaining_seconds === 'number') setRemainingSeconds(started.remaining_seconds); }} />;
   }
 
   if (!proctoring.active) {
@@ -324,7 +364,7 @@ function CandidateAssessment() {
           <div className="ca-welcome-assessment"><span>Your assessment</span><strong>{assessment?.title || 'Your assessment'}</strong></div>
           <div><i className="far fa-clock" aria-hidden="true" /><strong>{assessment?.time_limit_minutes || (remainingSeconds != null ? Math.ceil(remainingSeconds / 60) : '—')}<small> min</small></strong><span>Time limit</span></div>
           <div><i className="far fa-file-alt" aria-hidden="true" /><strong>{totalQuestions}</strong><span>Questions</span></div>
-          <div><i className="fas fa-expand" aria-hidden="true" /><strong>Fullscreen</strong><span>Exam mode</span></div>
+          <div><i className="fas fa-video" aria-hidden="true" /><strong>Proctored</strong><span>Camera, mic &amp; screen</span></div>
         </div>
       </header>
       <div className="ca-welcome-columns">
@@ -333,6 +373,8 @@ function CandidateAssessment() {
       <h2 id="ca-instructions-title">A few things before you begin</h2>
       <p className="ca-section-intro">Follow these guidelines for a smooth assessment experience.</p>
       <ol className="ca-instruction-list">
+        <li><span className="ca-instruction-icon"><i className="fas fa-user-check" aria-hidden="true" /></span><div><h3>Keep your face in view</h3><p>Your camera takes a photo at random about every 10 seconds. If your face is not visible or you look away from the screen, you get a warning. The second time, the exam ends automatically.</p></div></li>
+        <li><span className="ca-instruction-icon"><i className="fas fa-video" aria-hidden="true" /></span><div><h3>Your whole session is recorded</h3><p>Your camera, microphone and entire screen are recorded until you submit. Do not turn them off or stop screen sharing.</p></div></li>
         <li><span className="ca-instruction-icon"><i className="fas fa-expand" aria-hidden="true" /></span><div><h3>Stay focused, stay in fullscreen</h3><p>Do not switch browser tabs, leave fullscreen, or move to another window.</p></div></li>
         <li><span className="ca-instruction-icon"><i className="fas fa-route" aria-hidden="true" /></span><div><h3>Use the exam’s navigation</h3><p>You can move between questions and the Questions / Coding sections inside this exam. Do not use browser Back, Forward, reload, or navigation shortcuts.</p></div></li>
         <li><span className="ca-instruction-icon"><i className="far fa-clock" aria-hidden="true" /></span><div><h3>Keep an eye on your time</h3><p>The timer begins when you start. For an attempt already in progress, the original timer continues.</p></div></li>
@@ -344,19 +386,24 @@ function CandidateAssessment() {
       <p className="ca-section-intro">Read and accept the terms below to unlock your assessment.</p>
       <section className="ca-assessment-terms" aria-labelledby="ca-terms-title">
         <h2 id="ca-terms-title">Terms and conditions</h2>
-        <p>Complete this assessment independently. By accepting, you agree to stay in the exam tab and follow the instructions above. Navigation and focus violations are recorded, and two violations end your attempt. Submitted answers cannot be changed.</p>
+        <p>This is a proctored exam. Complete it on your own, in a quiet and well-lit room. By accepting, you agree that:</p>
+        <ul className="ca-terms-list">
+          <li>Your camera, microphone and entire screen will be on and recorded for the whole exam.</li>
+          <li>Photos of your face will be taken at random, about every 10 seconds.</li>
+          <li>The recordings and photos will be stored with your name and reviewed by the hiring team.</li>
+          <li>If your face is not detected or you look away from the screen, you will get a warning. The second time, the exam ends automatically.</li>
+          <li>Leaving fullscreen, switching tabs or windows, or turning off your camera, microphone or screen sharing counts as a violation. Two violations end the exam.</li>
+          <li>You cannot change your answers after you submit.</li>
+        </ul>
         <label className="ca-terms-consent">
-          <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} disabled={proctoring.starting} />
-          <span>I have read and agree to the assessment terms and conditions.</span>
+          <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} />
+          <span>I have read and agree to the proctored assessment terms and conditions.</span>
         </label>
       </section>
       {proctoring.count > 0 && <p className="ca-proctoring-warning">Warning already recorded: {proctoring.count} / 2. One more violation will end your exam.</p>}
-      {proctoring.error && <p className="ca-inline-error" role="alert">{proctoring.error}</p>}
-      <button className="ca-btn ca-btn-primary" disabled={!termsAccepted || proctoring.starting || proctoring.syncing} onClick={async () => {
-        const started = await proctoring.start(termsAccepted);
-        if (typeof started?.remaining_seconds === 'number') setRemainingSeconds(started.remaining_seconds);
-      }}>{proctoring.starting ? 'Starting…' : assessment?.started_at ? 'Accept & resume assessment' : 'Accept & start assessment'} <i className="fas fa-arrow-right" aria-hidden="true" /></button>
-      <p className="ca-start-note"><i className="fas fa-expand" aria-hidden="true" /> Your exam opens in fullscreen after acceptance.</p>
+      <button className="ca-btn ca-btn-primary" disabled={!termsAccepted} onClick={() => setStage('setup')}>
+        Accept & set up proctoring <i className="fas fa-arrow-right" aria-hidden="true" /></button>
+      <p className="ca-start-note"><i className="fas fa-video" aria-hidden="true" /> Next, you will allow camera, microphone and screen recording.</p>
       </div>
       </div>
       <footer className="ca-welcome-footer"><span>ShimentoX · Candidate experience</span><span>Take your time to prepare. Do your best.</span></footer>
@@ -365,7 +412,7 @@ function CandidateAssessment() {
 
   return (
     <div className="ca-page" id="ca-root">
-      <div inert={proctoring.warning || proctoring.error || confirmSubmit ? '' : undefined}>
+      <div inert={examPaused || confirmSubmit ? '' : undefined}>
       <header className="ca-header">
         <div className="ca-brand">
           <img src="/ShimentoX-Logo-Dark.png" alt="ShimentoX" className="ca-logo" />
@@ -374,7 +421,7 @@ function CandidateAssessment() {
           </h1>
         </div>
         <div className="ca-header-actions">
-          <span className="ca-proctoring-status">Exam monitoring · {proctoring.count} / 2 warnings</span>
+          <span className="ca-proctoring-status"><span className="ca-rec-dot" aria-hidden="true" /> Recording · {proctoring.count} / 2 warnings · Face {media.faceCount} / {FACE_LIMIT}</span>
           {remainingSeconds != null && (
             <div className={`ca-timer ${remainingSeconds <= 300 ? 'ca-timer-warning' : ''}`} aria-label="Time remaining" role="timer">
               <i className="far fa-clock" aria-hidden="true" />
@@ -545,13 +592,29 @@ function CandidateAssessment() {
         </footer>
       )}
       </div>
-      {(proctoring.warning || proctoring.error) && <ExamDialog title={proctoring.count ? 'Exam warning: 1 of 2' : 'Exam monitoring paused'}>
-        {proctoring.count > 0 && <p>You left the exam or tried to navigate away. Your exam will be ended if you do this again.</p>}
+      <CameraPreview stream={media.streams.camera} className="ca-camera-pip" label="Your camera (recording)" />
+      {media.lost.length > 0 && <ExamDialog title="Recording stopped">
+        <p>Your {media.lost.map(kind => DEVICE_NAMES[kind]).join(' and ')} turned off. This has been recorded as a warning. Your exam will end if you do this again.</p>
+        <p>Turn {media.lost.length > 1 ? 'them' : 'it'} back on to continue{media.lost.includes('screen') ? ', and choose Entire screen when sharing' : ''}.</p>
+        {media.error && <p className="ca-inline-error" role="alert">{media.error}</p>}
+        <button className="ca-btn ca-btn-primary" disabled={Boolean(media.busy)}
+          onClick={() => proctoring.withoutMonitoring(media.restore)}>{media.busy ? 'Waiting for permission…' : 'Turn back on'}</button>
+      </ExamDialog>}
+      {!media.lost.length && (proctoring.warning || proctoring.error) && <ExamDialog title={proctoring.count ? 'Exam warning: 1 of 2' : 'Exam monitoring paused'}>
+        {proctoring.count > 0 && <p>You left the exam, tried to navigate away, or stopped recording. Your exam will be ended if you do this again.</p>}
         <p>Return to fullscreen and stay in this tab to continue.</p>
         {proctoring.error && <p className="ca-inline-error" role="alert">{proctoring.error}</p>}
         <button className="ca-btn ca-btn-primary" disabled={proctoring.syncing} onClick={proctoring.resume}>Return to exam</button>
       </ExamDialog>}
-      {confirmSubmit && !proctoring.warning && !proctoring.error && <ExamDialog title="Submit your assessment?">
+      {!media.lost.length && !proctoring.warning && !proctoring.error && media.faceWarning && <ExamDialog title={`Face not detected: warning ${media.faceWarning.count} of ${FACE_LIMIT}`}>
+        <p>{FACE_ISSUE_TEXT[media.faceWarning.issue] || FACE_ISSUE_TEXT.no_face}</p>
+        <p>If your face is not detected again, your exam will end automatically.</p>
+        <CameraPreview stream={media.streams.camera} className="ca-camera-dialog" />
+        {faceRecheck === 'failed' && <p className="ca-inline-error" role="alert">We still cannot see your face. Face the camera directly and try again.</p>}
+        <button className="ca-btn ca-btn-primary" disabled={faceRecheck === 'checking'} onClick={recheckFace}>
+          {faceRecheck === 'checking' ? 'Checking…' : 'I am in view, continue'}</button>
+      </ExamDialog>}
+      {confirmSubmit && !examPaused && <ExamDialog title="Submit your assessment?">
         <p>You cannot change your answers after submission.</p>
         <div className="ca-dialog-actions">
           <button className="ca-btn ca-btn-secondary" onClick={() => setConfirmSubmit(false)}>Continue exam</button>

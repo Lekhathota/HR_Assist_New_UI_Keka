@@ -7,10 +7,11 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import database as db
+from assessment import proctoring_media
 from assessment import repository as assessment_repo
 from assessment.models import (
     AssessmentStatus,
@@ -36,6 +37,7 @@ from assessment.utilities import (
     remaining_seconds,
     token_expiry,
     token_is_expired,
+    parse_iso_datetime,
     utc_now,
     validate_public_assessment_link,
 )
@@ -691,7 +693,8 @@ def _resolve_token_assessment(token: str, *, allow_time_expired: bool = False) -
 
     status = str(assessment.get("status") or "")
     if status == AssessmentStatus.TERMINATED or int(assessment.get("proctoring_violation_count") or 0) >= 2:
-        raise AssessmentServiceError("Assessment terminated after two proctoring violations. This attempt cannot be resumed.", status_code=409)
+        reason = str(assessment.get("termination_reason") or "Two proctoring violations")
+        raise AssessmentServiceError(f"Assessment terminated: {reason}. This attempt cannot be resumed.", status_code=409)
 
     if status in AssessmentStatus.submitted_states():
         raise AssessmentServiceError("This assessment has already been submitted.", status_code=409)
@@ -739,12 +742,20 @@ def get_assessment_by_token(token: str) -> dict[str, Any]:
     }
 
 
-def start_candidate_assessment(token: str, *, accepted_terms: bool = False) -> dict[str, Any]:
+TERMS_VERSION = "assessment-proctoring-v2"
+
+
+def start_candidate_assessment(token: str, *, accepted_terms: bool = False, recording_consent: bool = False) -> dict[str, Any]:
     assessment = _resolve_token_assessment(token)
     if accepted_terms is not True:
         raise AssessmentServiceError("Accept the assessment terms and conditions before starting.", status_code=400)
+    if recording_consent is not True:
+        raise AssessmentServiceError("Consent to camera, microphone and screen recording before starting.", status_code=400)
+    if not proctoring_media.has_verified_reference(int(assessment["id"])):
+        raise AssessmentServiceError("Capture a clear photo of your face before starting.", status_code=409)
     assessment = _begin_candidate_session(assessment)
-    acceptance = {"terms_accepted_at": utc_now(), "terms_version": "assessment-rules-v1"}
+    now = utc_now()
+    acceptance = {"terms_accepted_at": now, "terms_version": TERMS_VERSION, "recording_consent_at": now}
     if not assessment_repo.update_assessment(int(assessment["id"]), acceptance):
         raise AssessmentServiceError("Could not record terms acceptance. Please retry.", status_code=503)
     assessment = {**assessment, **acceptance}
@@ -771,6 +782,95 @@ def report_proctoring_violation(token: str, event_id: str, reason: str) -> dict[
     return {"success": True, "status": assessment.get("status"),
             "violation_count": int(assessment.get("proctoring_violation_count") or 0),
             "terminated": assessment.get("status") == AssessmentStatus.TERMINATED}
+
+
+# Late chunks from the final recorder flush are accepted for this long after the attempt closes.
+RECORDING_GRACE = timedelta(minutes=15)
+
+
+def _face_status(assessment: dict[str, Any], face_ok: bool) -> dict[str, Any]:
+    return {"success": True, "face_ok": face_ok, "status": assessment.get("status"),
+            "face_violation_count": int(assessment.get("face_violation_count") or 0),
+            "terminated": assessment.get("status") == AssessmentStatus.TERMINATED,
+            "termination_reason": assessment.get("termination_reason") or ""}
+
+
+def store_face_snapshot(token: str, *, snapshot_id: str, kind: str, image: bytes, mime_type: str,
+                        face_count: int, face_ok: bool, issue: str) -> dict[str, Any]:
+    """Persist a candidate photo. A periodic photo without a visible, forward-facing face
+    is a violation; the second violation terminates the attempt."""
+    raw = assessment_repo.get_assessment_by_token(str(token or "").strip())
+    if not raw:
+        raise AssessmentServiceError("Invalid assessment token.", status_code=404)
+    aid = int(raw["id"])
+    if proctoring_media.find_snapshot(aid, snapshot_id):
+        # Idempotent retry: report the outcome without counting it again.
+        return _face_status(raw, face_ok)
+    assessment = _resolve_token_assessment(token, allow_time_expired=True)
+    if kind == "periodic" and assessment.get("status") != AssessmentStatus.IN_PROGRESS:
+        raise AssessmentServiceError("Start the assessment before sending exam photos.", status_code=409)
+    proctoring_media.insert_snapshot(assessment, snapshot_id=snapshot_id, kind=kind, image=image,
+                                     mime_type=mime_type, face_count=face_count, face_ok=face_ok,
+                                     issue=issue, captured_at=utc_now())
+    if kind == "periodic" and not face_ok:
+        assessment = proctoring_media.record_face_violation(aid, snapshot_id, issue) or assessment
+        if assessment.get("status") == AssessmentStatus.TERMINATED:
+            assessment_repo.mark_answers_final(aid)
+            db.log_audit("Assessment Terminated", "",
+                f"Assessment #{aid} terminated: face not detected on camera twice.",
+                int(assessment.get("jd_id") or 0) or None)
+    return _face_status(assessment, face_ok)
+
+
+def store_recording_chunk(token: str, *, stream: str, session_id: str, sequence: int,
+                          data: bytes, mime_type: str) -> dict[str, Any]:
+    assessment = assessment_repo.get_assessment_by_token(str(token or "").strip())
+    if not assessment or not str(assessment.get("access_token") or "").strip():
+        raise AssessmentServiceError("Invalid assessment token.", status_code=404)
+    status = str(assessment.get("status") or "")
+    if not assessment.get("started_at"):
+        raise AssessmentServiceError("Start the assessment before uploading recordings.", status_code=409)
+    if status != AssessmentStatus.IN_PROGRESS:
+        closed = parse_iso_datetime(assessment.get("completed_at"))
+        if status not in AssessmentStatus.submitted_states() or not closed or utc_now() - closed > RECORDING_GRACE:
+            raise AssessmentServiceError("This assessment is no longer accepting recordings.", status_code=409)
+    stored = proctoring_media.store_recording_chunk(assessment, stream=stream, session_id=session_id,
+                                                    sequence=sequence, data=data, mime_type=mime_type)
+    return {"success": True, "stored": stored, "sequence": sequence}
+
+
+def get_proctoring_evidence(assessment_id: int) -> dict[str, Any]:
+    assessment = assessment_repo.get_assessment_by_id(int(assessment_id))
+    if not assessment:
+        raise AssessmentServiceError("Assessment not found.", status_code=404)
+    events = [{"type": "focus", **event} for event in assessment.get("proctoring_events") or []]
+    events += [{"type": "face", **event} for event in assessment.get("face_violations") or []]
+    return {
+        "assessment_id": int(assessment_id),
+        "candidate_name": assessment.get("candidate_name") or "",
+        "status": assessment.get("status"),
+        "termination_reason": assessment.get("termination_reason") or "",
+        "recording_consent_at": assessment.get("recording_consent_at"),
+        "face_violation_count": int(assessment.get("face_violation_count") or 0),
+        "proctoring_violation_count": int(assessment.get("proctoring_violation_count") or 0),
+        "events": sorted(events, key=lambda event: str(event.get("recorded_at") or "")),
+        "snapshots": proctoring_media.list_snapshots(int(assessment_id)),
+        "recordings": proctoring_media.list_recording_sessions(int(assessment_id)),
+    }
+
+
+def get_proctoring_snapshot(assessment_id: int, snapshot_id: str) -> tuple[bytes, str]:
+    row = proctoring_media.find_snapshot(int(assessment_id), snapshot_id)
+    if not row:
+        raise AssessmentServiceError("Snapshot not found.", status_code=404)
+    return bytes(row["image"]), row.get("mime_type") or "image/jpeg"
+
+
+def get_recording_chunk(assessment_id: int, stream: str, session_id: str, sequence: int) -> tuple[bytes, str]:
+    chunk = proctoring_media.read_recording_chunk(int(assessment_id), stream, session_id, sequence)
+    if not chunk:
+        raise AssessmentServiceError("Recording chunk not found.", status_code=404)
+    return chunk
 
 
 def save_answer(token: str, question_id: int, answer: str) -> dict[str, Any]:
@@ -920,6 +1020,11 @@ __all__ = [
     "get_assessment_by_token",
     "start_candidate_assessment",
     "report_proctoring_violation",
+    "store_face_snapshot",
+    "store_recording_chunk",
+    "get_proctoring_evidence",
+    "get_proctoring_snapshot",
+    "get_recording_chunk",
     "save_answer",
     "submit_assessment",
     "get_assessment_result",

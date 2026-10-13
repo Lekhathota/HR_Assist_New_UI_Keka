@@ -399,3 +399,23 @@
   .ab-form-row { grid-template-columns: 1fr; }
   .ab-points { margin-left: 0; }
 }
+
+/* Proctoring evidence */
+.ab-proctoring h2 { display: flex; align-items: center; gap: 10px; }
+.ab-proctoring h3 { margin: 20px 0 10px; font-size: 16px; }
+.ab-proctor-summary { margin: 0 0 12px; color: #536174; }
+.ab-proctor-events { margin: 0; padding-left: 18px; font-size: 14px; }
+.ab-proctor-events span { color: #6a7483; margin-right: 6px; }
+.ab-proctor-recordings { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.ab-proctor-recording { display: grid; gap: 10px; align-content: start; padding: 14px; border: 1px solid #e2e7ed; border-radius: 10px; }
+.ab-proctor-recording-head { display: grid; gap: 2px; font-size: 14px; }
+.ab-proctor-recording-head span { color: #6a7483; font-size: 13px; }
+.ab-proctor-video { width: 100%; border-radius: 8px; background: #000; }
+.ab-proctor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.ab-proctor-thumb { margin: 0; border: 1px solid #e2e7ed; border-radius: 10px; overflow: hidden; background: #fff; }
+.ab-proctor-thumb.flagged { border: 2px solid #d92d20; }
+.ab-proctor-thumb img, .ab-proctor-thumb-loading { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #f1f3f6; }
+.ab-proctor-thumb figcaption { display: grid; gap: 2px; padding: 8px 10px; font-size: 13px; font-weight: 600; }
+.ab-proctor-thumb.flagged figcaption { color: #b42318; }
+.ab-proctor-thumb figcaption span { color: #6a7483; font-weight: 400; font-size: 12px; }
+.ab-proctor-empty { color: #6a7483; font-size: 14px; }

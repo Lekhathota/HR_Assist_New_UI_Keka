@@ -24,3 +24,6 @@ venv/
 
 .DS_Store
  
+
+# MediaPipe runtime copied from node_modules by frontend/scripts/copy-proctoring-assets.js
+frontend/public/proctoring/vendor/

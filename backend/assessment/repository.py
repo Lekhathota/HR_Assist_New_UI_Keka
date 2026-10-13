@@ -75,6 +75,9 @@ def ensure_assessment_indexes() -> None:
     mongo.assessment_results.create_index([("id", ASCENDING)], unique=True)
     mongo.assessment_results.create_index([("assessment_id", ASCENDING)], unique=True)
 
+    from assessment.proctoring_media import ensure_proctoring_indexes
+    ensure_proctoring_indexes()
+
 
 def sync_assessment_counters() -> None:
     mongo = _database()
@@ -275,7 +278,10 @@ def complete_candidate_attempt(assessment_id: int) -> bool:
     """Submission cannot overwrite an attempt terminated by a concurrent violation."""
     result = _database().assessments.update_one(
         {"id": int(assessment_id), "status": AssessmentStatus.IN_PROGRESS,
-         "$or": [{"proctoring_violation_count": {"$lt": 2}}, {"proctoring_violation_count": {"$exists": False}}]},
+         "$and": [
+             {"$or": [{"proctoring_violation_count": {"$lt": 2}}, {"proctoring_violation_count": {"$exists": False}}]},
+             {"$or": [{"face_violation_count": {"$lt": 2}}, {"face_violation_count": {"$exists": False}}]},
+         ]},
         {"$set": {"status": AssessmentStatus.COMPLETED, "completed_at": _now(), "updated_at": _now()}},
     )
     return result.modified_count > 0
@@ -288,6 +294,8 @@ def delete_assessment_cascade(assessment_id: int) -> None:
     mongo.candidate_answers.delete_many({"assessment_id": aid})
     mongo.assessment_results.delete_many({"assessment_id": aid})
     mongo.assessments.delete_one({"id": aid})
+    from assessment.proctoring_media import delete_assessment_media
+    delete_assessment_media(aid)
 
 
 # Questions

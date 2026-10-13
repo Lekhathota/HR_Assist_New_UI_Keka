@@ -22,6 +22,7 @@ export default function useAssessmentProctoring(token, assessment) {
   const departureRef = useRef(false);
   const rearmTimerRef = useRef(null);
   const mountedRef = useRef(true);
+  const suppressRef = useRef(false);
 
   const store = useCallback(() => {
     try { sessionStorage.setItem(storageKey(token), JSON.stringify({ count: countRef.current, pending: queueRef.current })); } catch { /* Server remains authoritative. */ }
@@ -93,7 +94,7 @@ export default function useAssessmentProctoring(token, assessment) {
   }, [sync]);
 
   const incident = useCallback(reason => {
-    if (!activeRef.current || countRef.current >= LIMIT || departureRef.current) return;
+    if (!activeRef.current || countRef.current >= LIMIT || departureRef.current || suppressRef.current) return;
     departureRef.current = true;
     window.clearTimeout(rearmTimerRef.current);
     countRef.current += 1;
@@ -187,13 +188,28 @@ export default function useAssessmentProctoring(token, assessment) {
     if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
   };
 
-  const start = async acceptedTerms => {
-    if (!acceptedTerms || starting || countRef.current >= LIMIT) return null;
+  // Browser pickers (e.g. re-sharing the screen) blur the page; they are not departures.
+  const withoutMonitoring = useCallback(async task => {
+    suppressRef.current = true;
+    try { return await task(); } finally {
+      window.setTimeout(() => { suppressRef.current = false; }, 500);
+    }
+  }, []);
+
+  const markTerminated = useCallback(() => {
+    queueRef.current = [];
+    store();
+    setTerminated(true);
+    stop();
+  }, [store, stop]);
+
+  const start = async (acceptedTerms, recordingConsent) => {
+    if (!acceptedTerms || !recordingConsent || starting || countRef.current >= LIMIT) return null;
     setStarting(true); setError('');
     try {
       await enterFullscreen();
       if (queueRef.current.length && !await sync()) return null;
-      const result = await publicApiPost('/api/assessment/start', { token, accepted_terms: true });
+      const result = await publicApiPost('/api/assessment/start', { token, accepted_terms: true, recording_consent: true });
       countRef.current = Math.max(countRef.current, result.assessment?.proctoring_violation_count || 0);
       setCount(countRef.current);
       if (countRef.current >= LIMIT) { setTerminated(true); stop(); return null; }
@@ -220,5 +236,8 @@ export default function useAssessmentProctoring(token, assessment) {
     } catch (err) { setError(err.message || 'Return to fullscreen to continue.'); }
   };
 
-  return { active, starting, count, warning, terminated, error, syncing, start, resume, stop, sync };
+  return {
+    active, starting, count, warning, terminated, error, syncing,
+    start, resume, stop, sync, report: incident, withoutMonitoring, markTerminated,
+  };
 }

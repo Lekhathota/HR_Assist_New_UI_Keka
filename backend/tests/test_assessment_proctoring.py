@@ -1,4 +1,6 @@
 from contextlib import ExitStack
+from datetime import timedelta
+from io import BytesIO
 from pathlib import Path
 import sys
 import unittest
@@ -8,7 +10,7 @@ from flask import Flask
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from services import assessment_service as service
-from assessment import repository
+from assessment import proctoring_media, repository
 from assessment.models import AssessmentStatus
 from assessment.utilities import utc_now, assert_status_transition, compute_link_status
 from routes import assessment_routes
@@ -35,13 +37,25 @@ class AssessmentProctoringTests(unittest.TestCase):
         for status in ["SENT", "IN_PROGRESS"]:
             row = attempt(status=status, proctoring_violation_count=1)
             with patch.object(repository, "get_assessment_by_token", return_value=row), \
+                 patch.object(proctoring_media, "has_verified_reference", return_value=True), \
                  patch.object(repository, "begin_candidate_attempt", return_value=attempt(proctoring_violation_count=1)) as begin, \
                  patch.object(repository, "update_assessment", return_value=True) as update:
-                result = service.start_candidate_assessment("test-token", accepted_terms=True)
+                result = service.start_candidate_assessment("test-token", accepted_terms=True, recording_consent=True)
             self.assertEqual(begin.called, status == "SENT")
             self.assertEqual(result["assessment"]["proctoring_violation_count"], 1)
             self.assertGreater(result["assessment"]["remaining_seconds"], 0)
-            self.assertEqual(update.call_args.args[1]["terms_version"], "assessment-rules-v1")
+            self.assertEqual(update.call_args.args[1]["terms_version"], "assessment-proctoring-v2")
+            self.assertIn("recording_consent_at", update.call_args.args[1])
+
+    def test_start_requires_recording_consent_and_a_verified_face_photo(self):
+        for consent, reference, code in [(False, True, 400), (True, False, 409)]:
+            with patch.object(repository, "get_assessment_by_token", return_value=attempt(status="SENT")), \
+                 patch.object(proctoring_media, "has_verified_reference", return_value=reference), \
+                 patch.object(repository, "begin_candidate_attempt") as begin:
+                with self.assertRaises(service.AssessmentServiceError) as error:
+                    service.start_candidate_assessment("test-token", accepted_terms=True, recording_consent=consent)
+            self.assertEqual(error.exception.status_code, code)
+            begin.assert_not_called()
 
     def test_missing_consent_cannot_start_the_timer(self):
         with patch.object(repository, "get_assessment_by_token", return_value=attempt(status="SENT")), \
@@ -131,6 +145,99 @@ class AssessmentProctoringTests(unittest.TestCase):
         self.assertIn("proctoring_violation_count", pipeline[0]["$set"])
 
 
+class FaceProctoringTests(unittest.TestCase):
+    def snapshot(self, snapshot_id, face_ok, kind="periodic"):
+        return service.store_face_snapshot("test-token", snapshot_id=snapshot_id, kind=kind, image=b"jpeg",
+                                           mime_type="image/jpeg", face_count=int(face_ok), face_ok=face_ok,
+                                           issue="" if face_ok else "no_face")
+
+    def test_second_missing_face_terminates_without_scoring(self):
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(repository, "get_assessment_by_token", return_value=attempt()))
+            stack.enter_context(patch.object(proctoring_media, "find_snapshot", return_value=None))
+            insert = stack.enter_context(patch.object(proctoring_media, "insert_snapshot", return_value=True))
+            record = stack.enter_context(patch.object(proctoring_media, "record_face_violation", side_effect=[
+                attempt(face_violation_count=1),
+                attempt(status="TERMINATED", face_violation_count=2, termination_reason="Face not detected on camera twice"),
+            ]))
+            finalize = stack.enter_context(patch.object(repository, "mark_answers_final"))
+            stack.enter_context(patch.object(service.db, "log_audit"))
+            score = stack.enter_context(patch.object(service, "evaluate_assessment"))
+            first = self.snapshot("snap-1", False)
+            second = self.snapshot("snap-2", False)
+        self.assertEqual(first["face_violation_count"], 1)
+        self.assertFalse(first["terminated"])
+        self.assertTrue(second["terminated"])
+        self.assertEqual(insert.call_count, 2)
+        self.assertEqual(record.call_count, 2)
+        finalize.assert_called_once_with(1)
+        score.assert_not_called()
+
+    def test_visible_face_is_stored_without_a_violation(self):
+        with patch.object(repository, "get_assessment_by_token", return_value=attempt()), \
+             patch.object(proctoring_media, "find_snapshot", return_value=None), \
+             patch.object(proctoring_media, "insert_snapshot", return_value=True) as insert, \
+             patch.object(proctoring_media, "record_face_violation") as record:
+            result = self.snapshot("snap-1", True)
+        self.assertTrue(result["face_ok"])
+        self.assertTrue(insert.call_args.kwargs["face_ok"])
+        record.assert_not_called()
+
+    def test_retried_snapshot_is_not_counted_twice(self):
+        with patch.object(repository, "get_assessment_by_token", return_value=attempt(face_violation_count=1)), \
+             patch.object(proctoring_media, "find_snapshot", return_value={"snapshot_id": "snap-1"}), \
+             patch.object(proctoring_media, "insert_snapshot") as insert, \
+             patch.object(proctoring_media, "record_face_violation") as record:
+            result = self.snapshot("snap-1", False)
+        self.assertEqual(result["face_violation_count"], 1)
+        insert.assert_not_called()
+        record.assert_not_called()
+
+    def test_reference_photo_allowed_before_start_but_exam_photos_are_not(self):
+        with patch.object(repository, "get_assessment_by_token", return_value=attempt(status="SENT", started_at=None)), \
+             patch.object(proctoring_media, "find_snapshot", return_value=None), \
+             patch.object(proctoring_media, "insert_snapshot", return_value=True) as insert, \
+             patch.object(proctoring_media, "record_face_violation") as record:
+            self.assertTrue(self.snapshot("ref-1", True, kind="reference")["face_ok"])
+            with self.assertRaises(service.AssessmentServiceError) as error:
+                self.snapshot("snap-1", False)
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(insert.call_count, 1)
+        record.assert_not_called()
+
+    def test_recording_chunks_accepted_during_attempt_and_shortly_after_it_closes(self):
+        now = utc_now()
+        cases = [
+            (attempt(), True),
+            (attempt(status="TERMINATED", completed_at=now - timedelta(minutes=2)), True),
+            (attempt(status="COMPLETED", completed_at=now - timedelta(hours=1)), False),
+            (attempt(status="SENT", started_at=None), False),
+        ]
+        for row, accepted in cases:
+            with patch.object(repository, "get_assessment_by_token", return_value=row), \
+                 patch.object(proctoring_media, "store_recording_chunk", return_value=True) as store:
+                if accepted:
+                    service.store_recording_chunk("test-token", stream="camera", session_id="s-1", sequence=0,
+                                                  data=b"webm", mime_type="video/webm")
+                    store.assert_called_once()
+                else:
+                    with self.assertRaises(service.AssessmentServiceError):
+                        service.store_recording_chunk("test-token", stream="camera", session_id="s-1", sequence=0,
+                                                      data=b"webm", mime_type="video/webm")
+                    store.assert_not_called()
+
+    def test_atomic_face_violation_counts_each_snapshot_once(self):
+        mongo = MagicMock()
+        mongo.assessments.find_one_and_update.return_value = attempt(face_violation_count=1)
+        with patch.object(proctoring_media, "_database", return_value=mongo):
+            proctoring_media.record_face_violation(1, "snap-1", "no_face")
+        query, pipeline = mongo.assessments.find_one_and_update.call_args.args
+        self.assertEqual(query["status"], "IN_PROGRESS")
+        self.assertEqual(query["face_violations.snapshot_id"], {"$ne": "snap-1"})
+        self.assertIn("face_violation_count", pipeline[0]["$set"])
+        self.assertIn("status", pipeline[-1]["$set"])
+
+
 class ProctoringRouteTests(unittest.TestCase):
     def setUp(self):
         app = Flask(__name__)
@@ -152,6 +259,46 @@ class ProctoringRouteTests(unittest.TestCase):
                 response = self.client.post("/api/assessment/proctoring-event", json=payload)
                 self.assertEqual(response.status_code, 400)
         report.assert_not_called()
+
+    def test_snapshot_route_trusts_face_ok_only_with_a_detected_face(self):
+        with patch.object(assessment_routes, "store_face_snapshot", return_value={"success": True}) as store:
+            response = self.client.post("/api/assessment/proctoring/snapshot", data={
+                "token": "test-token", "snapshot_id": "snap-1", "kind": "periodic", "face_ok": "true",
+                "face_count": "0", "image": (BytesIO(b"jpeg"), "s.jpg", "image/jpeg")})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(store.call_args.kwargs["face_ok"])
+        self.assertEqual(store.call_args.kwargs["issue"], "no_face")
+
+    def test_invalid_snapshots_and_chunks_never_reach_persistence(self):
+        big = b"x" * (assessment_routes.MAX_SNAPSHOT_BYTES + 1)
+        with patch.object(assessment_routes, "store_face_snapshot") as store, \
+             patch.object(assessment_routes, "store_recording_chunk") as chunk:
+            for data in [
+                {"snapshot_id": "$bad", "kind": "periodic", "image": (BytesIO(b"j"), "s.jpg", "image/jpeg")},
+                {"snapshot_id": "s-1", "kind": "invented", "image": (BytesIO(b"j"), "s.jpg", "image/jpeg")},
+                {"snapshot_id": "s-1", "kind": "periodic", "image": (BytesIO(b"j"), "s.txt", "text/plain")},
+                {"snapshot_id": "s-1", "kind": "periodic", "image": (BytesIO(big), "s.jpg", "image/jpeg")},
+                {"snapshot_id": "s-1", "kind": "periodic"},
+            ]:
+                self.assertEqual(self.client.post("/api/assessment/proctoring/snapshot", data=data).status_code, 400)
+            for data in [
+                {"stream": "audio", "session_id": "s-1", "sequence": "0", "chunk": (BytesIO(b"w"), "c.webm", "video/webm")},
+                {"stream": "camera", "session_id": "s-1", "sequence": "-1", "chunk": (BytesIO(b"w"), "c.webm", "video/webm")},
+                {"stream": "screen", "session_id": "s-1", "sequence": "0", "chunk": (BytesIO(b"w"), "c.exe", "application/x-msdownload")},
+            ]:
+                self.assertEqual(self.client.post("/api/assessment/proctoring/recording", data=data).status_code, 400)
+        store.assert_not_called()
+        chunk.assert_not_called()
+
+    def test_recording_route_forwards_valid_chunk(self):
+        with patch.object(assessment_routes, "store_recording_chunk", return_value={"success": True, "stored": True}) as store:
+            response = self.client.post("/api/assessment/proctoring/recording", data={
+                "token": "test-token", "stream": "screen", "session_id": "s-1", "sequence": "3",
+                "chunk": (BytesIO(b"webm"), "c.webm", "video/webm;codecs=vp8")})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(store.call_args.kwargs["sequence"], 3)
+        self.assertEqual(store.call_args.kwargs["mime_type"], "video/webm")
+        self.assertEqual(store.call_args.kwargs["data"], b"webm")
 
 
 if __name__ == "__main__":

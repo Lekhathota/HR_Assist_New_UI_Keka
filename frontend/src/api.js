@@ -384,6 +384,32 @@ export async function publicApiGet(path) {
   return data;
 }
 
+/** Multipart upload for public candidate endpoints (exam photos and recordings). */
+export async function publicApiPostForm(path, formData) {
+  const res = await fetch(`${BASE}${path}`, { method: 'POST', credentials: 'include', body: formData });
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    /* non-JSON body */
+  }
+  if (!res.ok) {
+    const error = new Error(data.error || `Request failed (${res.status})`);
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
+}
+
+/** Authenticated binary download, e.g. proctoring photos and recording chunks. */
+export async function apiGetBlob(path) {
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders(), credentials: 'include' });
+  redirectIfUnauthorized(path, res.status);
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  return res.blob();
+}
+
 export async function publicApiPost(path, body, { keepalive = false } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',

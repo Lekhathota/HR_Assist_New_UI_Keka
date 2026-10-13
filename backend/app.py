@@ -6,6 +6,7 @@ Recruitment Assist — Flask application bootstrap and blueprint registration.
 from __future__ import annotations
 
 import atexit
+import mimetypes
 import os
 import shutil
 import socket
@@ -17,6 +18,10 @@ from secrets import token_hex
 from dotenv import load_dotenv
 from flask import Flask, flash, jsonify, redirect, request, send_from_directory, session, url_for
 from flask_cors import CORS
+
+# Windows registries often mislabel these; the exam's face detector needs both.
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("application/wasm", ".wasm")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))

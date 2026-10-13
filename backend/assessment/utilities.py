@@ -298,6 +298,7 @@ def assessment_summary_payload(
         "updated_at": assessment.get("updated_at"),
         "question_count": len(questions or []),
         "proctoring_violation_count": int(assessment.get("proctoring_violation_count") or 0),
+        "face_violation_count": int(assessment.get("face_violation_count") or 0),
         "termination_reason": assessment.get("termination_reason") or "",
         "terms_accepted_at": assessment.get("terms_accepted_at"),
         "terms_version": assessment.get("terms_version") or "",

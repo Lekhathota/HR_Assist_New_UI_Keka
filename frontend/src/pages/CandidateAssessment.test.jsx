@@ -3,8 +3,21 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import CandidateAssessment from './CandidateAssessment.jsx';
 import { publicApiGet, publicApiPost } from '../api.js';
+import useMediaProctoring from '../hooks/useMediaProctoring.js';
 
 jest.mock('../api.js', () => ({ publicApiGet: jest.fn(), publicApiPost: jest.fn() }));
+jest.mock('../hooks/useMediaProctoring.js', () => ({ __esModule: true, FACE_LIMIT: 2, default: jest.fn() }));
+
+const fakeStream = () => ({ getTracks: () => [], getVideoTracks: () => [], getAudioTracks: () => [] });
+let mockMedia, mediaOptions;
+const makeMedia = (overrides = {}) => ({
+  supported: true, streams: { camera: fakeStream(), mic: fakeStream(), screen: fakeStream() },
+  error: '', busy: '', reference: { status: 'ok', message: '', url: '' }, faceCount: 0, faceWarning: null,
+  terminated: false, lost: [], pending: 0, ready: true,
+  requestCamera: jest.fn(), requestMicrophone: jest.fn(), requestScreen: jest.fn(),
+  captureReference: jest.fn(), recheckFace: jest.fn(async () => true), restore: jest.fn(async () => true),
+  finish: jest.fn(async () => {}), ...overrides,
+});
 
 const makePayload = (total, saved_answers = []) => ({
   assessment: { title: 'Title received from API', candidate_name: 'Candidate received from API', remaining_seconds: 3603 },
@@ -22,17 +35,27 @@ const click = element => act(() => element.click());
 const answerCount = () => $('.ca-answered-count').textContent;
 const navItems = () => container.querySelectorAll('.ca-nav-item');
 const tab = name => [...container.querySelectorAll('.ca-tab')].find(el => el.textContent.startsWith(name));
+const button = text => [...container.querySelectorAll('button')].find(el => el.textContent.trim().startsWith(text));
+const tree = () => (
+  <MemoryRouter initialEntries={['/assessment/test-token']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Routes><Route path="/assessment/:token" element={<CandidateAssessment />} /></Routes>
+  </MemoryRouter>
+);
+const rerender = () => act(async () => root.render(tree()));
+async function acceptTermsAndSetup() {
+  click($('.ca-terms-consent input'));
+  await act(async () => button('Accept & set up proctoring').click());
+  click($('.ca-setup .ca-terms-consent input'));
+  click(button('Allow & continue'));
+}
+async function startExam() {
+  await acceptTermsAndSetup();
+  await act(async () => button(container.textContent.includes('Resume assessment') ? 'Resume assessment' : 'Start assessment').click());
+}
 async function renderPayload(data, start = true) {
   publicApiGet.mockResolvedValue(data);
-  await act(async () => root.render(
-    <MemoryRouter initialEntries={['/assessment/test-token']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <Routes><Route path="/assessment/:token" element={<CandidateAssessment />} /></Routes>
-    </MemoryRouter>,
-  ));
-  if (start) {
-    click($('.ca-terms-consent input'));
-    await act(async () => $('.ca-exam-rules .ca-btn').click());
-  }
+  await act(async () => root.render(tree()));
+  if (start) await startExam();
 }
 async function typeSolution(value) {
   await act(async () => {
@@ -64,6 +87,9 @@ beforeEach(() => {
     return Promise.resolve(path === '/api/assessment/submit' ? { result: { status: 'COMPLETED' } } : { success: true });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
+  jest.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  mockMedia = makeMedia();
+  useMediaProctoring.mockImplementation((token, options) => { mediaOptions = options; return mockMedia; });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(() => {
@@ -90,7 +116,7 @@ test.each([14, 20])('new %i-question assessment starts at zero despite starter c
   expect($('.ca-code-input').value).toBe('API supplied starter template\n');
   expect(answerCount()).toBe(`0 / ${total} answered`);
   expect(publicApiPost).toHaveBeenCalledTimes(1);
-  expect(publicApiPost).toHaveBeenCalledWith('/api/assessment/start', { token: 'test-token', accepted_terms: true });
+  expect(publicApiPost).toHaveBeenCalledWith('/api/assessment/start', { token: 'test-token', accepted_terms: true, recording_consent: true });
 });
 
 test('actual responses update count, indicators and progress and survive navigation', async () => {
@@ -195,16 +221,18 @@ test('rules gate fullscreen and the timer before the candidate starts', async ()
   expect($('.ca-welcome-logo').getAttribute('src')).toBe('/ShimentoX-Logo-Dark.png');
   expect($('.ca-welcome-heading h1').textContent).toBe('Welcome, Candidate received from API!');
   expect(container.textContent).toContain('Terms and conditions');
-  expect($('.ca-exam-rules .ca-btn').disabled).toBe(true);
-  click($('.ca-exam-rules .ca-btn'));
+  expect(container.textContent).toContain('Photos of your face will be taken at random, about every 10 seconds');
+  expect(container.textContent).toContain('The second time, the exam ends automatically');
+  expect(button('Accept & set up proctoring').disabled).toBe(true);
+  click(button('Accept & set up proctoring'));
   expect(document.documentElement.requestFullscreen).not.toHaveBeenCalled();
-  expect(container.textContent).toContain('two violations end your attempt');
   expect($('.ca-question-card')).toBeNull();
   await act(async () => jest.advanceTimersByTime(3000));
   expect(publicApiPost).not.toHaveBeenCalled();
-  click($('.ca-terms-consent input'));
-  expect($('.ca-exam-rules .ca-btn').disabled).toBe(false);
-  await act(async () => $('.ca-exam-rules .ca-btn').click());
+  await acceptTermsAndSetup();
+  expect(container.textContent).toContain('Capture your face');
+  expect(document.documentElement.requestFullscreen).not.toHaveBeenCalled();
+  await act(async () => button('Start assessment').click());
   expect(document.documentElement.requestFullscreen).toHaveBeenCalledTimes(1);
   expect($('.ca-timer span').textContent).toBe('1:00:03');
 });
@@ -279,8 +307,7 @@ test('server warning counts survive a fresh load and the next departure terminat
     ? { violation_count: 2, terminated: true, status: 'TERMINATED' } : { success: true }));
   await renderPayload(data, false);
   expect(container.textContent).toContain('Warning already recorded: 1 / 2');
-  click($('.ca-terms-consent input'));
-  await act(async () => $('.ca-exam-rules .ca-btn').click());
+  await startExam();
   await act(async () => window.dispatchEvent(new Event('blur')));
   expect(container.textContent).toContain('Assessment Terminated');
 });
@@ -308,4 +335,66 @@ test('completed submissions stop monitoring and release fullscreen without recor
   expect(events()).toHaveLength(0);
   expect(container.textContent).toContain('Assessment Submitted');
   expect(document.exitFullscreen).toHaveBeenCalled();
+});
+
+test('setup blocks the start until camera photo, microphone and screen are all ready', async () => {
+  mockMedia = makeMedia({ ready: false, streams: { camera: fakeStream(), mic: null, screen: null } });
+  await renderPayload(makePayload(14), false);
+  await acceptTermsAndSetup();
+  expect(button('Start assessment').disabled).toBe(true);
+  click(button('3. Microphone'));
+  click(button('Turn on microphone'));
+  expect(mockMedia.requestMicrophone).toHaveBeenCalled();
+  expect(publicApiPost).not.toHaveBeenCalled();
+});
+
+test('recording consent is required before device setup continues', async () => {
+  await renderPayload(makePayload(14), false);
+  click($('.ca-terms-consent input'));
+  await act(async () => button('Accept & set up proctoring').click());
+  expect(container.textContent).toContain('Permission to record this exam session');
+  expect(button('Allow & continue').disabled).toBe(true);
+});
+
+test('a missing face shows a warning and the exam pauses until the face is back', async () => {
+  await renderPayload(makePayload(14));
+  expect(mediaOptions.active).toBe(true);
+  mockMedia = makeMedia({ faceWarning: { issue: 'no_face', count: 1 }, faceCount: 1 });
+  await rerender();
+  expect($('[role="alertdialog"]').textContent).toContain('Face not detected');
+  expect($('[role="alertdialog"]').textContent).toContain('warning 1 of 2');
+  expect($('.ca-proctoring-status').textContent).toContain('Face 1 / 2');
+  expect($('.ca-layout').parentElement.hasAttribute('inert')).toBe(true);
+  await act(async () => button('I am in view').click());
+  expect(mockMedia.recheckFace).toHaveBeenCalled();
+});
+
+test('a second missing face terminates the exam and finishes the recording', async () => {
+  await renderPayload(makePayload(14));
+  mockMedia = makeMedia({ terminated: true, faceCount: 2 });
+  await act(async () => mediaOptions.onTerminated());
+  expect(container.textContent).toContain('Assessment Terminated');
+  expect(container.textContent).toContain('face was not detected on camera twice');
+  expect(mockMedia.finish).toHaveBeenCalled();
+  expect(publicApiPost.mock.calls.some(([path]) => path === '/api/assessment/submit')).toBe(false);
+});
+
+test('turning off a device is a violation and the candidate must turn it back on', async () => {
+  await renderPayload(makePayload(14));
+  mockMedia = makeMedia({ lost: ['screen'], streams: { camera: fakeStream(), mic: fakeStream(), screen: null } });
+  await act(async () => mediaOptions.onViolation('media_stopped'));
+  expect(events()[0][1].reason).toBe('media_stopped');
+  expect($('[role="alertdialog"]').textContent).toContain('Your screen sharing turned off');
+  await act(async () => button('Turn back on').click());
+  expect(mockMedia.restore).toHaveBeenCalled();
+});
+
+test('submission finishes the recording upload', async () => {
+  await renderPayload(makePayload(14));
+  await act(async () => $('.ca-submit-link').click());
+  await act(async () => button('Confirm submission').click());
+  expect(mockMedia.finish).toHaveBeenCalled();
+  mockMedia = makeMedia({ pending: 3 });
+  await rerender();
+  expect(container.textContent).toContain('Uploading your exam recording (3 parts left)');
 });

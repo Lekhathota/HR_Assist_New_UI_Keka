@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
+import ProctoringEvidence from '../components/ProctoringEvidence.jsx';
 import '../styles/assessment_builder.css';
 
 const TYPE_LABELS = {
@@ -487,6 +488,10 @@ function AssessmentBuilder() {
             <p><strong>Status:</strong> {assessmentResult.status}</p>
             {assessmentResult.summary && <p>{assessmentResult.summary}</p>}
           </div>
+        )}
+
+        {['IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(assessment?.status) && (
+          <ProctoringEvidence assessmentId={assessmentId} />
         )}
 
         <div className="ab-settings white-card">
