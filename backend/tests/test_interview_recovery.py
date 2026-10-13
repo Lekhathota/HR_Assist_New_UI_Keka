@@ -137,9 +137,11 @@ class FakeRepo:
     def raw_interview(self, interview_id):
         return copy.deepcopy(self.interviews.get(interview_id))
 
-    def interviews_due_for_no_show_check(self, start, end, statuses):
+    def interviews_due_for_no_show_check(self, start, end, statuses, *, require_recorded_no_show=True):
+        def attendance_ok(value):
+            return value == "no_show" if require_recorded_no_show else value not in ("attended", "no_show")
         return [copy.deepcopy(i) for i in self.interviews.values()
-                if i["status"] in statuses and start <= i["interview_start"] <= end and i.get("attendance_status") != "attended"]
+                if i["status"] in statuses and start <= i["interview_end"] <= end and attendance_ok(i.get("attendance_status"))]
 
     def acquire_lock(self, key, owner, now, seconds):
         held = self.locks.get(key)
@@ -339,7 +341,7 @@ class RescheduleTests(RecoveryTestBase):
 class NoShowTests(RecoveryTestBase):
     def setUp(self):
         super().setUp()
-        self.clock.now = datetime(2026, 10, 9, 10, 20, tzinfo=UTC)  # 20 min after the 10:00 start
+        self.clock.now = datetime(2026, 10, 9, 11, 20, tzinfo=UTC)  # 20 min after the 11:00 scheduled end
         self.auto = self.make_service(RecoveryConfig(**{**CONFIG.__dict__, "no_show_mode": "auto"}))
 
     def test_genuine_no_show_triggers_automatic_outreach(self):
@@ -348,7 +350,7 @@ class NoShowTests(RecoveryTestBase):
         self.assertEqual(self.repo.interviews[1]["status"], NO_SHOW_STATUS)
         self.assertEqual(self.case()["recovery_type"], RecoveryType.NO_SHOW)
         self.assertEqual(self.case()["status"], S.AWAITING_RESPONSE)
-        self.assertIn("We missed you", self.messenger.candidate[0]["subject"])
+        self.assertEqual(self.messenger.candidate[0]["subject"], "Follow-Up Regarding Your Interview")
 
     def test_detection_is_idempotent(self):
         for _ in range(4):
@@ -357,7 +359,9 @@ class NoShowTests(RecoveryTestBase):
         self.assertEqual(len(self.messenger.candidate), 1)
 
     def test_grace_period_is_respected(self):
-        self.clock.now = datetime(2026, 10, 9, 10, 10, tzinfo=UTC)
+        self.clock.now = datetime(2026, 10, 9, 10, 50, tzinfo=UTC)  # still in progress
+        self.assertEqual(self.auto.run_due()["detected_no_shows"], 0)
+        self.clock.now = datetime(2026, 10, 9, 11, 10, tzinfo=UTC)  # ended, but inside the grace period
         self.assertEqual(self.auto.run_due()["detected_no_shows"], 0)
         with self.assertRaises(RecoveryConflict):
             self.svc.report_attendance(1, "no_show", actor="rec")
@@ -408,6 +412,46 @@ class NoShowTests(RecoveryTestBase):
         self.assertEqual(len(self.messenger.recruiter), 1)
         self.assertEqual(self.actions().count("escalated"), 1)
         self.assertEqual(self.actions().count("response_timeout"), 3)
+
+    def test_outreach_message_uses_real_interview_data(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        mail = self.messenger.candidate[0]
+        self.assertEqual(mail["subject"], "Follow-Up Regarding Your Interview")
+        for text in ("Hi Asha Rao,", "QA Engineer position", "Friday, 09 October 2026 at 10:00", self.token,
+                     "Talent Acquisition Team"):
+            self.assertIn(text, mail["body"])
+        case = self.case()
+        self.assertIsNotNone(case["detected_at"])
+        self.assertIsNotNone(case["last_outreach_at"])
+        outreach = [a for a in self.repo.attempts if a["action"] == "no_show_outreach"][0]
+        self.assertEqual((outreach["candidate_id"], outreach["attempt_number"], outreach["delivery_status"]), (10, 1, "sent"))
+        self.assertEqual(outreach["message_type"], "no_show_outreach")
+
+    def test_failed_email_is_recorded_not_reported_as_sent(self):
+        self.messenger.fail_with = DeliveryResult("email", "failed", error="SMTP timeout", transient=True)
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        outreach = [a for a in self.repo.attempts if a["action"] == "no_show_outreach"][0]
+        self.assertEqual(outreach["delivery_status"], "failed")
+        self.assertIn("SMTP timeout", outreach["failure_reason"])
+        self.assertEqual(self.case()["status"], S.RETRY_SCHEDULED)
+        self.assertIsNone(self.case().get("last_outreach_at"))
+
+    def test_scheduler_picks_up_a_recorded_no_show_and_late_attendance(self):
+        # Attendance recorded but the case was never opened (e.g. the request crashed), or recorded days later.
+        self.clock.now = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
+        self.repo.interviews[1]["attendance_status"] = "no_show"
+        self.assertEqual(self.svc.run_due()["detected_no_shows"], 1)
+        self.assertEqual(self.case()["source"], "recorded_no_show")
+        self.assertEqual(len(self.messenger.candidate), 1)
+        for _ in range(3):
+            self.svc.run_due()
+        self.assertEqual(len(self.repo.cases), 1)
+        self.assertEqual(len(self.messenger.candidate), 1)
+
+    def test_unrecorded_attendance_is_never_guessed_in_default_mode(self):
+        self.clock.now = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
+        self.assertEqual(self.svc.run_due()["detected_no_shows"], 0)
+        self.assertEqual(self.messenger.candidate, [])
 
     def test_attended_correction_closes_open_case(self):
         self.auto.run_due()

@@ -47,7 +47,7 @@ class RecoveryConfig:
     enabled: bool = True
     no_show_grace_minutes: int = 15
     no_show_mode: str = "confirmed"
-    no_show_lookback_hours: int = 48
+    no_show_lookback_hours: int = 168
     max_attempts: int = 3
     response_timeout_minutes: int = 1440
     retry_delay_minutes: int = 60
@@ -100,7 +100,7 @@ def load_config() -> RecoveryConfig:
         enabled=_bool("INTERVIEW_RECOVERY_ENABLED", True),
         no_show_grace_minutes=_int("INTERVIEW_NO_SHOW_GRACE_MINUTES", 15, 0, 1440),
         no_show_mode=mode,
-        no_show_lookback_hours=_int("INTERVIEW_NO_SHOW_LOOKBACK_HOURS", 48, 1, 720),
+        no_show_lookback_hours=_int("INTERVIEW_NO_SHOW_LOOKBACK_HOURS", 168, 1, 720),
         max_attempts=_int("INTERVIEW_RECOVERY_MAX_ATTEMPTS", 3, 1, 20),
         response_timeout_minutes=_int("INTERVIEW_RECOVERY_RESPONSE_TIMEOUT_MINUTES", 1440, 5, 20160),
         retry_delay_minutes=_int("INTERVIEW_RECOVERY_RETRY_DELAY_MINUTES", 60, 1, 10080),

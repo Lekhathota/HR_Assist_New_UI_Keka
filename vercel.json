@@ -21,5 +21,11 @@
       "source": "/:path*",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/interview-recovery/run",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

@@ -28,12 +28,36 @@ No slots / no reply / delivery failure ─► RETRY_SCHEDULED ─► ... ─► 
 5. **No-show**: after `INTERVIEW_NO_SHOW_GRACE_MINUTES`, the interview is marked `No Show` and the candidate is emailed asking whether they want a new time (Yes → slot proposal flow, No → case closed, recruiter informed).
 6. **Stops automatically** when the interview is cancelled, completed (Selected/Rejected), rescheduled by the recruiter, marked attended, or deleted.
 
-### No-show detection modes (`INTERVIEW_NO_SHOW_DETECTION`)
+### No-show detection
 
-HR Assist has no attendance feed from a meeting provider, so "the candidate did not attend" needs a signal:
+HR Assist has no attendance feed from a meeting provider, so a no-show is only ever acted on from an **explicit attendance outcome**. It is never inferred just because the scheduled time passed.
 
-- `confirmed` (default): the recruiter/interviewer clicks **No-show** on a past interview. Recovery then runs automatically. This avoids messaging candidates who attended an interview nobody marked.
-- `auto`: every scheduler run treats active interviews with no attendance recorded, past the grace period and within `INTERVIEW_NO_SHOW_LOOKBACK_HOURS`, as no-shows. Use only if interviewers reliably click **Attended**.
+- After an interview's **scheduled end** + `INTERVIEW_NO_SHOW_GRACE_MINUTES`, the interviewer or recruiter clicks **Attended** or **No-show** on the interview (Hiring Pipeline → Interviews). The outcome is saved on the interview (`attendance_status`, `attendance_recorded_at`, `attendance_recorded_by`).
+- **No-show** opens the recovery case and sends the follow-up immediately. The scheduled sweep (below) also picks up any interview recorded as a no-show that has no case yet: outcomes recorded late (within `INTERVIEW_NO_SHOW_LOOKBACK_HOURS`, default 7 days), or a request that failed midway.
+- Never processed: interviews that are cancelled, completed (Selected/Rejected), rescheduled to a new time, marked attended, or still in progress or inside the grace period.
+- `INTERVIEW_NO_SHOW_DETECTION=auto` (opt-in) additionally treats ended interviews with **no** recorded attendance as no-shows. Use it only if interviewers reliably click **Attended**.
+- Idempotent: each interview occurrence (interview + original start time) gets at most one no-show case, enforced by a unique index on open cases. Concurrent sweeps cannot create a second case or send a second initial email.
+
+### Follow-up email
+
+Sent automatically through the existing SMTP integration (and SMS when Twilio is configured), using the interview's real data:
+
+> Subject: Follow-Up Regarding Your Interview
+> Hi {candidate name}, We noticed that you were unable to attend your scheduled interview for the {job title} position on {original date and time} ({INTERVIEW_TIMEZONE}). … choose a new interview time using the link below: {secure /interview/<token> link} … Best regards, {COMPANY_NAME} Talent Acquisition Team
+
+The link is the existing candidate reschedule page. It is tokenized per interview, so a candidate can only see and change their own interview. Reminders (until `INTERVIEW_RECOVERY_MAX_ATTEMPTS`) use the subject "Reminder: Follow-Up Regarding Your Interview". An email counts as sent only when the SMTP server accepts it; failures are recorded with the reason and retried with backoff. Once the candidate reschedules, declines, or a recruiter resolves the case, no further messages are sent.
+
+Each attempt is stored in `interview_recovery_attempts` with interview id, candidate id, attempt number, message type, timestamp, delivery status and failure reason. The case stores `detected_at` and `last_outreach_at`.
+
+| Shown in Hiring Pipeline | Case status |
+|---|---|
+| No-show detected · outreach pending | PENDING / PROCESSING |
+| Outreach pending (retrying) / Follow-up retry scheduled | RETRY_SCHEDULED |
+| Outreach sent · awaiting reply | AWAITING_RESPONSE |
+| Candidate choosing new time | SLOT_PROPOSED |
+| Rescheduled | RECOVERED |
+| Escalated to recruiter | ESCALATED |
+| Resolved | CLOSED |
 
 ### Attempts, retries and escalation
 
@@ -112,11 +136,9 @@ All settings are validated at use; invalid values return a clear 503 instead of 
 1. Set `CANDIDATE_TEST_BASE_URL` (public HTTPS URL of the app) and `INTERVIEW_TIMEZONE`.
 2. SMTP (`SMTP_HOST/PORT/USER/PASS`, `DEFAULT_FROM_EMAIL`) must work; Twilio is optional (SMS is sent in addition to email when configured).
 3. Set `INTERVIEW_RECOVERY_CRON_SECRET` (or rely on Vercel's `CRON_SECRET`).
-4. Schedule the tick. Retries, response timeouts and auto no-show detection only advance when `/api/interview-recovery/run` is called. On Vercel **Pro**, add to `vercel.json`:
-   ```json
-   "crons": [{ "path": "/api/interview-recovery/run", "schedule": "*/10 * * * *" }]
-   ```
-   Vercel **Hobby** only allows daily crons (more frequent schedules fail deployment), so use an external scheduler (e.g. GitHub Actions or cron-job.org) calling the endpoint every 5–15 minutes with the bearer secret. Reschedule requests themselves do not wait for the tick.
+4. Schedule the tick. Retries, response timeouts and the no-show sweep advance only when `/api/interview-recovery/run` is called. Two schedulers are included:
+   - **GitHub Actions** (`.github/workflows/interview-recovery.yml`) runs every 15 minutes on any Vercel plan. Add repository secrets `INTERVIEW_RECOVERY_RUN_URL` (e.g. `https://shimentoxtalentos.vercel.app/api/interview-recovery/run`) and `INTERVIEW_RECOVERY_CRON_SECRET` (same value as in Vercel). Until both are set the workflow skips with a warning.
+   - **Vercel Cron** (`vercel.json`) runs once a day at 06:00 UTC as a backstop; Hobby plans allow daily crons. Vercel sends `CRON_SECRET` automatically when that variable is set in the project.
 5. Deploy; indexes are created on the first request.
 
 ## Not implemented / limitations

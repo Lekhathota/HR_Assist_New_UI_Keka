@@ -61,6 +61,34 @@ const INTERVIEW_VIEWS = [
   ['upcoming', 'Upcoming'], ['needs_followup', 'Needs follow-up'], ['past', 'Past'], ['cancelled', 'Cancelled'], ['all', 'All'],
 ];
 
+// Automated no-show / reschedule recovery shown on an interview row.
+function recoveryState(recovery) {
+  if (!recovery) return null;
+  const noShow = recovery.recovery_type === 'NO_SHOW';
+  const delivered = Number(recovery.attempt_count || 0) > 0;
+  switch (recovery.status) {
+    case 'PENDING':
+    case 'PROCESSING':
+      return noShow ? { label: 'No-show detected · outreach pending', tone: 'warn' } : { label: 'Reschedule requested', tone: 'warn' };
+    case 'RETRY_SCHEDULED':
+      if (noShow && recovery.stage === 'awaiting_consent') return { label: delivered ? 'Follow-up retry scheduled' : 'Outreach pending (retrying)', tone: 'warn' };
+      return { label: 'Finding new times', tone: 'warn' };
+    case 'AWAITING_RESPONSE':
+      return { label: 'Outreach sent · awaiting reply', tone: 'info' };
+    case 'SLOT_PROPOSED':
+      return { label: 'Candidate choosing new time', tone: 'info' };
+    case 'RESCHEDULED':
+    case 'RECOVERED':
+      return { label: 'Rescheduled', tone: 'good' };
+    case 'ESCALATED':
+      return { label: 'Escalated to recruiter', tone: 'bad' };
+    case 'CLOSED':
+      return { label: recovery.outcome === 'candidate_declined' ? 'Resolved · candidate withdrew' : 'Resolved', tone: 'muted' };
+    default:
+      return null;
+  }
+}
+
 // "72.0912" -> "72.1%", "85" -> "85%".
 function pct(value) {
   const n = Number(value);
@@ -269,6 +297,52 @@ function HiringPipeline() {
       if (!silent) toast({ type: 'error', message: err.message || 'Could not load assessment pipeline.' });
     } finally {
       if (!silent) setLoadingAssessments(false);
+    }
+  };
+
+  const [recoveryCase, setRecoveryCase] = useState(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [attendanceBusyId, setAttendanceBusyId] = useState(null);
+
+  const openRecoveryCase = async (caseId) => {
+    setRecoveryBusy(true);
+    try {
+      const data = await apiGet(`/api/interview-recovery/cases/${caseId}`);
+      setRecoveryCase(data.case || null);
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Could not load the follow-up history.' });
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const recoveryAction = async (caseId, action) => {
+    setRecoveryBusy(true);
+    try {
+      const { ok, data } = await apiPost(`/api/interview-recovery/cases/${caseId}/${action}`, {});
+      if (!ok || !data.success) throw new Error(data.error || 'Could not update the follow-up.');
+      setRecoveryCase(data.case || null);
+      toast({ type: 'success', message: action === 'retry' ? 'Automatic follow-up restarted.' : 'Follow-up closed.' });
+      await loadInterviews();
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Could not update the follow-up.' });
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const markAttendance = async (interview, attendance) => {
+    if (attendance === 'no_show' && !window.confirm(`Record ${interview.candidate_name || 'the candidate'} as a no-show? They will be emailed automatically with a link to choose a new time.`)) return;
+    setAttendanceBusyId(interview.id);
+    try {
+      const { ok, data } = await apiPost(`/api/interviews/${interview.id}/attendance`, { attendance });
+      if (!ok || !data.success) throw new Error(data.error || 'Could not record attendance.');
+      toast({ type: 'success', message: attendance === 'no_show' ? 'No-show recorded. The candidate is being contacted automatically.' : 'Attendance recorded.' });
+      await loadInterviews();
+    } catch (err) {
+      toast({ type: 'error', message: err.message || 'Could not record attendance.' });
+    } finally {
+      setAttendanceBusyId(null);
     }
   };
 
@@ -948,6 +1022,9 @@ function HiringPipeline() {
                           const past = isPastInterview(item);
                           const cancelled = isCancelled(item);
                           const lockedOutcome = isOutcomeLocked(item);
+                          const recovery = recoveryState(item.recovery);
+                          const noShow = normalizeStatus(item.status) === 'no show' || item.attendance_status === 'no_show';
+                          const canMarkAttendance = past && !cancelled && !lockedOutcome && !noShow && item.attendance_status !== 'attended';
                           return (
                             <li key={item.id} id={`interview-${item.id}`}
                               className={`hp-row hp-row-interview${cancelled ? ' is-cancelled' : ''}${highlightedInterviewId === item.id ? ' is-highlighted' : ''}`}>
@@ -970,7 +1047,20 @@ function HiringPipeline() {
                                 {item.notes && <span className="hp-note" title={item.notes}><i className="fas fa-note-sticky" aria-hidden="true"></i>{item.notes}</span>}
                               </div>
                               <div className="hp-pills">
-                                <span className={`hp-pill ${toneOf(item.status || 'scheduled')}`}>{prettyStatus(item.status || 'Scheduled')}</span>
+                                <span className={`hp-pill ${noShow ? 'bad' : toneOf(item.status || 'scheduled')}`}>{prettyStatus(item.status || 'Scheduled')}</span>
+                                {item.attendance_status === 'attended' && <span className="hp-pill good">Attended</span>}
+                                {recovery && (
+                                  <button type="button" className={`hp-pill hp-pill-btn ${recovery.tone}`} onClick={() => openRecoveryCase(item.recovery.id)}
+                                    disabled={recoveryBusy} title="View automatic follow-up history">
+                                    <i className="fas fa-robot" aria-hidden="true"></i> {recovery.label}
+                                  </button>
+                                )}
+                                {item.recovery && (
+                                  <span className="hp-recovery-meta">
+                                    {item.recovery.recovery_type === 'NO_SHOW' ? 'Follow-ups' : 'Offers'} sent: {item.recovery.attempt_count || 0}/{item.recovery.max_attempts || '—'}
+                                    {item.recovery.last_outreach_at && ` · last ${formatDateTime(item.recovery.last_outreach_at).date} ${formatDateTime(item.recovery.last_outreach_at).time}`}
+                                  </span>
+                                )}
                                 <span className="hp-delivery" title={`Email ${prettyStatus(emailStatus || 'sent')} · Text ${prettyStatus(textStatus || 'sent')} · Follow-up ${prettyStatus(item.followup_status || 'not sent')}`}>
                                   <i className={`fas fa-envelope ${toneOf(emailStatus || 'sent')}`} aria-label={`Email ${prettyStatus(emailStatus || 'sent')}`}></i>
                                   <i className={`fas fa-comment-sms ${toneOf(textStatus || 'sent')}`} aria-label={`Text ${prettyStatus(textStatus || 'sent')}`}></i>
@@ -978,6 +1068,18 @@ function HiringPipeline() {
                                 </span>
                               </div>
                               <div className="hp-actions">
+                                {canMarkAttendance && (
+                                  <>
+                                    <button type="button" className="hp-btn hp-btn-ghost" onClick={() => markAttendance(item, 'attended')} disabled={attendanceBusyId === item.id}
+                                      title="The candidate attended this interview">
+                                      <i className="fas fa-user-check" aria-hidden="true"></i> Attended
+                                    </button>
+                                    <button type="button" className="hp-btn hp-btn-warn" onClick={() => markAttendance(item, 'no_show')} disabled={attendanceBusyId === item.id}
+                                      title="The candidate did not attend: send the automatic follow-up">
+                                      <i className={`fas ${attendanceBusyId === item.id ? 'fa-spinner fa-spin' : 'fa-user-slash'}`} aria-hidden="true"></i> No-show
+                                    </button>
+                                  </>
+                                )}
                                 {past && !cancelled && !lockedOutcome && (
                                   <>
                                     <button type="button" className="hp-btn hp-btn-success" onClick={() => setInterviewOutcome(item, 'selected')} disabled={outcomeBusyId === item.id}>
@@ -1014,6 +1116,55 @@ function HiringPipeline() {
             </>
           )}
         </section>
+
+        {recoveryCase && (
+          <div className="jd-modal-backdrop" role="presentation">
+            <div className="jd-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="recovery-case-title">
+              <div className="jd-modal-header">
+                <div>
+                  <h2 id="recovery-case-title"><i className="fas fa-robot"></i> {recoveryCase.recovery_type === 'NO_SHOW' ? 'No-show follow-up' : 'Reschedule request'}</h2>
+                  <p>
+                    {recoveryState(recoveryCase)?.label || prettyStatus(recoveryCase.status)} · attempt {recoveryCase.attempt_count} of {recoveryCase.max_attempts}
+                    {recoveryCase.detected_at && ` · detected ${formatDateTime(recoveryCase.detected_at).date} ${formatDateTime(recoveryCase.detected_at).time}`}
+                  </p>
+                </div>
+                <button type="button" className="jd-modal-close" onClick={() => setRecoveryCase(null)} aria-label="Close follow-up history">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              {recoveryCase.escalation_reason && (
+                <div className="recovery-modal-alert">
+                  <strong>{recoveryCase.escalation_reason}</strong>
+                  {recoveryCase.recommended_action && <span>Next step: {recoveryCase.recommended_action}</span>}
+                </div>
+              )}
+              {recoveryCase.confirmed_slot && <p className="recovery-modal-note">New interview time: {recoveryCase.confirmed_slot.label}</p>}
+              {recoveryCase.last_error && !recoveryCase.escalation_reason && <p className="recovery-modal-note">Last error: {recoveryCase.last_error}</p>}
+              <ol className="recovery-history">
+                {(recoveryCase.history || []).map(entry => (
+                  <li key={entry.id}>
+                    <span className="recovery-history-time">{formatDateTime(entry.created_at).date} {formatDateTime(entry.created_at).time}</span>
+                    <span className="recovery-history-action">{prettyStatus(entry.action)}{entry.message_type ? ` (attempt ${entry.attempt_number})` : ''}</span>
+                    {entry.delivery_status && <span className={`hp-pill ${entry.delivery_status === 'sent' ? 'good' : 'bad'}`}>{entry.delivery_status === 'sent' ? 'Email sent' : 'Delivery failed'}</span>}
+                    {entry.failure_reason && <span className="recovery-history-error">{entry.failure_reason}</span>}
+                  </li>
+                ))}
+              </ol>
+              <div className="jd-modal-actions">
+                {!['RESCHEDULED', 'RECOVERED', 'CLOSED'].includes(recoveryCase.status) && (
+                  <button type="button" className="btn btn-secondary" onClick={() => recoveryAction(recoveryCase.id, 'close')} disabled={recoveryBusy}>
+                    <i className="fas fa-circle-xmark"></i> Mark resolved
+                  </button>
+                )}
+                {recoveryCase.status === 'ESCALATED' && (
+                  <button type="button" className="btn btn-primary" onClick={() => recoveryAction(recoveryCase.id, 'retry')} disabled={recoveryBusy}>
+                    <i className="fas fa-rotate"></i> Retry follow-up
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {scheduleActive && (
           <div className="jd-modal-backdrop" role="presentation">

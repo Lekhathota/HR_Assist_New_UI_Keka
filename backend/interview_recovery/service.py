@@ -16,6 +16,7 @@ candidate's attempts.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
@@ -83,6 +84,10 @@ def _iso(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: _iso(v) for k, v in value.items()}
     return value
+
+
+def _company_name() -> str:
+    return (os.environ.get("COMPANY_NAME") or "ShimentoX").strip() or "ShimentoX"
 
 
 class InterviewGateway:
@@ -208,9 +213,14 @@ class RecoveryService:
 
     def _record(self, case: dict, action: str, *, outcome: str = "", deliveries: Optional[list[DeliveryResult]] = None,
                 detail: Optional[dict] = None) -> None:
+        failures = [d for d in deliveries or [] if d.status == "failed"]
         self.repo.add_attempt({
-            "case_id": int(case["id"]), "interview_id": int(case["interview_id"]), "action": action,
+            "case_id": int(case["id"]), "interview_id": int(case["interview_id"]),
+            "candidate_id": int(case.get("candidate_id") or 0), "jd_id": case.get("jd_id"),
+            "action": action, "message_type": action if deliveries else "",
             "outcome": outcome, "attempt_number": int(case.get("attempt_count") or 0),
+            "delivery_status": ("sent" if any(d.status == "sent" for d in deliveries) else "failed") if deliveries else "",
+            "failure_reason": "; ".join(f"{d.channel}: {d.error}" for d in failures)[:500],
             "deliveries": [d.to_dict() for d in deliveries or []], "detail": _iso(detail or {}),
         })
 
@@ -275,24 +285,46 @@ class RecoveryService:
             if open_case:
                 self._close(open_case, "attendance_corrected")
             return {"interview_id": int(interview["id"]), "attendance_status": ATTENDANCE_ATTENDED, "case": None}
+        self._assert_no_show_eligible(interview)
+        # Persist the explicit attendance outcome first: if opening the case fails, the
+        # scheduled sweep finds this recorded no-show and finishes the job.
+        self.repo.set_interview_fields(int(interview["id"]), {
+            "attendance_status": ATTENDANCE_NO_SHOW, "attendance_recorded_at": self._now(), "attendance_recorded_by": actor,
+        })
+        interview["attendance_status"] = ATTENDANCE_NO_SHOW
         case = self._open_no_show(interview, source="recruiter_confirmed", actor=actor, require_grace=True)
         return {"interview_id": int(interview["id"]), "attendance_status": ATTENDANCE_NO_SHOW, "case": self.case_view(case)}
 
     def detect_no_shows(self) -> int:
-        """Auto mode: treat active interviews without attendance past the grace period as no-shows."""
+        """Scheduled sweep for interviews whose scheduled end (+ grace) has passed.
+
+        confirmed mode (default): acts only on interviews an interviewer/recruiter explicitly
+        marked as a no-show, including outcomes recorded late (within the lookback window).
+        auto mode (opt-in): also treats interviews with no recorded attendance as no-shows.
+        Idempotent: each interview occurrence opens at most one no-show case.
+        """
         cfg = self.config
-        if not cfg.enabled or cfg.no_show_mode != "auto":
+        if not cfg.enabled:
             return 0
         local_now = self._local_now()
         window_end = local_now - timedelta(minutes=cfg.no_show_grace_minutes)
         window_start = local_now - timedelta(hours=cfg.no_show_lookback_hours)
+        statuses = sorted(ACTIVE_INTERVIEW_STATUSES | {NO_SHOW_STATUS})
+        candidates = list(self.repo.interviews_due_for_no_show_check(window_start, window_end, statuses,
+                                                                     require_recorded_no_show=True))
+        if cfg.no_show_mode == "auto":
+            candidates += self.repo.interviews_due_for_no_show_check(window_start, window_end, sorted(ACTIVE_INTERVIEW_STATUSES),
+                                                                     require_recorded_no_show=False)
         opened = 0
-        for interview in self.repo.interviews_due_for_no_show_check(window_start, window_end, sorted(ACTIVE_INTERVIEW_STATUSES)):
+        for interview in candidates:
             try:
-                case = self._open_no_show(interview, source="auto_detection", actor=ACTOR, require_grace=True)
+                source = "recorded_no_show" if interview.get("attendance_status") == ATTENDANCE_NO_SHOW else "auto_detection"
+                case = self._open_no_show(interview, source=source, actor=ACTOR, require_grace=True)
                 opened += 1 if case and case.get("_created") else 0
             except RecoveryError:
                 continue
+            except Exception:  # one bad record must not stop the sweep
+                logger.exception("No-show detection failed for interview %s", interview.get("id"))
         return opened
 
     def run_due(self, limit: int = 50) -> dict:
@@ -545,6 +577,7 @@ class RecoveryService:
                 "attempt_count": attempts, "next_action_at": None, "lease_until": None,
                 "response_deadline": self._now() + timedelta(minutes=cfg.response_timeout_minutes),
                 "last_error": "" if outcome.delivered else outcome.error, "delivery_failure_count": 0 if outcome.delivered else int(case.get("delivery_failure_count") or 0),
+                **({"last_outreach_at": self._now()} if outcome.delivered else {}),
             })
             return
         self._delivery_failed(case, interview, outcome, {"proposed_slots": slots})
@@ -559,7 +592,7 @@ class RecoveryService:
             self.repo.update_case(int(case["id"]), {
                 "status": RecoveryStatus.AWAITING_RESPONSE, "attempt_count": attempts, "next_action_at": None,
                 "response_deadline": self._now() + timedelta(minutes=self.config.response_timeout_minutes),
-                "lease_until": None, "last_error": "", "delivery_failure_count": 0,
+                "lease_until": None, "last_error": "", "delivery_failure_count": 0, "last_outreach_at": self._now(),
             })
             return
         self._delivery_failed(case, interview, outcome, {})
@@ -704,16 +737,21 @@ class RecoveryService:
             "response_deadline": None, "lease_until": None, "closed_at": self._now(),
         })
 
-    def _open_no_show(self, interview: dict, *, source: str, actor: str, require_grace: bool) -> dict:
-        self._require_enabled()
+    def _assert_no_show_eligible(self, interview: dict, require_grace: bool = True) -> None:
         cfg = self.config
         start = _naive(interview.get("interview_start"))
+        end = _naive(interview.get("interview_end")) or (start + timedelta(minutes=60) if start else None)
         if interview.get("status") not in ACTIVE_INTERVIEW_STATUSES and interview.get("status") != NO_SHOW_STATUS:
             raise RecoveryConflict("Only scheduled interviews can be marked as a no-show.")
         if interview.get("attendance_status") == ATTENDANCE_ATTENDED:
             raise RecoveryConflict("The candidate is recorded as having attended this interview.")
-        if not start or (require_grace and self._local_now() < start + timedelta(minutes=cfg.no_show_grace_minutes)):
-            raise RecoveryConflict(f"A no-show can be recorded {cfg.no_show_grace_minutes} minutes after the interview start.")
+        if not end or (require_grace and self._local_now() < end + timedelta(minutes=cfg.no_show_grace_minutes)):
+            raise RecoveryConflict(f"A no-show can be recorded {cfg.no_show_grace_minutes} minutes after the interview's scheduled end.")
+
+    def _open_no_show(self, interview: dict, *, source: str, actor: str, require_grace: bool) -> dict:
+        self._require_enabled()
+        start = _naive(interview.get("interview_start"))
+        self._assert_no_show_eligible(interview, require_grace)
         existing = self.repo.get_open_case(int(interview["id"]), RecoveryType.NO_SHOW)
         if existing or self.repo.case_exists_for_occurrence(int(interview["id"]), RecoveryType.NO_SHOW, start):
             return existing or {}
@@ -723,6 +761,7 @@ class RecoveryService:
             return case
         self.gateway.mark_no_show(interview)
         self.repo.set_interview_fields(int(interview["id"]), {"attendance_status": ATTENDANCE_NO_SHOW})
+        self.repo.update_case(int(case["id"]), {"detected_at": self._now()})
         self._record(case, "no_show_detected", detail={"source": source, "interview_start": start})
         self._run_case(int(case["id"]), {RecoveryStatus.PENDING})
         return {**(self.repo.get_case(int(case["id"])) or case), "_created": True}
@@ -746,11 +785,19 @@ class RecoveryService:
                     "If none of these work, you can share your availability on the same page.\n\nRegards,\nRecruitment Team")
             sms = f"New interview times are available for {role}. Choose one here: {link}"
         elif kind == "no_show":
-            subject = f"We missed you at your {role} interview"
-            body = (f"Hi {name},\n\nWe were sorry not to see you at your scheduled interview for {role}. "
-                    f"If you are still interested, you can pick a new time here:\n{link}\n\n"
-                    "If you are no longer interested, you can let us know on the same page.\n\nRegards,\nRecruitment Team")
-            sms = f"We missed you at your {role} interview. Reschedule or reply here: {link}"
+            full_name = str(interview.get("candidate_name") or "").strip() or "there"
+            original = _naive(case.get("original_interview_start") or interview.get("interview_start"))
+            when = f" on {original:%A, %d %B %Y at %H:%M} ({self.config.timezone})" if original else ""
+            reminder = int(case.get("attempt_count") or 0) > 0
+            subject = ("Reminder: " if reminder else "") + "Follow-Up Regarding Your Interview"
+            body = (f"Hi {full_name},\n\n"
+                    f"We noticed that you were unable to attend your scheduled interview for the {role} position{when}.\n\n"
+                    "We understand that unexpected circumstances can arise. If you would still like to proceed, "
+                    f"you can choose a new interview time using the link below:\n\n{link}\n\n"
+                    "If you are no longer interested, you can let us know on the same page.\n\n"
+                    "Please let us know if you have any questions.\n\n"
+                    f"Best regards,\n{_company_name()} Talent Acquisition Team")
+            sms = f"We missed you at your {role} interview. Choose a new time here: {link}"
         else:
             subject = f"Your {role} interview is confirmed"
             body = (f"Hi {name},\n\nYour interview for {role} is confirmed for {options.strip(' -')} "
@@ -766,7 +813,7 @@ class RecoveryService:
                 "stage", "source", "reason", "preferred_windows", "attempt_count", "max_attempts", "delivery_failure_count",
                 "proposed_slots", "selected_slot", "confirmed_slot", "original_interview_start", "next_action_at",
                 "response_deadline", "last_error", "escalated_at", "escalation_reason", "recommended_action", "outcome",
-                "created_at", "updated_at", "closed_at")
+                "created_at", "updated_at", "closed_at", "detected_at", "last_outreach_at")
         view = {key: _iso(case.get(key)) for key in keys}
         if include_history:
             view["history"] = [_iso({k: v for k, v in a.items() if k != "_id"}) for a in self.repo.list_attempts(int(case["id"]))]
