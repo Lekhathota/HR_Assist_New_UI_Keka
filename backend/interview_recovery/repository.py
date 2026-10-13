@@ -206,11 +206,18 @@ def raw_interview(interview_id: int) -> Optional[dict]:
     return {k: v for k, v in row.items() if k != "_id"} if row else None
 
 
-def interviews_due_for_no_show_check(window_start: datetime, window_end: datetime, statuses: list[str]) -> list[dict]:
+def interviews_due_for_no_show_check(window_start: datetime, window_end: datetime, statuses: list[str],
+                                     *, require_recorded_no_show: bool = True) -> list[dict]:
+    """Interviews whose scheduled END falls in the window.
+
+    require_recorded_no_show=True (default): only interviews explicitly marked no_show by an
+    interviewer/recruiter. False (auto mode): any interview without a recorded attendance.
+    """
+    attendance = "no_show" if require_recorded_no_show else {"$nin": ["attended", "no_show"]}
     rows = _database().interviews.find({
         "status": {"$in": statuses},
-        "interview_start": {"$gte": window_start, "$lte": window_end},
-        "attendance_status": {"$ne": "attended"},
+        "interview_end": {"$gte": window_start, "$lte": window_end},
+        "attendance_status": attendance,
     })
     return [{k: v for k, v in row.items() if k != "_id"} for row in rows]
 

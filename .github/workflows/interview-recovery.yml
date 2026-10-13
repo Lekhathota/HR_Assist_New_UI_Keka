@@ -1,0 +1,33 @@
+# Runs the interview recovery scheduler: no-show detection, follow-up outreach,
+# retries and escalations. The endpoint is idempotent, so overlapping runs are safe.
+#
+# Repository secrets (Settings -> Secrets and variables -> Actions):
+#   INTERVIEW_RECOVERY_RUN_URL     e.g. https://shimentoxtalentos.vercel.app/api/interview-recovery/run
+#   INTERVIEW_RECOVERY_CRON_SECRET same value as INTERVIEW_RECOVERY_CRON_SECRET (or CRON_SECRET) in Vercel
+name: Interview recovery scheduler
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: interview-recovery
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Run interview recovery
+        env:
+          RUN_URL: ${{ secrets.INTERVIEW_RECOVERY_RUN_URL }}
+          CRON_SECRET: ${{ secrets.INTERVIEW_RECOVERY_CRON_SECRET }}
+        run: |
+          if [ -z "$RUN_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::warning::INTERVIEW_RECOVERY_RUN_URL / INTERVIEW_RECOVERY_CRON_SECRET are not set; skipping."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 290 \
+            -H "Authorization: Bearer ${CRON_SECRET}" "${RUN_URL}"

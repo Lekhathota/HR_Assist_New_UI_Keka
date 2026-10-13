@@ -227,3 +227,10 @@ body.theme-shimento .app-shell .hp-page .hp-empty p { margin: 0; font-size: 14px
   .app-shell .hp-page .hp-pills { flex-wrap: nowrap; }
   .app-shell .hp-page .hp-row:not(.hp-row-interview) .hp-actions { flex-wrap: nowrap; }
 }
+
+/* Automatic no-show / reschedule follow-up */
+.app-shell .hp-page .hp-btn-warn { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.app-shell .hp-page .hp-btn-warn:hover:not(:disabled) { background: #ffedd5; }
+.app-shell .hp-page .hp-pill-btn { border: 0; cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 5px; }
+.app-shell .hp-page .hp-pill-btn:hover:not(:disabled) { filter: brightness(.97); text-decoration: underline; }
+.app-shell .hp-page .hp-recovery-meta { flex-basis: 100%; font-size: 12px; color: #6b7280; }
