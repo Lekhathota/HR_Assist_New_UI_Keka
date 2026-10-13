@@ -14,6 +14,7 @@ import database as db
 from assessment import proctoring_media
 from assessment import repository as assessment_repo
 from assessment.models import (
+    ASSESSMENT_STAGE_LABELS,
     AssessmentStatus,
     DEFAULT_PASSING_SCORE,
     QuestionType,
@@ -92,6 +93,21 @@ def _assessment_meta(row: dict[str, Any]) -> dict[str, Any]:
         "assessment_duration_minutes": duration,
         "link_status": compute_link_status(row),
     }
+
+
+def record_candidate_outcome(assessment: dict[str, Any], status: str) -> None:
+    """Propagate a final assessment status to the candidate's hiring stage.
+
+    Every way an attempt ends (submission, re-grade, either kind of termination)
+    goes through here so the Talent pages and the hiring process stay in step.
+    """
+    candidate_id = int(assessment.get("candidate_id") or 0)
+    if not candidate_id:
+        return
+    db.update_candidate(candidate_id, {"hiring_stage": ASSESSMENT_STAGE_LABELS.get(status, status.title())})
+    if status == AssessmentStatus.PASSED:
+        from services.hiring_process_service import advance_after_assessment
+        advance_after_assessment(candidate_id, int(assessment.get("jd_id") or 0))
 
 
 def _lookup_payload(row: dict[str, Any]) -> dict[str, Any]:
@@ -221,6 +237,7 @@ def assessment_pipeline_snapshot(limit: int = 25) -> list[dict[str, Any]]:
                 "completed_at": lookup.get("completed_at"),
                 "assessment_duration_minutes": lookup.get("assessment_duration_minutes"),
                 "link_status": lookup.get("link_status"),
+                "termination_reason": (assessment_row or {}).get("termination_reason") or "",
                 "interview": latest_interview,
                 "interview_id": latest_interview.get("id") if latest_interview else None,
                 "interview_status": latest_interview.get("status") if latest_interview else "",
@@ -889,6 +906,7 @@ def report_proctoring_violation(token: str, event_id: str, reason: str) -> dict[
             raise AssessmentServiceError("Could not record exam violation.", status_code=503)
         if assessment.get("status") == AssessmentStatus.TERMINATED:
             assessment_repo.mark_answers_final(int(assessment["id"]))
+            record_candidate_outcome(assessment, AssessmentStatus.TERMINATED)
             db.log_audit("Assessment Terminated", "",
                 f"Assessment #{assessment['id']} terminated after two proctoring violations.",
                 int(assessment.get("jd_id") or 0) or None)
@@ -929,6 +947,7 @@ def store_face_snapshot(token: str, *, snapshot_id: str, kind: str, image: bytes
         assessment = proctoring_media.record_face_violation(aid, snapshot_id, issue) or assessment
         if assessment.get("status") == AssessmentStatus.TERMINATED:
             assessment_repo.mark_answers_final(aid)
+            record_candidate_outcome(assessment, AssessmentStatus.TERMINATED)
             db.log_audit("Assessment Terminated", "",
                 f"Assessment #{aid} terminated: face not detected on camera twice.",
                 int(assessment.get("jd_id") or 0) or None)
@@ -1125,11 +1144,7 @@ def regrade_assessment(assessment_id: int, *, actor: str = "") -> dict[str, Any]
 
     if final_status != previous_status:
         assessment_repo.update_assessment(int(assessment_id), {"status": final_status})
-        candidate_id = int(assessment.get("candidate_id") or 0)
-        db.update_candidate(candidate_id, {"hiring_stage": "Assessment Passed" if passed else "Assessment Failed"})
-        if passed:
-            from services.hiring_process_service import advance_after_assessment
-            advance_after_assessment(candidate_id, int(assessment.get("jd_id") or 0))
+        record_candidate_outcome(assessment, final_status)
     db.log_audit(
         "Assessment Re-graded",
         actor,
@@ -1189,14 +1204,7 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
 
     result_id = assessment_repo.upsert_assessment_result(_result_document(assessment, scoring, final_status, summary))
 
-    db.update_candidate(
-        int(assessment.get("candidate_id") or 0),
-        {"hiring_stage": "Assessment Passed" if passed else "Assessment Failed"},
-    )
-
-    if passed:
-        from services.hiring_process_service import advance_after_assessment
-        advance_after_assessment(int(assessment.get("candidate_id") or 0), int(assessment.get("jd_id") or 0))
+    record_candidate_outcome(assessment, final_status)
 
     db.log_audit(
         "Assessment Completed",

@@ -1118,7 +1118,8 @@ function CandidateProfile() {
           <div className="cp-hero-stage">
             <span className="cp-label">Hiring progress</span>
             <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} steps={steps}
-              stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} onHold={Boolean(candidate.on_hold)} />
+              stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} onHold={Boolean(candidate.on_hold)}
+              assessmentStatus={candidate.assessment_status} />
           </div>
         </section>
 

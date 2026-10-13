@@ -1463,7 +1463,8 @@ function Candidates() {
                       </td>
                       <td className="candidates-simple-client">{c.client_name || 'No client'}</td>
                       <td className="candidates-simple-stage" data-label="Stage">
-                        <StageTrackerDelivery screeningStatus={c.screening_status ?? null} steps={c.hiring_process_steps} stageId={c.stage_id} hiringStage={c.hiring_stage} onHold={Boolean(c.on_hold)} />
+                        <StageTrackerDelivery screeningStatus={c.screening_status ?? null} steps={c.hiring_process_steps} stageId={c.stage_id} hiringStage={c.hiring_stage} onHold={Boolean(c.on_hold)}
+              assessmentStatus={c.assessment_status} />
                       </td>
                       <td className="candidates-simple-actions">
                         <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">

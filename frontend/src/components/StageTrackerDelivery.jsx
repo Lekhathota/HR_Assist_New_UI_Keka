@@ -7,6 +7,19 @@ const SCREENING = {
   rejected: { label: 'Rejected', tone: 'bad' },
 };
 const NOT_SCREENED = { label: 'Not screened', tone: 'none' };
+// Latest assessment for the candidate (candidate.assessment_status from the backend).
+const ASSESSMENT = {
+  SENT: { label: 'Assessment Sent', state: 'current' },
+  IN_PROGRESS: { label: 'Assessment In Progress', state: 'current' },
+  COMPLETED: { label: 'Assessment Submitted', state: 'current' },
+  PASSED: { label: 'Assessment Passed', state: 'ok' },
+  FAILED: { label: 'Assessment Failed', state: 'bad' },
+  TERMINATED: { label: 'Assessment Terminated', state: 'bad' },
+};
+const isAssessmentStep = step => {
+  const name = String(step?.name || '').toLowerCase();
+  return name.includes('assessment') || name === 'test';
+};
 
 const ICON_PATHS = {
   ok: 'M3.5 8.5l3 3 6-7',
@@ -40,37 +53,46 @@ function interviewState(hiringStage) {
  * - the JD's configured hiring process (step names + the candidate's current step), or
  * - when no process is configured, Screening (screening result) and Interview (interview status).
  */
-export function buildStages({ screeningStatus, steps, stageId, hiringStage, onHold }) {
+export function buildStages({ screeningStatus, steps, stageId, hiringStage, onHold, assessmentStatus }) {
   const screening = SCREENING[screeningStatus] || NOT_SCREENED;
   const rejected = screeningStatus === 'rejected';
+  const assessment = ASSESSMENT[assessmentStatus];
 
   if (Array.isArray(steps) && steps.length) {
-    const current = steps.findIndex(step => step.id === stageId);
+    let current = steps.findIndex(step => step.id === stageId);
+    const assessmentIndex = steps.findIndex(isAssessmentStep);
+    // The assessment outcome is authoritative until the candidate moves past that step.
+    const onAssessment = assessment && assessmentIndex >= 0 && current <= assessmentIndex && !rejected;
+    if (onAssessment) current = assessmentIndex;
     const items = steps.map((step, i) => {
       let state = 'none';
       if (i < current) state = 'ok';
-      else if (i === current) state = rejected ? 'bad' : onHold ? 'warn' : 'current';
+      else if (i === current) state = rejected ? 'bad' : onAssessment ? assessment.state : onHold ? 'warn' : 'current';
       return { name: step.name, state };
     });
-    const stageName = current >= 0 ? steps[current].name : 'Not started';
+    const failed = onAssessment && assessment.state === 'bad';
+    const stageName = onAssessment ? assessment.label : current >= 0 ? steps[current].name : 'Not started';
     const label = rejected ? 'Rejected' : onHold ? `${stageName} · On hold` : stageName;
-    const tone = rejected ? 'bad' : onHold ? 'warn' : current >= 0 ? 'ok' : 'none';
+    const tone = rejected || failed ? 'bad' : onHold ? 'warn' : current >= 0 ? 'ok' : 'none';
     return { items, label, tone };
   }
 
   const interview = rejected ? 'none' : interviewState(hiringStage);
+  const assessmentState = rejected || !assessment ? 'none' : assessment.state;
   const items = [
     { name: 'Screening', state: screening.tone === 'none' ? 'current' : screening.tone },
+    { name: 'Assessment', state: assessmentState },
     { name: 'Interview', state: interview },
   ];
-  const label = interview !== 'none' ? hiringStage : screening.label;
-  const tone = interview === 'bad' || rejected ? 'bad' : interview === 'warn' || screening.tone === 'warn' ? 'warn'
-    : interview !== 'none' || screening.tone === 'ok' ? 'ok' : 'none';
+  const label = interview !== 'none' ? hiringStage : assessmentState !== 'none' ? assessment.label : screening.label;
+  const latest = interview !== 'none' ? interview : assessmentState;
+  const tone = latest === 'bad' || rejected ? 'bad' : latest === 'warn' || (latest === 'none' && screening.tone === 'warn') ? 'warn'
+    : latest !== 'none' || screening.tone === 'ok' ? 'ok' : 'none';
   return { items, label: onHold && !rejected ? `${label} · On hold` : label, tone };
 }
 
-export default function StageTrackerDelivery({ screeningStatus, steps, stageId, hiringStage, onHold }) {
-  const { items, label, tone } = buildStages({ screeningStatus, steps, stageId, hiringStage, onHold });
+export default function StageTrackerDelivery({ screeningStatus, steps, stageId, hiringStage, onHold, assessmentStatus }) {
+  const { items, label, tone } = buildStages({ screeningStatus, steps, stageId, hiringStage, onHold, assessmentStatus });
   return (
     <div className={`stx stx--${tone}`} role="group" aria-label={`Stage: ${label}`} title={label}
       style={{ '--stx-cols': items.length }}>

@@ -450,3 +450,8 @@
 
 .ab-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .ab-result-head h2 { margin: 0; }
+.ab-proctor-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.ab-proctor-head h2 { margin: 0; }
+.ab-proctor-live { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: #b42318; font-size: 14px; font-weight: 600; }
+.ab-proctor-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #d92d20; }
+.ab-proctor-download { justify-self: start; }

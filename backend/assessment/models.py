@@ -39,6 +39,17 @@ class AssessmentStatus(str, Enum):
         return frozenset({cls.SENT, cls.IN_PROGRESS})
 
 
+# Candidate-facing hiring stage shown on the Talent pages for each assessment state.
+ASSESSMENT_STAGE_LABELS = {
+    "SENT": "Assessment Sent",
+    "IN_PROGRESS": "Assessment In Progress",
+    "COMPLETED": "Assessment Submitted",
+    "PASSED": "Assessment Passed",
+    "FAILED": "Assessment Failed",
+    "TERMINATED": "Assessment Terminated",
+}
+
+
 class QuestionType(str, Enum):
     MCQ = "mcq"
     SHORT_ANSWER = "short_answer"

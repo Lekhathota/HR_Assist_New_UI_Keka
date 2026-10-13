@@ -560,7 +560,7 @@ function AssessmentBuilder() {
         )}
 
         {['IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(assessment?.status) && (
-          <ProctoringEvidence assessmentId={assessmentId} />
+          <ProctoringEvidence assessmentId={assessmentId} live={assessment?.status === 'IN_PROGRESS'} />
         )}
 
         <div className="ab-settings white-card">

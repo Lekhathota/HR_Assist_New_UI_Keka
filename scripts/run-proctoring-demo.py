@@ -10,10 +10,12 @@ import importlib.util
 from datetime import timedelta
 from pathlib import Path
 import random
+import secrets
 import sys
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from werkzeug.security import generate_password_hash
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / "backend" / ".env")
@@ -42,7 +44,7 @@ QUESTION_BANK = [
 ]
 
 
-def create_demo_attempt(label: str, candidate_name: str) -> str:
+def create_demo_attempt(label: str, candidate_name: str) -> tuple[str, int]:
     token = generate_access_token()
     now = utc_now()
     assessment_id = repository.create_assessment({
@@ -73,7 +75,7 @@ def create_demo_attempt(label: str, candidate_name: str) -> str:
         {**question, "assessment_id": assessment_id, "sort_order": index}
         for index, question in enumerate(questions)
     ])
-    return token
+    return token, assessment_id
 
 
 def main() -> None:
@@ -100,9 +102,22 @@ def main() -> None:
     db._db.assessments.create_index("access_token", unique=True, sparse=True)
     db._db.questions.create_index("id", unique=True)
     ensure_proctoring_indexes()
+    # A throwaway recruiter login for this demo database only, to review the evidence.
+    reviewer_password = secrets.token_urlsafe(9)
+    db._db.users.create_index("username", unique=True)
+    db._db.users.update_one({"username": "demo.reviewer"}, {
+        "$set": {"password": generate_password_hash(reviewer_password), "role": "admin", "is_active": True,
+                 "email": "reviewer@example.invalid"},
+        "$setOnInsert": {"id": 1, "username": "demo.reviewer"},
+    }, upsert=True)
     db._db.candidates.update_one({"id": 1}, {"$setOnInsert": {
         "id": 1, "name": args.candidate_name, "email": "demo@example.invalid", "jd_id": 1,
         "status": "Selected", "match_score": 90, "structured_data": {},
+    }}, upsert=True)
+    # The hiring pipeline lists screened, selected candidates.
+    db._db.comparisons.update_one({"candidate_id": 1, "jd_id": 1}, {"$setOnInsert": {
+        "id": 1, "candidate_id": 1, "jd_id": 1, "status": "Selected", "match_score": 90,
+        "comparison_date": utc_now(), "jd_title": "Practice assessment",
     }}, upsert=True)
     db._db.job_descriptions.update_one({"id": 1}, {"$setOnInsert": {
         "id": 1, "title": "Practice assessment", "status": "Active",
@@ -116,8 +131,10 @@ def main() -> None:
     app = module.app
     app.config["SESSION_COOKIE_SECURE"] = False
     for label in ("Primary", "Spare"):
-        token = create_demo_attempt(label, args.candidate_name)
-        print(f"{label}: http://localhost:{args.port}/assessment/{token}", flush=True)
+        token, assessment_id = create_demo_attempt(label, args.candidate_name)
+        print(f"{label} candidate link: http://localhost:{args.port}/assessment/{token}", flush=True)
+        print(f"{label} View candidate test: http://localhost:{args.port}/hiring-pipeline/assessment/{assessment_id}", flush=True)
+    print(f"Reviewer login (demo database only): demo.reviewer / {reviewer_password}", flush=True)
     print("Isolated demo database only. Links expire in 24 hours. No emails sent.", flush=True)
     print(f"Photos: {args.database}.proctoring_snapshots | Recordings: {args.database}.proctoring_recordings (GridFS)", flush=True)
     app.run(host="127.0.0.1", port=args.port, debug=False, use_reloader=False)

@@ -119,6 +119,11 @@ def resolve_process(jd: dict[str, Any] | None, candidate: dict[str, Any] | None 
     return normalize_process({"steps": stages})
 
 
+def is_assessment_step(step: dict[str, Any]) -> bool:
+    name = str(step.get("name") or "").casefold()
+    return "assessment" in name or name == "test"
+
+
 def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None) -> dict[str, Any]:
     process = resolve_process(jd, candidate)
     steps = process["steps"]
@@ -142,6 +147,8 @@ def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None
             or candidate.get("screening_status") in {"accepted", "rejected", "waitlisted"}
         ) else None
         stage_id = next((step["id"] for step in steps if step["name"].casefold() == name), None)
+        if "assessment" in hiring_stage and not candidate.get("automation_paused"):
+            stage_id = next((step["id"] for step in steps if is_assessment_step(step)), stage_id)
     stage_name = next((step["name"] for step in steps if step["id"] == stage_id), None) or "Not Started"
     return {
         "configured": True,
@@ -183,8 +190,7 @@ def advance_after_assessment(candidate_id: int, jd_id: int) -> bool:
     process = resolve_process(jd, candidate)
     steps = process["steps"]
     current = next((i for i, step in enumerate(steps) if step["id"] == candidate.get("stage_id")), -1)
-    assessment_index = next((i for i, step in enumerate(steps)
-                             if "assessment" in step["name"].casefold() or "test" == step["name"].casefold()), -1)
+    assessment_index = next((i for i, step in enumerate(steps) if is_assessment_step(step)), -1)
     mapped = process["event_mappings"].get("assessment_passed")
     if mapped:
         target = next(i for i, step in enumerate(steps) if step["id"] == mapped)

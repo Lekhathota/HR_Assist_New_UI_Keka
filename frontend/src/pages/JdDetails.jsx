@@ -1862,6 +1862,22 @@ const downloadPDF = (reportText) => {
                                   </div>
                                 )}
 
+                                {assessment.status === 'TERMINATED' && (
+                                  <div className="jd-assessment-status-note">
+                                    <span><i className="fas fa-ban"></i> Assessment Terminated</span>
+                                  </div>
+                                )}
+
+                                {['IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(assessment.status) && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary jd-table-btn"
+                                    onClick={() => openAssessmentBuilder(c)}
+                                  >
+                                    <i className="fas fa-user-shield"></i> View candidate test
+                                  </button>
+                                )}
+
                                 {assessment.eligibleForInterview && (
                                   <button
                                     type="button"

@@ -49,6 +49,7 @@ function toneOf(value) {
   return 'muted';
 }
 
+const ASSESSMENT_REFRESH_MS = 30000;
 const ASSESSMENT_TONE = {
   NOT_CREATED: 'muted', DRAFT: 'info', SENT: 'warn', IN_PROGRESS: 'warn', COMPLETED: 'info', PASSED: 'good', FAILED: 'bad', TERMINATED: 'bad',
 };
@@ -259,15 +260,15 @@ function HiringPipeline() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const timeOptions = useMemo(() => buildTimeOptions(blockedSlots), [blockedSlots]);
 
-  const loadAssessments = async () => {
-    setLoadingAssessments(true);
+  const loadAssessments = async ({ silent = false } = {}) => {
+    if (!silent) setLoadingAssessments(true);
     try {
       const data = await apiGet('/api/assessment/pipeline?limit=500');
       setAssessmentRows(data.pipeline || []);
     } catch (err) {
-      toast({ type: 'error', message: err.message || 'Could not load assessment pipeline.' });
+      if (!silent) toast({ type: 'error', message: err.message || 'Could not load assessment pipeline.' });
     } finally {
-      setLoadingAssessments(false);
+      if (!silent) setLoadingAssessments(false);
     }
   };
 
@@ -286,6 +287,14 @@ function HiringPipeline() {
   useEffect(() => {
     loadInterviews();
     loadAssessments();
+  }, []);
+
+  // Candidates finish, fail or get terminated while this page is open; keep statuses current.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') loadAssessments({ silent: true }); };
+    const timer = window.setInterval(refresh, ASSESSMENT_REFRESH_MS);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
   }, []);
 
   useEffect(() => {
@@ -853,7 +862,9 @@ function HiringPipeline() {
                           {showScore && row.assessment_percentage != null && <span className="hp-match hp-match-test" title="Assessment score">{pct(row.assessment_percentage)}<small>test</small></span>}
                         </div>
                         <div className="hp-pills">
-                          <span className={`hp-pill ${ASSESSMENT_TONE[status] || 'muted'}`}>{formatAssessmentStatus(status)}</span>
+                          <span className={`hp-pill ${ASSESSMENT_TONE[status] || 'muted'}`}
+                            title={status === 'TERMINATED' ? row.termination_reason || undefined : undefined}>{formatAssessmentStatus(status)}</span>
+                          {status === 'TERMINATED' && row.termination_reason && <span className="hp-pill bad">{row.termination_reason}</span>}
                           {activeInterview
                             ? <span className={`hp-pill ${toneOf(row.interview_status)}`}>{interviewLabel(row.interview_status)}</span>
                             : status !== 'NOT_CREATED' && status !== 'DRAFT' && <span className={`hp-pill ${toneOf(row.link_status)}`}>Link {String(row.link_status || 'not sent').toLowerCase()}</span>}
@@ -865,9 +876,9 @@ function HiringPipeline() {
                               {generatingAssessmentId === generatedKey ? 'Generating…' : 'Generate assessment'}
                             </button>
                           )}
-                          {row.assessment_id && ['DRAFT', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(status) && (
+                          {row.assessment_id && ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(status) && (
                             <button type="button" className={`hp-btn ${status === 'DRAFT' ? 'hp-btn-primary' : 'hp-btn-ghost'}`} onClick={() => reviewAssessment(row)}>
-                              <i className="fas fa-clipboard-check" aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'Review'}
+                              <i className={`fas ${status === 'DRAFT' ? 'fa-clipboard-check' : 'fa-user-shield'}`} aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'View candidate test'}
                             </button>
                           )}
                           {row.eligible_for_interview && !activeInterview && (

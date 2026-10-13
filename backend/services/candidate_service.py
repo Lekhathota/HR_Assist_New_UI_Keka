@@ -11,6 +11,7 @@ import database as db
 from app.regex_extractor import extract_resume_regex
 from app.text_extractor import extract_text
 from app.utils import clean_resume_text
+from assessment.models import ASSESSMENT_STAGE_LABELS
 from services.hiring_process_service import compute_effective_stage
 from services.role_category_service import categorize_candidate
 
@@ -273,13 +274,33 @@ def _interview_stage(candidate_id: int) -> str:
     return "Interview Scheduled"
 
 
+def _latest_assessment(candidate: dict[str, Any]) -> dict[str, Any] | None:
+    candidate_id = int(candidate.get("id") or 0)
+    if not candidate_id:
+        return None
+    query: dict[str, Any] = {"candidate_id": candidate_id}
+    if candidate.get("jd_id"):
+        query["jd_id"] = int(candidate["jd_id"])
+    return db._database().assessments.find_one(
+        query, {"_id": 0, "id": 1, "status": 1, "termination_reason": 1}, sort=[("created_at", -1)])
+
+
 def _apply_current_hiring_stage(candidate: dict[str, Any]) -> dict[str, Any]:
+    # Stage precedence: resume rejection, then interview progress, then the
+    # latest assessment, then screening. Derived live so it never goes stale.
+    assessment = _latest_assessment(candidate)
+    if assessment:
+        candidate["assessment_id"] = assessment.get("id")
+        candidate["assessment_status"] = assessment.get("status")
+        candidate["assessment_termination_reason"] = assessment.get("termination_reason") or ""
     if str(candidate.get("status") or "").lower() == "rejected":
         candidate["hiring_stage"] = "Rejected"
         return candidate
     stage = _interview_stage(int(candidate.get("id") or 0))
     if stage:
         candidate["hiring_stage"] = stage
+    elif assessment and assessment.get("status") in ASSESSMENT_STAGE_LABELS:
+        candidate["hiring_stage"] = ASSESSMENT_STAGE_LABELS[assessment["status"]]
     return candidate
 
 
