@@ -209,6 +209,12 @@ export default function useMediaProctoring(token, { active, initialFaceCount = 0
     }
   }, [token]);
 
+  /** Discards the photo and returns to the live camera so the candidate can reposition. */
+  const retakeReference = useCallback(() => {
+    setError('');
+    setReference({ status: 'idle', message: '', url: '' });
+  }, []);
+
   const recheckFace = useCallback(async () => {
     try {
       const result = await captureAndCheck(videoRef.current);
@@ -329,6 +335,6 @@ export default function useMediaProctoring(token, { active, initialFaceCount = 0
     requestCamera: () => request('camera'),
     requestMicrophone: () => request('mic'),
     requestScreen: () => request('screen'),
-    captureReference, recheckFace, restore, finish,
+    captureReference, retakeReference, recheckFace, restore, finish,
   };
 }
