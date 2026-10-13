@@ -69,6 +69,36 @@ function CodingResultBreakdown({ result, questions }) {
   );
 }
 
+const isChoice = type => type === 'mcq' || type === 'true_false';
+
+// What the candidate actually submitted for one question, with its grading when scored.
+export function CandidateAnswer({ question, answer, result }) {
+  const text = String(answer?.answer ?? '').trim();
+  const choice = isChoice(question.question_type);
+  // Terminated attempts are not scored, so choice answers are checked against the key here.
+  const correct = result ? Boolean(result.is_correct)
+    : choice && text && question.correct_answer ? text === String(question.correct_answer).trim() : null;
+  const verdict = !text ? { label: 'Not answered', tone: 'muted' }
+    : correct === true ? { label: 'Correct', tone: 'ok' }
+      : correct === false ? { label: 'Incorrect', tone: 'bad' }
+        : { label: 'Not graded', tone: 'muted' };
+  return (
+    <div className={`ab-candidate-answer ab-answer-${verdict.tone}`}>
+      <div className="ab-candidate-answer-head">
+        <strong><i className="fas fa-user-edit" aria-hidden="true" /> Candidate's answer</strong>
+        <span className={`ab-answer-verdict ab-answer-verdict-${verdict.tone}`}>{verdict.label}</span>
+        {result && <span className="ab-points">{result.points_earned}/{result.points_possible} pts</span>}
+        {answer?.language && <span className="ab-skill">{answer.language}</span>}
+      </div>
+      {!text ? <p className="ab-muted">The candidate did not answer this question.</p>
+        : choice ? <p className="ab-answer-choice">{text}</p>
+          : question.question_type === 'short_answer' ? <p className="ab-answer-text">{text}</p>
+            : <pre className="ab-code-preview">{answer.answer}</pre>}
+      {choice && correct === false && question.correct_answer && <p className="ab-muted">Correct answer: {question.correct_answer}</p>}
+    </div>
+  );
+}
+
 function typeBadgeClass(type) {
   if (type === 'coding') return 'ab-badge-coding';
   if (type === 'sql') return 'ab-badge-sql';
@@ -96,9 +126,14 @@ function AssessmentBuilder() {
   const [busy, setBusy] = useState(false);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState(null);
+  const [candidateAnswers, setCandidateAnswers] = useState({});
 
   const isDraft = assessment?.status === 'DRAFT';
   const isReviewable = ['PASSED', 'FAILED', 'COMPLETED'].includes(assessment?.status);
+  // Answers exist once the candidate starts, including attempts that were terminated.
+  const showAnswers = ['IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(assessment?.status);
+  const resultByQuestion = new Map((assessmentResult?.question_results || []).map(r => [r.question_id, r]));
+  const answeredCount = Object.values(candidateAnswers).filter(a => String(a?.answer ?? '').trim()).length;
   const sortedQuestions = [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const loadAssessment = useCallback(async () => {
@@ -108,6 +143,7 @@ function AssessmentBuilder() {
       const data = await apiGet(`/api/assessment/${assessmentId}`);
       setAssessment(data.assessment || null);
       setQuestions(data.questions || []);
+      setCandidateAnswers(Object.fromEntries((data.answers || []).map(row => [row.question_id, row])));
       setDraft({
         title: data.assessment?.title || '',
         passing_score: data.assessment?.passing_score ?? 70,
@@ -619,6 +655,11 @@ function AssessmentBuilder() {
 
         <div className="ab-questions">
           <h2>Questions ({sortedQuestions.length})</h2>
+          {showAnswers && <p className="ab-answer-summary">
+            <i className="fas fa-user-edit" aria-hidden="true" /> Candidate answered <strong>{answeredCount} of {sortedQuestions.length}</strong> questions.
+            {assessment?.status === 'IN_PROGRESS' && ' The test is still in progress; reload to see the latest answers.'}
+            {assessment?.status === 'TERMINATED' && ' The test was terminated, so these are the answers saved up to that point and they were not scored.'}
+          </p>}
           {sortedQuestions.length === 0 ? (
             <div className="ab-empty">No questions yet. Generate or add questions to begin.</div>
           ) : (
@@ -668,6 +709,7 @@ function AssessmentBuilder() {
                       {q.question_type === 'sql' && q.correct_answer && !(q.test_cases || []).length && (
                         <pre className="ab-code-preview">{q.correct_answer}</pre>
                       )}
+                      {showAnswers && <CandidateAnswer question={q} answer={candidateAnswers[q.id]} result={resultByQuestion.get(q.id)} />}
                       {(q.question_type === 'coding' || q.question_type === 'sql') && (
                         <ReferenceSolutionPanel question={q}
                           onChange={patch => setQuestions(prev => prev.map(item => (item.id === q.id ? { ...item, ...patch } : item)))} />

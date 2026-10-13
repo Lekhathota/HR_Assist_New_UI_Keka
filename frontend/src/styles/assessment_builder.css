@@ -455,3 +455,16 @@
 .ab-proctor-live { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: #b42318; font-size: 14px; font-weight: 600; }
 .ab-proctor-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #d92d20; }
 .ab-proctor-download { justify-self: start; }
+
+/* Candidate answers on the View candidate test page */
+.ab-answer-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; color: #536174; }
+.ab-candidate-answer { margin: 14px 0; padding: 14px 16px; border: 1px solid #e2e7ed; border-left: 4px solid #9aa4b2; border-radius: 10px; background: #fafbfc; }
+.ab-candidate-answer.ab-answer-ok { border-left-color: #1f9d55; background: #f3fbf6; }
+.ab-candidate-answer.ab-answer-bad { border-left-color: #d92d20; background: #fef5f4; }
+.ab-candidate-answer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.ab-answer-verdict { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #eceff3; color: #536174; }
+.ab-answer-verdict-ok { background: #dcf3e5; color: #1f7a45; }
+.ab-answer-verdict-bad { background: #fde3e0; color: #b42318; }
+.ab-answer-choice { margin: 0; font-weight: 600; }
+.ab-answer-text { margin: 0; white-space: pre-wrap; }
+.ab-candidate-answer .ab-muted { margin: 6px 0 0; }
