@@ -15,7 +15,7 @@ const makeMedia = (overrides = {}) => ({
   error: '', busy: '', reference: { status: 'ok', message: '', url: '' }, faceCount: 0, faceWarning: null,
   terminated: false, lost: [], pending: 0, ready: true,
   requestCamera: jest.fn(), requestMicrophone: jest.fn(), requestScreen: jest.fn(),
-  captureReference: jest.fn(), recheckFace: jest.fn(async () => true), restore: jest.fn(async () => true),
+  captureReference: jest.fn(), retakeReference: jest.fn(), recheckFace: jest.fn(async () => true), restore: jest.fn(async () => true),
   finish: jest.fn(async () => {}), ...overrides,
 });
 
@@ -456,4 +456,13 @@ test('SQL questions show the tables and the expected sample result', async () =>
   expect(container.textContent).toContain('CREATE TABLE t (a INTEGER);');
   expect($('.ca-result-table')).not.toBeNull();
   expect($('.ca-editor-language').textContent).toBe('SQL (SQLite)');
+});
+
+test('retaking the face photo returns to the live camera instead of re-capturing', async () => {
+  await renderPayload(makePayload(14), false);
+  await acceptTermsAndSetup();
+  expect(container.textContent).toContain('Face verified');
+  click(button('Retake photo'));
+  expect(mockMedia.retakeReference).toHaveBeenCalledTimes(1);
+  expect(mockMedia.captureReference).not.toHaveBeenCalled();
 });

@@ -94,7 +94,8 @@ export default function ProctoringSetup({ media, proctoring, resuming, onBack, o
               <i className="fas fa-video" aria-hidden="true" /> {busy === 'camera' ? 'Waiting for permission…' : 'Turn on camera'}</button>
             : reference.status === 'ok'
               ? <>
-                <button type="button" className="ca-btn ca-btn-secondary" onClick={media.captureReference}>Retake photo</button>
+                <button type="button" className="ca-btn ca-btn-secondary" onClick={media.retakeReference}>
+                  <i className="fas fa-redo" aria-hidden="true" /> Retake photo</button>
                 <button type="button" className="ca-btn ca-btn-primary" onClick={() => setStep(2)}>Continue <i className="fas fa-arrow-right" aria-hidden="true" /></button>
               </>
               : <button type="button" className="ca-btn ca-btn-primary" disabled={reference.status === 'checking'} onClick={media.captureReference}>

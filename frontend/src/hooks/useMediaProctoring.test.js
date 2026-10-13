@@ -217,3 +217,17 @@ test('stopping a device before the exam starts is not a violation', async () => 
   expect(options.onViolation).not.toHaveBeenCalled();
   expect(hook.ready).toBe(false);
 });
+
+test('retake discards the photo so a new one can be captured and verified', async () => {
+  await render();
+  await setUpDevices();
+  expect(hook.ready).toBe(true);
+  await act(async () => { hook.retakeReference(); });
+  expect(hook.reference).toEqual({ status: 'idle', message: '', url: '' });
+  expect(hook.ready).toBe(false);
+  expect(hook.streams.camera).not.toBeNull();
+  await act(async () => { await hook.captureReference(); });
+  expect(hook.reference.status).toBe('ok');
+  expect(uploads('reference')).toHaveLength(2);
+  expect(hook.ready).toBe(true);
+});
