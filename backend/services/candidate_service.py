@@ -12,7 +12,7 @@ from app.regex_extractor import extract_resume_regex
 from app.text_extractor import extract_text
 from app.utils import clean_resume_text
 from assessment.models import ASSESSMENT_STAGE_LABELS
-from services.hiring_process_service import compute_effective_stage
+from services.hiring_process_service import compute_effective_stage, is_assessment_step, resolve_process
 from services.role_category_service import categorize_candidate
 
 
@@ -253,8 +253,9 @@ def candidate_ids_with_interview_in_range(range_start: datetime | None, range_en
     return list({int(row.get("candidate_id") or 0) for row in interviews if row.get("candidate_id")})
 
 
-def _interview_stage(candidate_id: int) -> str:
-    interviews = db.get_interviews({"candidate_id": candidate_id})
+def _interview_stage(candidate_id: int, interviews: list[dict[str, Any]] | None = None) -> str:
+    if interviews is None:
+        interviews = db.get_interviews({"candidate_id": candidate_id})
     if not interviews:
         return ""
     now = datetime.now(timezone.utc)
@@ -274,10 +275,14 @@ def _interview_stage(candidate_id: int) -> str:
     return "Interview Scheduled"
 
 
-def _latest_assessment(candidate: dict[str, Any]) -> dict[str, Any] | None:
+def _latest_assessment(candidate: dict[str, Any], prefetched: dict[str, Any] | None = None) -> dict[str, Any] | None:
     candidate_id = int(candidate.get("id") or 0)
     if not candidate_id:
         return None
+    if prefetched is not None:
+        jd_id = int(candidate["jd_id"]) if candidate.get("jd_id") else None
+        rows = prefetched["assessments"].get(candidate_id, [])
+        return next((row for row in rows if jd_id is None or row.get("jd_id") == jd_id), None)
     query: dict[str, Any] = {"candidate_id": candidate_id}
     if candidate.get("jd_id"):
         query["jd_id"] = int(candidate["jd_id"])
@@ -285,10 +290,10 @@ def _latest_assessment(candidate: dict[str, Any]) -> dict[str, Any] | None:
         query, {"_id": 0, "id": 1, "status": 1, "termination_reason": 1}, sort=[("created_at", -1)])
 
 
-def _apply_current_hiring_stage(candidate: dict[str, Any]) -> dict[str, Any]:
+def _apply_current_hiring_stage(candidate: dict[str, Any], prefetched: dict[str, Any] | None = None) -> dict[str, Any]:
     # Stage precedence: resume rejection, then interview progress, then the
     # latest assessment, then screening. Derived live so it never goes stale.
-    assessment = _latest_assessment(candidate)
+    assessment = _latest_assessment(candidate, prefetched)
     if assessment:
         candidate["assessment_id"] = assessment.get("id")
         candidate["assessment_status"] = assessment.get("status")
@@ -296,7 +301,11 @@ def _apply_current_hiring_stage(candidate: dict[str, Any]) -> dict[str, Any]:
     if str(candidate.get("status") or "").lower() == "rejected":
         candidate["hiring_stage"] = "Rejected"
         return candidate
-    stage = _interview_stage(int(candidate.get("id") or 0))
+    candidate_id = int(candidate.get("id") or 0)
+    interviews = prefetched["interviews"].get(candidate_id, []) if prefetched is not None else None
+    stage = _interview_stage(candidate_id, interviews)
+    # Kept separately because a configured pipeline replaces hiring_stage with its step name.
+    candidate["interview_stage"] = stage
     if stage:
         candidate["hiring_stage"] = stage
     elif assessment and assessment.get("status") in ASSESSMENT_STAGE_LABELS:
@@ -398,8 +407,75 @@ def _merge_reextracted_profile(candidate: dict[str, Any], *, force: bool = False
     return True
 
 
+ASSESSMENT_FAILURE_STATUSES = {"FAILED", "TERMINATED"}
+
+
+def _past_assessment_step(candidate: dict[str, Any]) -> bool:
+    steps = candidate.get("hiring_process_steps") or []
+    ids = [step.get("id") for step in steps]
+    current = ids.index(candidate.get("stage_id")) if candidate.get("stage_id") in ids else -1
+    assessment_index = next((i for i, step in enumerate(steps) if is_assessment_step(step)), -1)
+    return assessment_index >= 0 and current > assessment_index
+
+
+# Purpose: Overall Talent-page result: the screening result, overridden by a later rejection.
+def candidate_outcome(candidate: dict[str, Any]) -> str:
+    status = str(candidate.get("status") or "").strip().lower()
+    if status == "rejected":
+        return "Rejected"
+    if str(candidate.get("interview_stage") or "").strip().lower() == "rejected after interview":
+        return "Rejected"
+    if candidate.get("assessment_status") in ASSESSMENT_FAILURE_STATUSES and not _past_assessment_step(candidate):
+        return "Rejected"
+    return "Selected" if status == "selected" else "Pending"
+
+
+def _prefetch_list_data(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Load interviews, assessments and comparisons for many candidates in a few queries."""
+    ids = [int(row["id"]) for row in rows if row.get("id")]
+    interviews: dict[int, list[dict[str, Any]]] = {}
+    for interview in db.get_interviews({"candidate_ids": ids}) if ids else []:
+        interviews.setdefault(int(interview.get("candidate_id") or 0), []).append(interview)
+    assessments: dict[int, list[dict[str, Any]]] = {}
+    if ids:
+        cursor = db._database().assessments.find(
+            {"candidate_id": {"$in": ids}},
+            {"_id": 0, "id": 1, "candidate_id": 1, "jd_id": 1, "status": 1, "termination_reason": 1},
+            sort=[("created_at", -1)],
+        )
+        for row in cursor:
+            assessments.setdefault(int(row.get("candidate_id") or 0), []).append(row)
+    return {
+        "interviews": interviews,
+        "assessments": assessments,
+        "comparisons": db.get_comparisons_for_candidates(ids) if ids else {},
+        "jds": {},
+        "processes": {},
+    }
+
+
+def _cached_jd(jd_id: int, prefetched: dict[str, Any] | None) -> dict[str, Any] | None:
+    if prefetched is None:
+        return db.get_jd_by_id(jd_id)
+    if jd_id not in prefetched["jds"]:
+        prefetched["jds"][jd_id] = db.get_jd_by_id(jd_id)
+    return prefetched["jds"][jd_id]
+
+
+def _effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None, prefetched: dict[str, Any] | None) -> dict[str, Any]:
+    if prefetched is None:
+        return compute_effective_stage(candidate, jd)
+    # The pipeline only depends on the job and client, so resolve it once per pair.
+    key = ((jd or {}).get("id"), (jd or {}).get("client_id") or candidate.get("client_id"),
+           (jd or {}).get("client_account_id") or candidate.get("client_account_id"))
+    if key not in prefetched["processes"]:
+        prefetched["processes"][key] = resolve_process(jd, candidate)
+    return compute_effective_stage(candidate, jd, process=prefetched["processes"][key])
+
+
 # Purpose: Normalizes candidate record into the app's expected format.
-def normalize_candidate_record(candidate: dict[str, Any], *, repair: bool = True, force_reextract: bool = False) -> dict[str, Any]:
+def normalize_candidate_record(candidate: dict[str, Any], *, repair: bool = True, force_reextract: bool = False,
+                               prefetched: dict[str, Any] | None = None) -> dict[str, Any]:
     candidate = dict(candidate or {})
     candidate["structured_data"] = _normalize_structured_data(candidate.get("structured_data"))
     if repair:
@@ -429,16 +505,23 @@ def normalize_candidate_record(candidate: dict[str, Any], *, repair: bool = True
     if should_persist_category:
         db.update_candidate(int(candidate["id"]), category_payload)
     _sync_candidate_status(candidate)
-    _apply_current_hiring_stage(candidate)
-    jd = db.get_jd_by_id(int(candidate["jd_id"])) if candidate.get("jd_id") else None
-    effective = compute_effective_stage(candidate, jd)
+    candidate["interview_stage"] = ""
+    _apply_current_hiring_stage(candidate, prefetched)
+    jd = _cached_jd(int(candidate["jd_id"]), prefetched) if candidate.get("jd_id") else None
+    effective = _effective_stage(candidate, jd, prefetched)
     if effective["configured"]:
         candidate["hiring_stage"] = effective["stage_name"]
     candidate["stage_id"] = effective["stage_id"]
     candidate["on_hold"] = effective["on_hold"]
     candidate["automation_paused"] = effective["automation_paused"]
     candidate["hiring_process_steps"] = effective["steps"]
-    comparisons = db.get_comparisons(candidate_id=int(candidate["id"])) if candidate.get("id") else []
+    candidate["outcome"] = candidate_outcome(candidate)
+    if not candidate.get("id"):
+        comparisons = []
+    elif prefetched is not None:
+        comparisons = prefetched["comparisons"].get(int(candidate["id"]), [])
+    else:
+        comparisons = db.get_comparisons(candidate_id=int(candidate["id"]))
     candidate["job_applications"] = [
         {"jd_id": comparison.get("jd_id"), "jd_title": comparison.get("jd_title") or "Job",
          "status": comparison.get("status") or "Pending", "candidate_id": candidate.get("id")}
@@ -447,6 +530,11 @@ def normalize_candidate_record(candidate: dict[str, Any], *, repair: bool = True
     if jd and not any(item.get("jd_id") == jd.get("id") for item in candidate["job_applications"]):
         candidate["job_applications"].append({"jd_id": jd.get("id"), "jd_title": jd.get("title") or "Job",
                                                "status": candidate.get("status") or "Pending", "candidate_id": candidate.get("id")})
+    # The candidate's own job reflects later rejections (interview, assessment), not just screening.
+    if candidate["outcome"] == "Rejected" and jd:
+        for item in candidate["job_applications"]:
+            if item.get("jd_id") == jd.get("id"):
+                item["status"] = "Rejected"
     return candidate
 
 
@@ -468,7 +556,9 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
         return rows
 
     db_filters = {k: v for k, v in filters.items() if k not in {"status"}}
-    rows = [normalize_candidate_record(row, repair=False) for row in db.get_all_candidates(db_filters if db_filters else None)]
+    raw_rows = db.get_all_candidates(db_filters if db_filters else None)
+    prefetched = _prefetch_list_data(raw_rows)
+    rows = [normalize_candidate_record(row, repair=False, prefetched=prefetched) for row in raw_rows]
     for row in rows:
         row["screening_status"] = derive_screening_status(row, row.pop("_screening_comparison", None))
     status_filter = str(filters.get("status") or "").strip().lower()
@@ -476,8 +566,11 @@ def candidates_payload(filters: dict[str, Any] | None = None) -> list[dict[str, 
         # "On Hold" is a manual flag layered on top of the score-driven Selected/Rejected
         # status, not a value that status itself ever holds — filter on the flag instead.
         rows = [row for row in rows if bool(row.get("on_hold"))]
+    elif status_filter == "in process":
+        # Still moving through the pipeline: passed screening, not rejected later, not on hold.
+        rows = [row for row in rows if (row.get("outcome") or candidate_outcome(row)) == "Selected" and not row.get("on_hold")]
     elif status_filter:
-        rows = [row for row in rows if str(row.get("status") or "").lower() == status_filter]
+        rows = [row for row in rows if (row.get("outcome") or candidate_outcome(row)).lower() == status_filter]
     return rows
 
 
@@ -521,6 +614,7 @@ def candidate_profile_payload(candidate_id: int) -> dict[str, Any] | None:
     if not candidate.get("hiring_process_steps"):
         _apply_current_hiring_stage(candidate)
     related = db.get_related_candidate_records(candidate)
+    candidate["related_candidate_ids"] = sorted({int(row["id"]) for row in related if row.get("id")} | {int(candidate_id)})
     comps = []
     for submission in related:
         comps.extend(db.get_comparisons(candidate_id=int(submission["id"])))
@@ -553,7 +647,8 @@ def candidate_profile_payload(candidate_id: int) -> dict[str, Any] | None:
         }
         for co in comps
     ]
-    interviews = db.get_interviews({"candidate_id": candidate_id})
+    # Interviews may be booked against any of this person's submissions.
+    interviews = db.get_interviews({"candidate_ids": candidate["related_candidate_ids"]})
     for interview in interviews:
         email_status = interview.get("email_status") or "sent"
         text_status = interview.get("text_status") or "sent"
@@ -615,6 +710,7 @@ def candidate_profile_payload(candidate_id: int) -> dict[str, Any] | None:
         "screening_summaries": [
             {
                 "jd_title": x.get("jd_title", ""),
+                "match_score": x.get("match_score", 0),
                 "summary": x.get("recommendation") or candidate.get("screening_summary", ""),
                 "status": x.get("status", ""),
                 "rejection_reason": x.get("failure_reason") or candidate.get("rejection_reason", ""),

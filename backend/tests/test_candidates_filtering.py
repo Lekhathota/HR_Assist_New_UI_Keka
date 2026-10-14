@@ -118,3 +118,40 @@ class DeriveScreeningStatusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CandidateOutcomeTests(unittest.TestCase):
+    def test_later_rejections_override_the_screening_result(self) -> None:
+        outcome = candidate_service.candidate_outcome
+        self.assertEqual(outcome({"status": "Selected"}), "Selected")
+        self.assertEqual(outcome({"status": "Rejected"}), "Rejected")
+        self.assertEqual(outcome({"status": "Selected", "interview_stage": "Rejected After Interview"}), "Rejected")
+        self.assertEqual(outcome({"status": "Selected", "assessment_status": "FAILED"}), "Rejected")
+
+    def test_failed_assessment_no_longer_counts_once_moved_past_it(self) -> None:
+        steps = [{"id": "a", "name": "Assessment"}, {"id": "b", "name": "HR"}]
+        candidate = {"status": "Selected", "assessment_status": "FAILED", "hiring_process_steps": steps, "stage_id": "b"}
+        self.assertEqual(candidate_service.candidate_outcome(candidate), "Selected")
+
+
+class CandidatesPayloadOutcomeFilterTests(unittest.TestCase):
+    def _rows(self):
+        return [
+            {"id": 1, "status": "Selected", "on_hold": False},
+            {"id": 2, "status": "Selected", "on_hold": True},
+            {"id": 3, "status": "Selected", "interview_stage": "Rejected After Interview"},
+            {"id": 4, "status": "Rejected"},
+        ]
+
+    def _payload(self, status):
+        with patch.object(candidate_service.db, "get_all_candidates", return_value=self._rows()), \
+            patch.object(candidate_service, "_prefetch_list_data", return_value={}), \
+            patch.object(candidate_service, "normalize_candidate_record", side_effect=lambda row, **_: row):
+            return sorted(row["id"] for row in candidate_service.candidates_payload({"status": status}))
+
+    def test_in_process_excludes_holds_and_later_rejections(self) -> None:
+        self.assertEqual(self._payload("in process"), [1])
+
+    def test_rejected_includes_interview_rejections(self) -> None:
+        self.assertEqual(self._payload("rejected"), [3, 4])
+        self.assertEqual(self._payload("selected"), [1, 2])

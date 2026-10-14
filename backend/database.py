@@ -2057,10 +2057,21 @@ def get_all_candidates(filters: Optional[dict] = None) -> list[dict]:
     rows = list(_database().candidates.find(query).sort("uploaded_at", DESCENDING))
     out = _serialize_docs(rows)
     filter_jd_id = filters.get("jd_id")
+    # One query for every row's screening comparison instead of one per candidate.
+    pairs = {(int(filter_jd_id if filter_jd_id is not None else row.get("jd_id") or 0), int(row.get("id") or 0)) for row in out}
+    pairs = {pair for pair in pairs if pair[0]}
+    comparisons: dict[tuple[int, int], dict] = {}
+    if pairs:
+        cursor = _database().comparisons.find({
+            "candidate_id": {"$in": list({cid for _, cid in pairs})},
+            "jd_id": {"$in": list({jd for jd, _ in pairs})},
+        })
+        for doc in cursor:
+            comparisons.setdefault((int(doc.get("jd_id") or 0), int(doc.get("candidate_id") or 0)), doc)
     for row in out:
         candidate_jd_id = filter_jd_id if filter_jd_id is not None else row.get("jd_id")
         if candidate_jd_id:
-            comparison = _database().comparisons.find_one({"jd_id": int(candidate_jd_id), "candidate_id": int(row.get("id") or 0)}) or {}
+            comparison = comparisons.get((int(candidate_jd_id), int(row.get("id") or 0))) or {}
             row.update({key: comparison.get(key) for key in ("selection_status", "qualification_status", "candidate_source") if key in comparison})
             if comparison:
                 row["_screening_comparison"] = {
@@ -2355,6 +2366,26 @@ def get_comparisons(jd_id: Optional[int] = None, candidate_id: Optional[int] = N
         item["client_id"] = (jd or {}).get("client_id") or (cand or {}).get("client_id")
         item["client_name"] = (jd or {}).get("client_name") or (cand or {}).get("client_name", "")
         out.append(item)
+    return out
+
+
+def get_comparisons_for_candidates(candidate_ids: list[int]) -> dict[int, list[dict]]:
+    """Batch form of get_comparisons(candidate_id=...) keyed by candidate id, newest first."""
+    db = _database()
+    ids = [int(x) for x in candidate_ids]
+    rows = _serialize_docs(list(db.comparisons.find({"candidate_id": {"$in": ids}}).sort("comparison_date", DESCENDING)))
+    jd_ids = list({int(row.get("jd_id") or 0) for row in rows})
+    jds = {int(jd["id"]): jd for jd in db.job_descriptions.find({"id": {"$in": jd_ids}}, {"id": 1, "title": 1, "client_id": 1, "client_name": 1})}
+    names = {int(c["id"]): c for c in db.candidates.find({"id": {"$in": ids}}, {"id": 1, "name": 1, "client_id": 1, "client_name": 1})}
+    out: dict[int, list[dict]] = {}
+    for item in rows:
+        jd = jds.get(int(item.get("jd_id") or 0)) or {}
+        cand = names.get(int(item.get("candidate_id") or 0)) or {}
+        item["jd_title"] = jd.get("title", "")
+        item["candidate_name"] = cand.get("name", "")
+        item["client_id"] = jd.get("client_id") or cand.get("client_id")
+        item["client_name"] = jd.get("client_name") or cand.get("client_name", "")
+        out.setdefault(int(item.get("candidate_id") or 0), []).append(item)
     return out
 
 
@@ -2872,6 +2903,8 @@ def get_interviews(filters: Optional[dict] = None) -> list[dict]:
         query["recruiter_id"] = int(filters["recruiter_id"])
     if filters.get("candidate_id"):
         query["candidate_id"] = int(filters["candidate_id"])
+    if filters.get("candidate_ids") is not None:
+        query["candidate_id"] = {"$in": [int(x) for x in filters["candidate_ids"]]}
     if filters.get("jd_id"):
         query["jd_id"] = int(filters["jd_id"])
     if filters.get("exclude_cancelled"):

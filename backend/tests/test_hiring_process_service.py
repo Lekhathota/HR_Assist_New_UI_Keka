@@ -145,6 +145,14 @@ class ComputeEffectiveStageTests(unittest.TestCase):
         self.assertTrue(result["configured"])
         self.assertEqual(result["stage_name"], "Not Started")
 
+    def test_job_process_reflects_interview_progress_without_stored_stage(self) -> None:
+        steps = [{"id": "s1", "name": "Resume Screening"}, {"id": "s2", "name": "Technical Interview"}]
+        result = hps.compute_effective_stage(
+            _candidate(status="Selected", hiring_stage="Rejected After Interview"), _jd(steps=steps))
+        self.assertEqual(result["stage_id"], "s2")
+        screened = hps.compute_effective_stage(_candidate(status="Selected"), _jd(steps=steps))
+        self.assertEqual(screened["stage_name"], "Resume Screening")
+
     def test_configured_jd_resolves_stage_name(self) -> None:
         steps = [{"id": "s1", "name": "Round 1"}, {"id": "s2", "name": "Round 2"}]
         result = hps.compute_effective_stage(_candidate(stage_id="s2"), _jd(steps=steps))
