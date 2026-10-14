@@ -8,6 +8,7 @@ reports "not_configured", and delivery failures are classified as transient
 from __future__ import annotations
 
 import os
+import smtplib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,7 +23,7 @@ _PERMANENT_MARKERS = ("not configured", "authentication", "missing", "not instal
 @dataclass
 class DeliveryResult:
     channel: str
-    status: str  # sent | failed | skipped
+    status: str  # sent | failed | skipped | unknown
     provider_message_id: str = ""
     error: str = ""
     transient: bool = False
@@ -52,6 +53,11 @@ class MessageOutcome:
 
 def _classify(exc: Exception) -> tuple[str, bool]:
     message = str(exc) or exc.__class__.__name__
+    cause = exc.__cause__ or exc
+    if isinstance(cause, smtplib.SMTPResponseException):
+        return message[:500], 400 <= cause.smtp_code < 500
+    if isinstance(cause, smtplib.SMTPRecipientsRefused):
+        return message[:500], bool(cause.recipients) and all(400 <= value[0] < 500 for value in cause.recipients.values())
     permanent = any(marker in message.lower() for marker in _PERMANENT_MARKERS)
     return message[:500], not permanent
 
@@ -121,7 +127,7 @@ class Messenger:
     """Candidate and recruiter messaging through the existing SMTP/Twilio senders."""
 
     def send_candidate(self, interview: dict, subject: str, body: str, sms_body: str = "") -> MessageOutcome:
-        from services.interview_service import default_from_email, send_email, send_text_message
+        from services.interview_service import EmailDeliveryUnknown, default_from_email, send_email, send_text_message
 
         outcome = MessageOutcome()
         to_email = interview.get("to_email") or interview.get("candidate_email") or ""
@@ -131,11 +137,13 @@ class Messenger:
             try:
                 send_email(to_email, subject, body, default_from_email())
                 outcome.deliveries.append(DeliveryResult("email", "sent"))
+            except EmailDeliveryUnknown as exc:
+                outcome.deliveries.append(DeliveryResult("email", "unknown", error=str(exc), transient=False))
             except Exception as exc:
                 error, transient = _classify(exc)
                 outcome.deliveries.append(DeliveryResult("email", "failed", error=error, transient=transient))
 
-        phone = self._candidate_phone(interview)
+        phone = self._candidate_phone(interview) if sms_body and os.environ.get("TWILIO_ACCOUNT_SID") else ""
         if sms_body and phone and os.environ.get("TWILIO_ACCOUNT_SID"):
             try:
                 sid = send_text_message(phone, sms_body)

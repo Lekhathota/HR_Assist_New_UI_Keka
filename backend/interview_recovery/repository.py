@@ -165,10 +165,21 @@ def claim_next_due_case(now: datetime, lease_seconds: int) -> Optional[dict]:
     return _case(row)
 
 
+def reserve_no_show_email(case: dict, now: datetime) -> bool:
+    """Persist the send boundary; an expired worker cannot reserve another send."""
+    return _database().interview_recovery_cases.update_one(
+        {"id": int(case["id"]), "status": RecoveryStatus.PROCESSING,
+         "lease_until": case.get("lease_until"), "attempt_count": {"$lt": 2},
+         "outreach_dispatch": {"$ne": "sending"}},
+        {"$set": {"outreach_dispatch": "sending", "last_attempt_at": now,
+                  "email_delivery_status": "sending", "max_attempts": 2}},
+    ).modified_count > 0
+
+
 def mark_escalated(case_id: int, now: datetime, reason: str, recommended_action: str) -> bool:
     """Escalate once: only the first call for an unescalated case succeeds."""
     result = _database().interview_recovery_cases.update_one(
-        {"id": int(case_id), "escalated_at": None},
+        {"id": int(case_id), "escalated_at": None, "status": {"$in": list(RecoveryStatus.AUTOMATED)}},
         {"$set": {
             "status": RecoveryStatus.ESCALATED, "is_open": True, "escalated_at": now,
             "escalation_reason": reason, "recommended_action": recommended_action,

@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import copy
 import sys
+import threading
+import smtplib
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -41,15 +44,24 @@ class Clock:
         self.now += timedelta(**kw)
 
 
+def atomic(method):
+    def locked(self, *args, **kwargs):
+        with self.mutex:
+            return method(self, *args, **kwargs)
+    return locked
+
+
 class FakeRepo:
     """In-memory twin of interview_recovery.repository."""
 
     def __init__(self, interviews):
+        self.mutex = threading.RLock()
         self.interviews = {i["id"]: i for i in interviews}
         self.cases: dict[int, dict] = {}
         self.attempts: list[dict] = []
         self.locks: dict[str, tuple[str, datetime]] = {}
 
+    @atomic
     def create_case(self, doc):
         for case in self.cases.values():
             if case["is_open"] and case["interview_id"] == doc["interview_id"] and case["recovery_type"] == doc["recovery_type"]:
@@ -81,6 +93,7 @@ class FakeRepo:
         return [copy.deepcopy(c) for c in self.cases.values()
                 if (recruiter_id is None or c["recruiter_id"] == recruiter_id) and (not statuses or c["status"] in statuses)]
 
+    @atomic
     def update_case(self, case_id, patch, *, expected_status=None):
         case = self.cases.get(int(case_id))
         if not case or (expected_status and case["status"] != expected_status):
@@ -97,12 +110,14 @@ class FakeRepo:
         case["lease_until"] = now + timedelta(seconds=lease)
         return copy.deepcopy(case)
 
+    @atomic
     def claim_case(self, case_id, from_statuses, now, lease):
         case = self.cases.get(int(case_id))
         if not case or case["status"] not in from_statuses:
             return None
         return self._claim(case, now, lease)
 
+    @atomic
     def claim_next_due_case(self, now, lease):
         for case in sorted(self.cases.values(), key=lambda c: c["id"]):
             st = case["status"]
@@ -112,9 +127,19 @@ class FakeRepo:
                 return self._claim(case, now, lease)
         return None
 
+    @atomic
+    def reserve_no_show_email(self, claimed, now):
+        case = self.cases[claimed["id"]]
+        if (case["status"] != S.PROCESSING or case.get("lease_until") != claimed.get("lease_until")
+                or case["attempt_count"] >= 2 or case.get("outreach_dispatch") == "sending"):
+            return False
+        case.update(outreach_dispatch="sending", last_attempt_at=now, email_delivery_status="sending", max_attempts=2)
+        return True
+
+    @atomic
     def mark_escalated(self, case_id, now, reason, action):
         case = self.cases[int(case_id)]
-        if case.get("escalated_at") is not None:
+        if case.get("escalated_at") is not None or case.get("status") not in S.AUTOMATED:
             return False
         case.update(status=S.ESCALATED, is_open=True, escalated_at=now, escalation_reason=reason,
                     recommended_action=action, next_action_at=None, response_deadline=None, lease_until=None)
@@ -405,13 +430,13 @@ class NoShowTests(RecoveryTestBase):
     def test_no_response_retries_then_escalates_exactly_once(self):
         self.auto.run_due()
         for _ in range(6):
-            self.clock.advance(minutes=61)
+            self.clock.advance(hours=24)
             self.auto.run_due()
-        self.assertEqual(len(self.messenger.candidate), 3)  # initial + 2 reminders = max_attempts
+        self.assertEqual(len(self.messenger.candidate), 2)  # initial + one reminder
         self.assertEqual(self.case()["status"], S.ESCALATED)
         self.assertEqual(len(self.messenger.recruiter), 1)
         self.assertEqual(self.actions().count("escalated"), 1)
-        self.assertEqual(self.actions().count("response_timeout"), 3)
+        self.assertEqual(self.actions().count("response_timeout"), 2)
 
     def test_outreach_message_uses_real_interview_data(self):
         self.svc.report_attendance(1, "no_show", actor="rec")
@@ -458,6 +483,220 @@ class NoShowTests(RecoveryTestBase):
         self.auto.report_attendance(1, "attended", actor="rec")
         self.assertEqual(self.case()["status"], S.CLOSED)
         self.assertEqual(self.case()["outcome"], "attendance_corrected")
+
+
+class NoShowRetryTrackingTests(RecoveryTestBase):
+    def setUp(self):
+        super().setUp()
+        self.clock.now = datetime(2026, 10, 9, 11, 20, tzinfo=UTC)
+    def test_exact_default_retry_boundary_and_second_deadline(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        first = self.clock()
+        view = self.svc.case_view(self.case())
+        self.assertEqual((view["attempt_count"], view["max_attempts"]), (1, 2))
+        self.assertEqual(view["email_delivery_status"], "sent")
+        self.assertEqual(view["last_attempt_at"], first.isoformat())
+        self.assertEqual(view["next_retry_at"], (first + timedelta(hours=24)).isoformat())
+        self.clock.advance(hours=24, seconds=-1)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.clock.advance(seconds=1)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 2)
+        self.assertTrue(self.messenger.candidate[-1]["subject"].startswith("Reminder:"))
+        self.assertEqual(self.case()["attempt_count"], 2)
+        self.assertIsNone(self.svc.case_view(self.case())["next_retry_at"])
+        self.clock.advance(hours=24)
+        for _ in range(4):
+            self.svc.run_due()
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertEqual(len(self.messenger.candidate), 2)
+        self.assertEqual(len(self.messenger.recruiter), 1)
+        with self.assertRaises(RecoveryConflict):
+            self.svc.retry_case(1, recruiter_id=7, actor="rec")
+
+    def test_custom_retry_interval(self):
+        svc = self.make_service(RecoveryConfig(**{**CONFIG.__dict__, "no_show_retry_interval_minutes": 90}))
+        svc.report_attendance(1, "no_show", actor="rec")
+        self.clock.advance(minutes=89)
+        svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.clock.advance(minutes=1)
+        svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 2)
+
+    def test_cancellation_resolution_and_manual_reschedule_stop_reminders(self):
+        for action in ("cancel", "resolve", "reschedule"):
+            with self.subTest(action=action):
+                self.setUp()
+                self.svc.report_attendance(1, "no_show", actor="rec")
+                if action == "cancel":
+                    self.repo.interviews[1]["status"] = "Cancelled"
+                elif action == "resolve":
+                    self.svc.close_case(1, recruiter_id=7, actor="rec")
+                else:
+                    self.gateway.reschedule(self.repo.interviews[1], datetime(2026, 10, 16, 10), datetime(2026, 10, 16, 11))
+                    self.repo.interviews[1]["attendance_status"] = None
+                self.clock.advance(days=3)
+                for _ in range(3):
+                    self.svc.run_due()
+                self.assertEqual(len(self.messenger.candidate), 1)
+                self.assertEqual(self.case()["status"], S.CLOSED)
+                self.assertIsNone(self.svc.case_view(self.case())["next_retry_at"])
+
+    def test_response_stops_no_show_reminders_and_booking_stops_all_retries(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        view = self.svc.public_respond(self.token, True)
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.assertEqual(self.case()["attempt_count"], 1)
+        self.svc.public_confirm_slot(self.token, view["case"]["proposed_slots"][0]["id"])
+        sent = len(self.messenger.candidate)
+        self.clock.advance(days=5)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), sent)
+        self.assertEqual(self.case()["status"], S.RECOVERED)
+
+    def test_responded_but_unbooked_case_escalates_without_more_email(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.svc.public_respond(self.token, True)
+        self.clock.advance(minutes=60)
+        self.svc.run_due()
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.assertEqual(self.case()["attempt_count"], 1)
+
+    def test_concurrent_scheduler_runs_send_one_reminder(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.clock.advance(hours=24)
+        entered, release = threading.Event(), threading.Event()
+        send = self.messenger.send_candidate
+        def blocked(*args, **kwargs):
+            entered.set()
+            self.assertTrue(release.wait(5))
+            return send(*args, **kwargs)
+        with patch.object(self.messenger, "send_candidate", side_effect=blocked):
+            with ThreadPoolExecutor(max_workers=2) as workers:
+                first = workers.submit(self.svc.run_due)
+                self.assertTrue(entered.wait(5))
+                self.assertEqual(workers.submit(self.svc.run_due).result(timeout=5)["processed"], 0)
+                release.set()
+                first.result(timeout=5)
+        self.assertEqual(len(self.messenger.candidate), 2)
+
+    def test_expired_lease_during_send_never_resends(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.clock.advance(hours=24)
+        send = self.messenger.send_candidate
+        def expired(*args, **kwargs):
+            self.clock.advance(seconds=CONFIG.lease_seconds + 1)
+            self.svc.run_due()
+            return send(*args, **kwargs)
+        with patch.object(self.messenger, "send_candidate", side_effect=expired):
+            self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 2)
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertEqual(self.case()["email_delivery_status"], "unknown")
+        self.clock.advance(days=3)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 2)
+
+    def test_crash_before_acceptance_commit_escalates_without_resend(self):
+        self.repo.interviews[1]["attendance_status"] = "no_show"
+        with patch.object(self.repo, "update_case", side_effect=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db interrupted")) if a[1].get("email_delivery_status") == "sent" else FakeRepo.update_case(self.repo, *a, **k)):
+            self.svc.run_due()
+        self.clock.advance(hours=1)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertEqual(self.case()["email_delivery_status"], "unknown")
+
+    def test_history_failure_after_acceptance_does_not_retry_early(self):
+        add = self.repo.add_attempt
+        def broken(doc):
+            if doc["action"] == "no_show_outreach":
+                raise RuntimeError("history unavailable")
+            return add(doc)
+        with patch.object(self.repo, "add_attempt", side_effect=broken):
+            self.svc.report_attendance(1, "no_show", actor="rec")
+        self.clock.advance(hours=1)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.assertEqual(self.case()["status"], S.AWAITING_RESPONSE)
+
+    def test_transient_email_failure_has_technical_backoff_and_no_response_timeout(self):
+        self.messenger.fail_with = DeliveryResult("email", "failed", error="SMTP unavailable", transient=True)
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.assertEqual(self.case()["attempt_count"], 0)
+        self.assertEqual(self.case()["email_delivery_status"], "failed")
+        self.assertEqual(self.case()["next_action_at"], self.clock() + timedelta(minutes=30))
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.messenger.fail_with = None
+        self.clock.advance(minutes=30)
+        self.svc.run_due()
+        self.assertEqual(self.case()["attempt_count"], 1)
+        self.assertEqual(self.case()["delivery_failure_count"], 0)
+        self.assertNotIn("response_timeout", self.actions())
+        self.assertEqual(self.case()["response_deadline"], self.clock() + timedelta(hours=24))
+
+    def test_bounded_technical_failures_escalate_separately(self):
+        self.messenger.fail_with = DeliveryResult("email", "failed", error="SMTP unavailable", transient=True)
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        for _ in range(5):
+            self.clock.advance(hours=3)
+            self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), CONFIG.max_delivery_failures)
+        self.assertEqual(self.case()["attempt_count"], 0)
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertNotIn("response_timeout", self.actions())
+
+    def test_unknown_email_delivery_is_never_retried(self):
+        self.messenger.fail_with = DeliveryResult("email", "unknown", error="SMTP acceptance unknown")
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.clock.advance(days=3)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertEqual(self.case()["email_delivery_status"], "unknown")
+
+
+    def test_cancelled_interview_rejects_candidate_reply_and_slot_confirmation(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        view = self.svc.public_respond(self.token, True)
+        self.repo.interviews[1]["status"] = "Cancelled"
+        with self.assertRaises(RecoveryConflict):
+            self.svc.public_confirm_slot(self.token, view["case"]["proposed_slots"][0]["id"])
+        self.assertEqual(self.case()["status"], S.CLOSED)
+        self.assertEqual(self.repo.interviews[1]["status"], "Cancelled")
+        self.setUp()
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.repo.interviews[1]["status"] = "Cancelled"
+        with self.assertRaises(RecoveryConflict):
+            self.svc.public_respond(self.token, True)
+        self.assertEqual(len(self.messenger.candidate), 1)
+
+    def test_resolution_during_send_is_not_reopened(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.clock.advance(hours=24)
+        send = self.messenger.send_candidate
+        def close_during_send(*args, **kwargs):
+            self.svc.close_case(1, recruiter_id=7, actor="rec")
+            return send(*args, **kwargs)
+        with patch.object(self.messenger, "send_candidate", side_effect=close_during_send):
+            self.svc.run_due()
+        self.assertEqual(self.case()["status"], S.CLOSED)
+        self.clock.advance(days=3)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 2)
+
+    def test_legacy_case_with_two_attempts_never_sends_a_third(self):
+        self.svc.report_attendance(1, "no_show", actor="rec")
+        self.repo.update_case(1, {"attempt_count": 2, "max_attempts": 10})
+        self.clock.advance(hours=24)
+        self.svc.run_due()
+        self.assertEqual(len(self.messenger.candidate), 1)
+        self.assertEqual(self.case()["status"], S.ESCALATED)
+        self.assertEqual(self.svc.case_view(self.case())["max_attempts"], 2)
 
 
 class FailureHandlingTests(RecoveryTestBase):
@@ -565,6 +804,59 @@ class SlotAndConfigTests(unittest.TestCase):
                                        "INTERVIEW_RECOVERY_ENABLED": "false"}):
             cfg = load_config()
         self.assertEqual((cfg.max_attempts, cfg.timezone, cfg.enabled), (5, "Asia/Kolkata", False))
+
+
+class RecoveryEmailDeliveryTests(unittest.TestCase):
+    def smtp(self, send_error=None, login_error=None, quit_error=None):
+        from unittest.mock import MagicMock
+        server = MagicMock()
+        server.__enter__.return_value = server
+        server.send_message.side_effect = send_error
+        server.login.side_effect = login_error
+        server.__exit__.side_effect = quit_error
+        return server
+
+    def test_submission_disconnect_is_unknown_and_not_transient(self):
+        from services.interview_service import EmailDeliveryUnknown, send_email
+        from interview_recovery.providers import Messenger
+        server = self.smtp(send_error=smtplib.SMTPServerDisconnected("lost after DATA"))
+        with patch.dict("os.environ", {"SMTP_USER": "sender@example.com", "SMTP_PASS": "test"}), patch("services.interview_service.smtplib.SMTP", return_value=server):
+            with self.assertRaises(EmailDeliveryUnknown):
+                send_email("asha@example.com", "subject", "body", "sender@example.com")
+            outcome = Messenger().send_candidate(interview(), "subject", "body")
+        self.assertEqual(outcome.deliveries[0].status, "unknown")
+        self.assertFalse(outcome.transient_failure)
+
+    def test_quit_failure_after_acceptance_is_success(self):
+        from services.interview_service import send_email
+        server = self.smtp(quit_error=smtplib.SMTPServerDisconnected("QUIT lost"))
+        with patch.dict("os.environ", {"SMTP_USER": "sender@example.com", "SMTP_PASS": "test"}), patch("services.interview_service.smtplib.SMTP", return_value=server):
+            send_email("asha@example.com", "subject", "body", "sender@example.com")
+        self.assertEqual(server.send_message.call_count, 1)
+
+    def test_smtp_response_codes_distinguish_retryable_and_permanent(self):
+        from interview_recovery.providers import Messenger
+        for code, transient in ((451, True), (550, False)):
+            with self.subTest(code=code):
+                server = self.smtp(send_error=smtplib.SMTPDataError(code, b"rejected"))
+                with patch.dict("os.environ", {"SMTP_USER": "sender@example.com", "SMTP_PASS": "test"}), patch("services.interview_service.smtplib.SMTP", return_value=server):
+                    result = Messenger().send_candidate(interview(), "subject", "body").deliveries[0]
+                self.assertEqual(result.status, "failed")
+                self.assertEqual(result.transient, transient)
+
+    def test_pre_submission_connection_failure_is_retryable(self):
+        from interview_recovery.providers import Messenger
+        with patch.dict("os.environ", {"SMTP_USER": "sender@example.com", "SMTP_PASS": "test"}), patch("services.interview_service.smtplib.SMTP", side_effect=TimeoutError("connect timeout")):
+            result = Messenger().send_candidate(interview(), "subject", "body").deliveries[0]
+        self.assertEqual(result.status, "failed")
+        self.assertTrue(result.transient)
+
+    def test_retry_config_default_and_validation(self):
+        with patch.dict("os.environ", {"INTERVIEW_NO_SHOW_RETRY_INTERVAL_MINUTES": "", "INTERVIEW_TIMEZONE": "UTC"}):
+            self.assertEqual(load_config().no_show_retry_interval_minutes, 1440)
+        with patch.dict("os.environ", {"INTERVIEW_NO_SHOW_RETRY_INTERVAL_MINUTES": "0", "INTERVIEW_TIMEZONE": "UTC"}):
+            with self.assertRaises(RecoveryConfigError):
+                load_config()
 
 
 class RouteAuthorizationTests(RecoveryTestBase):

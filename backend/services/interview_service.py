@@ -287,6 +287,10 @@ def send_text_message(to_phone: str, body: str) -> str:
     return str(message.sid or "")
 
 
+class EmailDeliveryUnknown(RuntimeError):
+    """Connection lost during SMTP submission: acceptance cannot be determined."""
+
+
 # Purpose: Sends email using configured delivery settings.
 def send_email(
     to_email: str,
@@ -318,12 +322,21 @@ def send_email(
         subtype = "pdf" if path.suffix.lower() == ".pdf" else "octet-stream"
         msg.add_attachment(data, maintype="application", subtype=subtype, filename=path.name)
 
+    submitting = False
+    accepted = False
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
             server.starttls()
             server.login(smtp_user, smtp_pass)
+            submitting = True
             server.send_message(msg)
+            accepted = True
     except smtplib.SMTPAuthenticationError as exc:
         raise RuntimeError("SMTP authentication failed. For Gmail, use an app password for SMTP_PASS.") from exc
     except (smtplib.SMTPException, OSError) as exc:
+        if accepted:
+            return  # QUIT failed after acceptance; the message was already sent.
+        if submitting and (isinstance(exc, smtplib.SMTPServerDisconnected) or
+                           (isinstance(exc, OSError) and not isinstance(exc, smtplib.SMTPException))):
+            raise EmailDeliveryUnknown(f"SMTP acceptance unknown: {exc}") from exc
         raise RuntimeError(f"Could not send email via SMTP: {exc}") from exc

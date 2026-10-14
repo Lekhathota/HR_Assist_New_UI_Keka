@@ -213,13 +213,13 @@ class RecoveryService:
 
     def _record(self, case: dict, action: str, *, outcome: str = "", deliveries: Optional[list[DeliveryResult]] = None,
                 detail: Optional[dict] = None) -> None:
-        failures = [d for d in deliveries or [] if d.status == "failed"]
+        failures = [d for d in deliveries or [] if d.status in {"failed", "unknown"}]
         self.repo.add_attempt({
             "case_id": int(case["id"]), "interview_id": int(case["interview_id"]),
             "candidate_id": int(case.get("candidate_id") or 0), "jd_id": case.get("jd_id"),
             "action": action, "message_type": action if deliveries else "",
             "outcome": outcome, "attempt_number": int(case.get("attempt_count") or 0),
-            "delivery_status": ("sent" if any(d.status == "sent" for d in deliveries) else "failed") if deliveries else "",
+            "delivery_status": ("unknown" if any(d.status == "unknown" for d in deliveries) else "sent" if any(d.status == "sent" for d in deliveries) else "failed") if deliveries else "",
             "failure_reason": "; ".join(f"{d.channel}: {d.error}" for d in failures)[:500],
             "deliveries": [d.to_dict() for d in deliveries or []], "detail": _iso(detail or {}),
         })
@@ -233,7 +233,8 @@ class RecoveryService:
             "interviewer": interview.get("interviewer") or "", "recovery_type": recovery_type,
             "status": RecoveryStatus.PENDING, "stage": stage, "source": source, "requested_by": actor,
             "reason": (reason or "")[:1000], "preferred_windows": preferred_windows or [],
-            "attempt_count": 0, "max_attempts": self.config.max_attempts,
+            "attempt_count": 0, "max_attempts": 2 if recovery_type == RecoveryType.NO_SHOW else self.config.max_attempts,
+            "last_attempt_at": None, "email_delivery_status": "pending", "outreach_dispatch": None,
             "delivery_failure_count": 0, "error_count": 0,
             "proposed_slots": [], "unavailable_slots": [], "selected_slot": None, "confirmed_slot": None,
             "original_interview_start": _naive(interview.get("interview_start")),
@@ -380,6 +381,10 @@ class RecoveryService:
         case = self.repo.get_open_case(int(interview["id"]))
         if not case:
             raise RecoveryConflict("There is nothing waiting for your response on this interview.")
+        reason = self._ineligible_reason(case, interview)
+        if reason:
+            self._close(case, reason)
+            raise RecoveryConflict("This interview is no longer awaiting recovery.")
         if not wants_reschedule:
             claimed = self.repo.claim_case(int(case["id"]), {RecoveryStatus.AWAITING_RESPONSE, RecoveryStatus.SLOT_PROPOSED,
                                                              RecoveryStatus.RETRY_SCHEDULED}, self._now(), self.config.lease_seconds)
@@ -404,6 +409,10 @@ class RecoveryService:
             if latest and (latest.get("confirmed_slot") or {}).get("id") == chosen_slot_id:
                 return {**self.public_view(token), "booked": True}  # duplicate confirmation
             raise RecoveryConflict("There are no interview times waiting for confirmation.")
+        reason = self._ineligible_reason(case, interview)
+        if reason:
+            self._close(case, reason)
+            raise RecoveryConflict("This interview can no longer be rescheduled automatically.")
         slot = next((s for s in case.get("proposed_slots") or [] if s.get("id") == chosen_slot_id), None)
         if not slot:
             raise RecoveryError("Please choose one of the interview times offered to you.")
@@ -438,6 +447,8 @@ class RecoveryService:
         case = self._owned_case(case_id, recruiter_id)
         if case.get("status") != RecoveryStatus.ESCALATED:
             raise RecoveryConflict("Only escalated cases can be retried.")
+        if case.get("recovery_type") == RecoveryType.NO_SHOW:
+            raise RecoveryConflict("No-show outreach cannot be restarted; contact the candidate directly or close the case.")
         now = self._now()
         updated = self.repo.update_case(int(case["id"]), {
             "status": RecoveryStatus.PENDING, "attempt_count": 0, "delivery_failure_count": 0, "error_count": 0,
@@ -519,7 +530,11 @@ class RecoveryService:
                 self.repo.update_case(int(case["id"]), {"status": RecoveryStatus.RETRY_SCHEDULED,
                                                         "next_action_at": self._now(), "lease_until": None})
         except Exception as exc:  # never leave a case stuck in PROCESSING
-            self._handle_unexpected(case, interview, exc)
+            fresh = self.repo.get_case(int(case["id"]))
+            if fresh and fresh.get("status") == RecoveryStatus.PROCESSING:
+                self._handle_unexpected(fresh, interview, exc)
+            else:
+                logger.exception("Recovery side effect failed after case state was committed")
 
     def _ineligible_reason(self, case: dict, interview: Optional[dict]) -> str:
         if not interview:
@@ -528,6 +543,8 @@ class RecoveryService:
             return "candidate_attended"
         status = str(interview.get("status") or "")
         if case.get("recovery_type") == RecoveryType.NO_SHOW:
+            if _naive(interview.get("interview_start")) != _naive(case.get("original_interview_start")):
+                return "rescheduled_elsewhere"
             return "" if status == NO_SHOW_STATUS else "interview_no_longer_no_show"
         if status not in ACTIVE_INTERVIEW_STATUSES:
             return "interview_cancelled_or_completed"
@@ -537,6 +554,9 @@ class RecoveryService:
 
     def _search_and_propose(self, case: dict, interview: dict, *, interactive: bool = False, count_attempt: bool = True) -> None:
         cfg = self.config
+        no_show = case.get("recovery_type") == RecoveryType.NO_SHOW
+        if no_show:
+            count_attempt = False
         local_now = self._local_now()
         start = _naive(interview.get("interview_start"))
         end = _naive(interview.get("interview_end"))
@@ -554,23 +574,26 @@ class RecoveryService:
         if not slots:
             self._record({**case, "attempt_count": attempts}, "slot_search", outcome=AttemptOutcome.NO_SLOTS,
                          detail={"calendar": self.calendar.name, "search_days": cfg.slot_search_days})
-            if attempts >= int(case.get("max_attempts") or cfg.max_attempts):
+            searches = int(case.get("slot_search_count") or 0) + 1
+            if (searches if no_show else attempts) >= int(case.get("max_attempts") or cfg.max_attempts):
                 self._escalate(case, interview, "No mutually available interview time was found within the search window.",
                                "Agree a time with the candidate directly or open more interviewer availability, then retry.",
                                {"attempt_count": attempts, "proposed_slots": []})
             else:
                 self.repo.update_case(int(case["id"]), {
-                    "status": RecoveryStatus.RETRY_SCHEDULED, "attempt_count": attempts, "proposed_slots": [],
+                    "status": RecoveryStatus.RETRY_SCHEDULED, "attempt_count": attempts, "proposed_slots": [], "slot_search_count": searches,
                     "next_action_at": self._now() + timedelta(minutes=cfg.retry_delay_minutes),
                     "last_error": "No mutually available slots yet.", "lease_until": None,
                 })
             return
 
-        outcome = self._message_candidate(case, interview, "slots", slots)
+        # A responding no-show candidate receives options on the existing portal.
+        # Follow-up email rounds remain capped, even while slot selection is pending.
+        outcome = MessageOutcome() if no_show else self._message_candidate(case, interview, "slots", slots)
         self._record({**case, "attempt_count": attempts}, "slots_offered",
-                     outcome=AttemptOutcome.DELIVERED if outcome.delivered else AttemptOutcome.DELIVERY_FAILED,
+                     outcome="portal_options" if no_show else AttemptOutcome.DELIVERED if outcome.delivered else AttemptOutcome.DELIVERY_FAILED,
                      deliveries=outcome.deliveries, detail={"slots": slots})
-        if outcome.delivered or interactive:
+        if outcome.delivered or interactive or no_show:
             # Interactive requests show the options on the portal page itself.
             self.repo.update_case(int(case["id"]), {
                 "status": RecoveryStatus.SLOT_PROPOSED, "stage": STAGE_SLOTS, "proposed_slots": slots,
@@ -583,21 +606,63 @@ class RecoveryService:
         self._delivery_failed(case, interview, outcome, {"proposed_slots": slots})
 
     def _send_no_show_outreach(self, case: dict, interview: dict) -> None:
-        outcome = self._message_candidate(case, interview, "no_show")
-        attempts = int(case.get("attempt_count") or 0) + 1
-        self._record({**case, "attempt_count": attempts}, "no_show_outreach",
-                     outcome=AttemptOutcome.DELIVERED if outcome.delivered else AttemptOutcome.DELIVERY_FAILED,
-                     deliveries=outcome.deliveries)
-        if outcome.delivered:
-            self.repo.update_case(int(case["id"]), {
-                "status": RecoveryStatus.AWAITING_RESPONSE, "attempt_count": attempts, "next_action_at": None,
-                "response_deadline": self._now() + timedelta(minutes=self.config.response_timeout_minutes),
-                "lease_until": None, "last_error": "", "delivery_failure_count": 0, "last_outreach_at": self._now(),
-            })
+        if case.get("outreach_dispatch") == "sending":
+            self._escalate(case, interview, "Email delivery is uncertain after an interrupted send.",
+                           "Check SMTP logs before contacting the candidate; automatic resend was stopped.",
+                           {"email_delivery_status": "unknown"})
             return
-        self._delivery_failed(case, interview, outcome, {})
+        if int(case.get("attempt_count") or 0) >= 2:
+            self._escalate(case, interview, "The two no-show outreach attempts are exhausted.",
+                           "Contact the candidate directly or close the case.")
+            return
+        if not self.repo.reserve_no_show_email(case, self._now()):
+            return
+        # Recheck cancellation/resolution after reserving and before external delivery.
+        fresh = self.repo.get_case(int(case["id"]))
+        current = self.repo.raw_interview(int(case["interview_id"]))
+        if fresh.get("status") != RecoveryStatus.PROCESSING:
+            return
+        reason = self._ineligible_reason(case, current)
+        if reason:
+            self._close(case, reason)
+            return
+        outcome = self._message_candidate(case, current, "no_show")
+        email = next((d for d in outcome.deliveries if d.channel == "email"), None)
+        delivered = email is not None and email.status == "sent"
+        attempts = int(case.get("attempt_count") or 0) + (1 if delivered else 0)
+        now = self._now()
+        if delivered:
+            # Commit acceptance before append-only history; recovery never repeats it.
+            self.repo.update_case(int(case["id"]), {
+                "status": RecoveryStatus.AWAITING_RESPONSE, "attempt_count": attempts, "max_attempts": 2,
+                "next_action_at": None, "response_deadline": now + timedelta(minutes=self.config.no_show_retry_interval_minutes),
+                "lease_until": None, "last_error": "", "delivery_failure_count": 0,
+                "last_outreach_at": now, "email_delivery_status": "sent", "outreach_dispatch": None,
+            }, expected_status=RecoveryStatus.PROCESSING)
+        else:
+            self._record({**case, "attempt_count": int(case.get("attempt_count") or 0) + 1}, "no_show_outreach",
+                         outcome=AttemptOutcome.DELIVERY_FAILED, deliveries=outcome.deliveries)
+            uncertain = email is not None and email.status == "unknown"
+            self.repo.update_case(int(case["id"]), {
+                "email_delivery_status": "unknown" if uncertain else "failed",
+                "outreach_dispatch": "sending" if uncertain else None,
+            }, expected_status=RecoveryStatus.PROCESSING)
+            fresh = self.repo.get_case(int(case["id"]))
+            if fresh.get("status") == RecoveryStatus.PROCESSING:
+                if uncertain:
+                    self._escalate(case, current, "SMTP acceptance is uncertain; automatic resend stopped.",
+                                   "Check SMTP logs before contacting the candidate.")
+                else:
+                    self._delivery_failed(case, current, MessageOutcome([email]) if email else outcome, {})
+        if delivered:
+            self._record({**case, "attempt_count": attempts}, "no_show_outreach",
+                         outcome=AttemptOutcome.DELIVERED, deliveries=outcome.deliveries)
 
     def _accept_no_show_reschedule(self, case: dict, windows: list[dict], *, interactive: bool) -> dict:
+        reason = self._ineligible_reason(case, self.repo.raw_interview(int(case["interview_id"])))
+        if reason:
+            self._close(case, reason)
+            raise RecoveryConflict("This interview is no longer awaiting recovery.")
         claimed = self.repo.claim_case(int(case["id"]), {RecoveryStatus.AWAITING_RESPONSE, RecoveryStatus.RETRY_SCHEDULED},
                                        self._now(), self.config.lease_seconds)
         if claimed:
@@ -614,8 +679,10 @@ class RecoveryService:
 
     def _handle_timeout(self, case: dict, interview: dict) -> None:
         self._record(case, "response_timeout", outcome=AttemptOutcome.NO_RESPONSE)
-        if int(case.get("attempt_count") or 0) >= int(case.get("max_attempts") or self.config.max_attempts):
+        limit = 2 if case.get("recovery_type") == RecoveryType.NO_SHOW else int(case.get("max_attempts") or self.config.max_attempts)
+        if (case.get("recovery_type") == RecoveryType.NO_SHOW and case.get("stage") == STAGE_SLOTS) or int(case.get("attempt_count") or 0) >= limit:
             self._escalate(case, interview,
+                           "The candidate did not confirm a proposed interview time." if case.get("stage") == STAGE_SLOTS else
                            f"The candidate did not respond after {case.get('attempt_count')} automated attempts.",
                            "Call the candidate to agree a time, or close the case if they have withdrawn.")
         elif case.get("stage") == STAGE_CONSENT:
@@ -639,7 +706,7 @@ class RecoveryService:
                 **extra, "status": RecoveryStatus.RETRY_SCHEDULED, "delivery_failure_count": failures,
                 "next_action_at": self._now() + timedelta(minutes=backoff), "last_error": outcome.error,
                 "lease_until": None,
-            })
+            }, expected_status=RecoveryStatus.PROCESSING)
 
     def _handle_unexpected(self, case: dict, interview: Optional[dict], exc: Exception) -> None:
         logger.exception("Interview recovery case %s failed", case.get("id"))
@@ -655,7 +722,7 @@ class RecoveryService:
                 self.repo.update_case(int(case["id"]), {
                     "status": RecoveryStatus.RETRY_SCHEDULED, "error_count": errors, "last_error": message,
                     "next_action_at": self._now() + timedelta(minutes=self.config.retry_delay_minutes), "lease_until": None,
-                })
+                }, expected_status=RecoveryStatus.PROCESSING)
         except Exception:
             logger.exception("Could not record failure for interview recovery case %s", case.get("id"))
 
@@ -702,7 +769,6 @@ class RecoveryService:
         if patch:
             self.repo.update_case(int(case["id"]), patch)
         if not self.repo.mark_escalated(int(case["id"]), self._now(), reason, action):
-            self.repo.update_case(int(case["id"]), {"status": RecoveryStatus.ESCALATED, "lease_until": None})
             return
         self._record(case, "escalated", detail={"reason": reason, "recommended_action": action})
         attempts = self.repo.list_attempts(int(case["id"]))
@@ -803,7 +869,7 @@ class RecoveryService:
             body = (f"Hi {name},\n\nYour interview for {role} is confirmed for {options.strip(' -')} "
                     f"({self.config.timezone}).\n\nYou can view or change it here:\n{link}\n\nRegards,\nRecruitment Team")
             sms = f"Your {role} interview is confirmed for {(slots or [{}])[0].get('label', '')}."
-        return self.messenger.send_candidate(interview, subject, body, sms)
+        return self.messenger.send_candidate(interview, subject, body, "" if kind == "no_show" else sms)
 
     # ------------------------------------------------------------------- views
     def case_view(self, case: Optional[dict], include_history: bool = False) -> Optional[dict]:
@@ -813,8 +879,15 @@ class RecoveryService:
                 "stage", "source", "reason", "preferred_windows", "attempt_count", "max_attempts", "delivery_failure_count",
                 "proposed_slots", "selected_slot", "confirmed_slot", "original_interview_start", "next_action_at",
                 "response_deadline", "last_error", "escalated_at", "escalation_reason", "recommended_action", "outcome",
-                "created_at", "updated_at", "closed_at", "detected_at", "last_outreach_at")
+                "created_at", "updated_at", "closed_at", "detected_at", "last_outreach_at",
+                "last_attempt_at", "email_delivery_status")
         view = {key: _iso(case.get(key)) for key in keys}
+        if case.get("recovery_type") == RecoveryType.NO_SHOW:
+            view["max_attempts"] = 2
+        retry_at = case.get("next_action_at") or case.get("response_deadline")
+        if case.get("recovery_type") == RecoveryType.NO_SHOW and (int(case.get("attempt_count") or 0) >= 2 or case.get("stage") != STAGE_CONSENT):
+            retry_at = None
+        view["next_retry_at"] = _iso(retry_at) if case.get("status") in RecoveryStatus.AUTOMATED else None
         if include_history:
             view["history"] = [_iso({k: v for k, v in a.items() if k != "_id"}) for a in self.repo.list_attempts(int(case["id"]))]
         return view
