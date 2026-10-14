@@ -932,6 +932,13 @@
     line-height: 1.6;
     white-space: normal;
 }
+/* A person with several job submissions gets one stage tracker per job. */
+.candidates-stage-record + .candidates-stage-record { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e5e7eb; }
+.candidates-stage-record-title { margin-bottom: 2px; color: #64748b; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.candidates-stage-more { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 2px 10px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; color: #f97316; font-size: 12px; font-weight: 600; cursor: pointer; }
+.candidates-stage-more:hover { background: #fff3e9; border-color: #fdba74; }
+.candidates-stage-more:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; }
+.candidates-stage-more i { font-size: 10px; }
 
 @media (min-width: 900px) {
     .app-shell .candidates-filter-bar input[type="text"] { flex: 0 1 22rem; min-width: 14rem; }

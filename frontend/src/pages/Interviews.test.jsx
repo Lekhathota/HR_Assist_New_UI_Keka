@@ -24,7 +24,7 @@ beforeEach(async () => {
     if (path.startsWith('/api/interviews/defaults')) return Promise.resolve({});
     if (path.startsWith('/api/interviews')) return Promise.resolve({ interviews });
     if (path.startsWith('/api/interview-recovery/cases/')) return Promise.resolve({ case: {
-      id: 1, recovery_type: 'NO_SHOW', status: 'AWAITING_RESPONSE', stage: 'awaiting_consent', attempt_count: 1, max_attempts: 3,
+      id: 1, recovery_type: 'NO_SHOW', status: 'AWAITING_RESPONSE', stage: 'awaiting_consent', attempt_count: 1, max_attempts: 2,
       detected_at: '2026-10-12T09:00:00+00:00',
       history: [
         { id: 1, action: 'no_show_detected', created_at: '2026-10-12T09:00:00+00:00' },
@@ -44,19 +44,19 @@ afterEach(() => { act(() => root.unmount()); container.remove(); jest.restoreAll
 test('ended interviews offer explicit attendance outcomes', async () => {
   apiPost.mockResolvedValue({ ok: true, data: { success: true } });
   interviews = [{ ...pastInterview, status: 'No Show', attendance_status: 'no_show', recovery: {
-    id: 1, recovery_type: 'NO_SHOW', status: 'AWAITING_RESPONSE', stage: 'awaiting_consent', attempt_count: 1, max_attempts: 3,
+    id: 1, recovery_type: 'NO_SHOW', status: 'AWAITING_RESPONSE', stage: 'awaiting_consent', attempt_count: 1, max_attempts: 2,
     last_outreach_at: '2026-10-12T09:00:01+00:00',
   } }];
   await act(async () => button('No-show').click());
   expect(window.confirm).toHaveBeenCalled();
   expect(apiPost).toHaveBeenCalledWith('/api/interviews/7/attendance', { attendance: 'no_show' });
   expect(container.textContent).toContain('Outreach sent · awaiting reply');
-  expect(container.textContent).toContain('Follow-ups sent: 1/3');
+  expect(container.textContent).toContain('Follow-ups sent: 1 of 2');
   expect(button('No-show')).toBeUndefined();
 });
 
 test('follow-up history shows attempts and delivery status', async () => {
-  interviews = [{ ...pastInterview, status: 'No Show', recovery: { id: 1, recovery_type: 'NO_SHOW', status: 'ESCALATED', attempt_count: 3, max_attempts: 3 } }];
+  interviews = [{ ...pastInterview, status: 'No Show', recovery: { id: 1, recovery_type: 'NO_SHOW', status: 'ESCALATED', attempt_count: 2, max_attempts: 2 } }];
   apiPost.mockResolvedValue({ ok: true, data: { success: true } });
   await act(async () => button('Attended').click());
   expect(apiPost).toHaveBeenCalledWith('/api/interviews/7/attendance', { attendance: 'attended' });
@@ -65,4 +65,18 @@ test('follow-up history shows attempts and delivery status', async () => {
   expect(container.textContent).toContain('No-show follow-up');
   expect(container.textContent).toContain('Email sent');
   expect(container.textContent).toContain('(attempt 1)');
+});
+
+test('second no-show attempt displays the cap and escalation', async () => {
+  interviews = [{ ...pastInterview, status: 'No Show', recovery: {
+    id: 1, recovery_type: 'NO_SHOW', status: 'ESCALATED', attempt_count: 2, max_attempts: 2,
+  } }];
+  apiPost.mockResolvedValue({ ok: true, data: { success: true } });
+  await act(async () => button('Attended').click());
+  expect(container.textContent).toContain('Follow-ups sent: 2 of 2');
+  expect(container.textContent).toContain('Escalated to recruiter');
+  apiGet.mockResolvedValueOnce({ case: { id: 1, recovery_type: 'NO_SHOW', status: 'ESCALATED', attempt_count: 2, max_attempts: 2, email_delivery_status: 'sent', history: [] } });
+  await act(async () => button('Escalated to recruiter').click());
+  expect(container.textContent).toContain('Email delivery: sent');
+  expect(button('Retry')).toBeUndefined();
 });

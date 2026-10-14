@@ -124,8 +124,17 @@ def is_assessment_step(step: dict[str, Any]) -> bool:
     return "assessment" in name or name == "test"
 
 
-def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None) -> dict[str, Any]:
-    process = resolve_process(jd, candidate)
+def _step_id_by_name(steps: list[dict[str, Any]], name: str | None) -> str | None:
+    """Exact step name first, then the first step containing it (e.g. "Technical Interview")."""
+    if not name:
+        return None
+    exact = next((step["id"] for step in steps if step["name"].casefold() == name), None)
+    return exact or next((step["id"] for step in steps if name in step["name"].casefold()), None)
+
+
+def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None,
+                            process: dict[str, Any] | None = None) -> dict[str, Any]:
+    process = process if process is not None else resolve_process(jd, candidate)
     steps = process["steps"]
     if not steps:
         return {
@@ -137,17 +146,17 @@ def compute_effective_stage(candidate: dict[str, Any], jd: dict[str, Any] | None
             "steps": [],
         }
     stage_id = candidate.get("stage_id")
-    # Existing screened candidates have no stored stage. Reflect their known
-    # progress in inherited pipelines without guessing completion of later rounds.
-    inherited = not normalize_process((jd or {}).get("hiring_process"))["steps"]
-    if not stage_id and inherited and not candidate.get("automation_paused"):
+    # Candidates without a stored stage (screened before the pipeline existed, or
+    # whose interview events aren't mapped to a step) still reflect their known
+    # progress, without guessing completion of later rounds.
+    if not stage_id and not candidate.get("automation_paused"):
         hiring_stage = str(candidate.get("hiring_stage") or "").casefold()
         name = "interview" if "interview" in hiring_stage else "screening" if (
             str(candidate.get("status") or "").casefold() in {"selected", "rejected"}
             or candidate.get("screening_status") in {"accepted", "rejected", "waitlisted"}
         ) else None
-        stage_id = next((step["id"] for step in steps if step["name"].casefold() == name), None)
-        if "assessment" in hiring_stage and not candidate.get("automation_paused"):
+        stage_id = _step_id_by_name(steps, name)
+        if "assessment" in hiring_stage:
             stage_id = next((step["id"] for step in steps if is_assessment_step(step)), stage_id)
     stage_name = next((step["name"] for step in steps if step["id"] == stage_id), None) or "Not Started"
     return {

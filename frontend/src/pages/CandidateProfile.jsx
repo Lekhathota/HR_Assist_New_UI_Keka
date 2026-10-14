@@ -84,9 +84,11 @@ function CandidateProfile() {
 
   const handleRemove = async () => {
     if (!candidate) return;
+    // The profile merges every resume submission for this person; remove them all.
+    const ids = candidate.related_candidate_ids?.length ? candidate.related_candidate_ids : [Number(candidateId)];
     const approved = await confirm({
       title: 'Remove candidate',
-      message: `Remove candidate "${candidate.name}" from the repository? This cannot be undone.`,
+      message: `Remove candidate "${candidate.name}"${ids.length > 1 ? ` and all ${ids.length} of their resume submissions` : ''} from the repository? This cannot be undone.`,
       confirmLabel: 'Remove Candidate',
       icon: 'fas fa-user-times',
       danger: true,
@@ -94,12 +96,16 @@ function CandidateProfile() {
     if (!approved) return;
     setDeleting(true);
     try {
-      const { ok, data } = await apiPost(`/api/candidates/${candidateId}/delete`, { confirmed: true });
-      if (ok && data.success) {
+      const results = await Promise.all(ids.map(id => apiPost(`/api/candidates/${id}/delete`, { confirmed: true })));
+      const failed = results.filter(({ ok, data }) => !(ok && data?.success));
+      if (!failed.length) {
         toast({ type: 'success', message: 'Candidate removed.' });
         navigate('/talent');
+      } else if (failed.length < results.length) {
+        toast({ type: 'error', message: `${results.length - failed.length} of ${results.length} submissions removed; the rest could not be removed.` });
+        navigate('/talent');
       } else {
-        toast({ type: 'error', message: data.error || 'Could not remove candidate.' });
+        toast({ type: 'error', message: failed[0].data?.error || 'Could not remove candidate.' });
       }
     } catch {
       toast({ type: 'error', message: 'Remove failed. Please try again.' });
@@ -1118,7 +1124,8 @@ function CandidateProfile() {
           <div className="cp-hero-stage">
             <span className="cp-label">Hiring progress</span>
             <StageTrackerDelivery screeningStatus={candidate.screening_status ?? null} steps={steps}
-              stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} onHold={Boolean(candidate.on_hold)}
+              stageId={candidate.stage_id} hiringStage={candidate.hiring_stage} interviewStage={candidate.interview_stage}
+              onHold={Boolean(candidate.on_hold)}
               assessmentStatus={candidate.assessment_status} />
           </div>
         </section>
@@ -1337,7 +1344,7 @@ function CandidateProfile() {
           </aside>
         </div>
 
-        <ReportModal />
+        {ReportModal()}
         <style>{`
           @keyframes slideUp {
             from { opacity: 0; transform: translateY(30px); }

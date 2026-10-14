@@ -4,6 +4,7 @@ import Layout from '../components/Layout.jsx';
 import ReferenceSolutionPanel from '../components/ReferenceSolutionPanel.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
 import ProctoringEvidence from '../components/ProctoringEvidence.jsx';
+import { downloadAssessmentPdf } from '../utils/assessmentPdf.js';
 import '../styles/assessment_builder.css';
 
 const TYPE_LABELS = {
@@ -127,6 +128,8 @@ function AssessmentBuilder() {
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState(null);
   const [candidateAnswers, setCandidateAnswers] = useState({});
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState('');
 
   const isDraft = assessment?.status === 'DRAFT';
   const isReviewable = ['PASSED', 'FAILED', 'COMPLETED'].includes(assessment?.status);
@@ -176,6 +179,21 @@ function AssessmentBuilder() {
   }, [notice]);
 
   const showNotice = (msg) => setNotice(msg);
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    setPdfProgress('Preparing PDF...');
+    setError('');
+    try {
+      await downloadAssessmentPdf(assessmentId, setPdfProgress);
+      showNotice('Test details PDF downloaded.');
+    } catch (err) {
+      setError(`Could not download the complete test PDF. ${err.message || 'Please retry.'}`);
+    } finally {
+      setDownloadingPdf(false);
+      setPdfProgress('');
+    }
+  };
 
   const handleRegrade = async () => {
     if (!window.confirm('Re-grade this assessment with the current automatic grading? The candidate answers are not changed; the score and pass/fail status may change.')) return;
@@ -552,6 +570,11 @@ function AssessmentBuilder() {
             </p>
           </div>
           <div className="ab-topbar-actions">
+            {showAnswers && (
+              <button type="button" className="btn btn-secondary" onClick={handleDownloadPdf} disabled={downloadingPdf || busy}>
+                <i className="fas fa-file-pdf" aria-hidden="true" /> {downloadingPdf ? pdfProgress : 'Download test PDF'}
+              </button>
+            )}
             <button type="button" className="btn btn-secondary" onClick={handlePreview} disabled={busy}>
               <i className="fas fa-eye" /> Preview
             </button>

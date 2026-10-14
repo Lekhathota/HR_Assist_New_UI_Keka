@@ -1057,7 +1057,7 @@ function HiringPipeline() {
                                 )}
                                 {item.recovery && (
                                   <span className="hp-recovery-meta">
-                                    {item.recovery.recovery_type === 'NO_SHOW' ? 'Follow-ups' : 'Offers'} sent: {item.recovery.attempt_count || 0}/{item.recovery.max_attempts || '—'}
+                                    {item.recovery.recovery_type === 'NO_SHOW' ? 'Follow-ups' : 'Offers'} sent: {item.recovery.attempt_count || 0} of {item.recovery.max_attempts || '—'}
                                     {item.recovery.last_outreach_at && ` · last ${formatDateTime(item.recovery.last_outreach_at).date} ${formatDateTime(item.recovery.last_outreach_at).time}`}
                                   </span>
                                 )}
@@ -1140,12 +1140,14 @@ function HiringPipeline() {
               )}
               {recoveryCase.confirmed_slot && <p className="recovery-modal-note">New interview time: {recoveryCase.confirmed_slot.label}</p>}
               {recoveryCase.last_error && !recoveryCase.escalation_reason && <p className="recovery-modal-note">Last error: {recoveryCase.last_error}</p>}
+              {recoveryCase.email_delivery_status && <p className="recovery-modal-note">Email delivery: {prettyStatus(recoveryCase.email_delivery_status)}</p>}
+              {recoveryCase.next_retry_at && <p className="recovery-modal-note">Next recovery check: {formatDateTime(recoveryCase.next_retry_at).date} {formatDateTime(recoveryCase.next_retry_at).time}</p>}
               <ol className="recovery-history">
                 {(recoveryCase.history || []).map(entry => (
                   <li key={entry.id}>
                     <span className="recovery-history-time">{formatDateTime(entry.created_at).date} {formatDateTime(entry.created_at).time}</span>
                     <span className="recovery-history-action">{prettyStatus(entry.action)}{entry.message_type ? ` (attempt ${entry.attempt_number})` : ''}</span>
-                    {entry.delivery_status && <span className={`hp-pill ${entry.delivery_status === 'sent' ? 'good' : 'bad'}`}>{entry.delivery_status === 'sent' ? 'Email sent' : 'Delivery failed'}</span>}
+                    {entry.delivery_status && <span className={`hp-pill ${entry.delivery_status === 'sent' ? 'good' : 'bad'}`}>{entry.delivery_status === 'sent' ? 'Email sent' : entry.delivery_status === 'unknown' ? 'Delivery uncertain' : 'Delivery failed'}</span>}
                     {entry.failure_reason && <span className="recovery-history-error">{entry.failure_reason}</span>}
                   </li>
                 ))}
@@ -1156,7 +1158,7 @@ function HiringPipeline() {
                     <i className="fas fa-circle-xmark"></i> Mark resolved
                   </button>
                 )}
-                {recoveryCase.status === 'ESCALATED' && (
+                {recoveryCase.status === 'ESCALATED' && recoveryCase.recovery_type !== 'NO_SHOW' && (
                   <button type="button" className="btn btn-primary" onClick={() => recoveryAction(recoveryCase.id, 'retry')} disabled={recoveryBusy}>
                     <i className="fas fa-rotate"></i> Retry follow-up
                   </button>

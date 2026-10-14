@@ -84,6 +84,8 @@ def api_candidates():
 @api_login_required
 def api_candidates_stage_options():
     project_id = request.args.get("project_id")
+    if project_id and not project_id.isdigit():
+        return jsonify({"error": "project_id must be a number."}), 400
     return jsonify({"groups": get_stage_options(int(project_id) if project_id else None)})
 
 
@@ -137,6 +139,7 @@ def api_candidate_hiring_state(candidate_id: int):
 # Purpose: API endpoint handler for candidates repair.
 @candidate_bp.route("/api/candidates/repair", methods=["POST"], endpoint="api_candidates_repair")
 @api_login_required
+@role_required("recruiter")
 def api_candidates_repair():
     return jsonify({"success": True, **repair_all_candidates(force_reextract=True)})
 
@@ -154,6 +157,7 @@ def api_candidate_profile(candidate_id: int):
 # Purpose: Implements the candidate delete backend behavior.
 @candidate_bp.route("/candidates/<int:candidate_id>/delete", methods=["POST"], endpoint="candidate_delete")
 @login_required
+@role_required("recruiter")
 def candidate_delete(candidate_id: int):
     user = current_user()
     row = db.get_candidate_by_id(candidate_id)
@@ -171,6 +175,7 @@ def candidate_delete(candidate_id: int):
 # Purpose: API endpoint handler for candidate delete.
 @candidate_bp.route("/api/candidates/<int:candidate_id>/delete", methods=["POST"], endpoint="api_candidate_delete")
 @api_login_required
+@role_required("recruiter")
 def api_candidate_delete(candidate_id: int):
     user = current_user()
     row = db.get_candidate_by_id(candidate_id)
