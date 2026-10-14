@@ -12,7 +12,7 @@ import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { currentReportId, issueReportId } from '../utils/reportId.js';
 import { useRoleCategories } from '../utils/useRoleCategories.js';
-import { dedupeCandidates, candidateMatchesSelection } from '../utils/candidateGrouping.js';
+import { dedupeCandidates, candidateMatchesSelection, stageRecordsByJob } from '../utils/candidateGrouping.js';
 
 
 const ROLE_CATEGORY_FILTER_LABELS = {
@@ -46,6 +46,13 @@ function Candidates() {
   // JSX usages) when no longer needed. ---
   const confirm = useConfirm();
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  // Rows whose other jobs' stage trackers are expanded.
+  const [expandedRows, setExpandedRows] = useState(() => new Set());
+  const toggleExpanded = (id) => setExpandedRows(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -55,13 +62,14 @@ function Candidates() {
     });
   };
   const toggleSelectAll = (rows) => {
-    setSelectedIds(prev => (prev.size === rows.length ? new Set() : new Set(rows.map(c => c.id))));
+    setSelectedIds(prev => (rows.every(c => prev.has(c.id)) ? new Set() : new Set(rows.map(c => c.id))));
   };
   const deleteSelected = async () => {
-    if (!selectedIds.size) return;
+    const rows = visibleSelected;
+    if (!rows.length) return;
     const approved = await confirm({
       title: 'Remove candidates',
-      message: `Remove ${selectedIds.size} selected candidate(s) from the repository? This cannot be undone.`,
+      message: `Remove ${rows.length} selected candidate(s) from the repository? This cannot be undone.`,
       confirmLabel: 'Remove Candidates',
       icon: 'fas fa-user-times',
       danger: true,
@@ -69,20 +77,20 @@ function Candidates() {
     if (!approved) return;
     setBulkDeleting(true);
     try {
-      const ids = Array.from(selectedIds);
+      // A row can merge several resume submissions for one person; remove all of them.
+      const ids = [...new Set(rows.flatMap(row => row.member_ids || [row.id]))];
       const results = await Promise.all(ids.map(id => apiPost(`/api/candidates/${id}/delete`, { confirmed: true })));
       const removedIds = new Set(ids.filter((id, i) => results[i].ok && results[i].data?.success));
-      const failedCount = ids.length - removedIds.size;
-      setCandidates(prev => {
-        const next = prev.filter(c => !removedIds.has(c.id));
-        writeSessionCache(TALENT_CACHE_KEY, next);
-        return next;
-      });
-      setServerFiltered(prev => (prev ? prev.filter(c => !removedIds.has(c.id)) : prev));
+      const isGone = row => (row.member_ids || [row.id]).every(id => removedIds.has(id));
+      const removedRows = rows.filter(isGone).length;
+      const failedCount = rows.length - removedRows;
+      setCandidates(prev => prev.filter(c => !isGone(c)));
+      writeSessionCache(TALENT_CACHE_KEY, (readSessionCache(TALENT_CACHE_KEY) || []).filter(c => !removedIds.has(c.id)));
+      setServerFiltered(prev => (prev ? prev.filter(c => !isGone(c)) : prev));
       setSelectedIds(new Set());
       toast(failedCount
-        ? { type: 'error', message: `${removedIds.size} removed, ${failedCount} could not be removed.` }
-        : { type: 'success', message: `${removedIds.size} candidate(s) removed.` });
+        ? { type: 'error', message: `${removedRows} removed, ${failedCount} could not be fully removed.` }
+        : { type: 'success', message: `${removedRows} candidate(s) removed.` });
     } finally {
       setBulkDeleting(false);
     }
@@ -223,16 +231,23 @@ function Candidates() {
     rejected: matchingRows.filter(c => candidateMatchesSelection(c, 'rejected')).length,
   };
   const filtered = matchingRows.filter(c => candidateMatchesSelection(c, selectionCategory));
+  // Selections hidden by a later search or filter are never acted on.
+  const visibleSelected = filtered.filter(c => selectedIds.has(c.id));
+  const allVisibleSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
 
   // ============================================================
   // CANDIDATES STATISTICS
   // ============================================================
 
+  // Reports cover the candidates currently shown (search, filters and category applied).
   const getCandidateStats = () => {
+    const candidates = filtered;
+    const resultOf = c => String(c.outcome ?? c.status ?? '').toLowerCase();
     const totalCandidates = candidates.length;
-    const selected = candidates.filter(c => (c.status || '').toLowerCase() === 'selected');
-    const rejected = candidates.filter(c => (c.status || '').toLowerCase() === 'rejected');
-    const inProcess = candidates.filter(c => (c.status || '').toLowerCase() === 'in process' || (c.status || '').toLowerCase() === 'in_process');
+    const selected = candidates.filter(c => resultOf(c) === 'selected');
+    const rejected = candidates.filter(c => resultOf(c) === 'rejected');
+    // Passed screening, not rejected later and not on hold.
+    const inProcess = selected.filter(c => !c.on_hold);
     
     let totalMatchScore = 0;
     let matchCount = 0;
@@ -1256,7 +1271,7 @@ function Candidates() {
             }
           },
             React.createElement('span', null, 'ℹ️'),
-            React.createElement('span', null, 'Report includes: Statistics, Skills, Education, Hiring Stages')
+            React.createElement('span', null, `Report covers the ${filtered.length} candidate${filtered.length === 1 ? '' : 's'} currently shown: Statistics, Skills, Education, Hiring Stages`)
           )
         ),
         React.createElement('div', {
@@ -1417,9 +1432,9 @@ function Candidates() {
             <div className="candidates-result-count">
               {filtered.length} candidate{filtered.length === 1 ? '' : 's'} found
               {/* TEMPORARY: bulk delete bar — remove with the rest of this block */}
-              {selectedIds.size > 0 && (
+              {visibleSelected.length > 0 && (
                 <span className="candidates-bulk-bar">
-                  <span>{selectedIds.size} selected</span>
+                  <span>{visibleSelected.length} selected</span>
                   <button type="button" className="btn btn-danger candidates-bulk-delete-btn" disabled={bulkDeleting} onClick={deleteSelected}>
                     {bulkDeleting ? 'Removing...' : <><i className="fas fa-trash"></i> Delete Selected</>}
                   </button>
@@ -1440,7 +1455,7 @@ function Candidates() {
                 <thead>
                   <tr>
                     <th className="candidates-select-col">
-                      <input type="checkbox" checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                      <input type="checkbox" checked={allVisibleSelected}
                         onChange={() => toggleSelectAll(filtered)} aria-label="Select all candidates" />
                     </th>
                     <th>Candidate Name</th><th>Client</th><th className="candidates-simple-stage-col">Stage</th><th>All Details</th>
@@ -1463,8 +1478,30 @@ function Candidates() {
                       </td>
                       <td className="candidates-simple-client">{c.client_name || 'No client'}</td>
                       <td className="candidates-simple-stage" data-label="Stage">
-                        <StageTrackerDelivery screeningStatus={c.screening_status ?? null} steps={c.hiring_process_steps} stageId={c.stage_id} hiringStage={c.hiring_stage} onHold={Boolean(c.on_hold)}
-              assessmentStatus={c.assessment_status} />
+                        {(() => {
+                          const jobs = stageRecordsByJob(c);
+                          const expanded = expandedRows.has(c.id);
+                          const shown = expanded ? jobs : jobs.slice(0, 1);
+                          return (<>
+                            {shown.map(record => (
+                              <div key={record.id} className="candidates-stage-record">
+                                {jobs.length > 1 && record.jd_title && (
+                                  <div className="candidates-stage-record-title">{record.jd_title}</div>
+                                )}
+                                <StageTrackerDelivery screeningStatus={record.screening_status ?? null} steps={record.hiring_process_steps}
+                                  stageId={record.stage_id} hiringStage={record.hiring_stage} interviewStage={record.interview_stage}
+                                  onHold={Boolean(record.on_hold)} assessmentStatus={record.assessment_status} />
+                              </div>
+                            ))}
+                            {jobs.length > 1 && (
+                              <button type="button" className="candidates-stage-more" aria-expanded={expanded}
+                                onClick={() => toggleExpanded(c.id)}>
+                                {expanded ? 'Show less' : `+${jobs.length - 1} more job${jobs.length > 2 ? 's' : ''}`}
+                                <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} aria-hidden="true"></i>
+                              </button>
+                            )}
+                          </>);
+                        })()}
                       </td>
                       <td className="candidates-simple-actions">
                         <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">
@@ -1525,7 +1562,7 @@ function Candidates() {
           </div>
         )}
 
-        <ReportModal />
+        {ReportModal()}
 
         <style>{`
           @keyframes slideUp {

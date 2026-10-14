@@ -51,3 +51,16 @@ test('a configured assessment step reflects a failed or terminated attempt', () 
   expect(advanced.items.map(i => i.state)).toEqual(['ok', 'ok', 'current']);
   expect(advanced.label).toBe('Interview');
 });
+
+test('an interview rejection shows on a configured hiring process', () => {
+  const result = buildStages({ screeningStatus: 'accepted', steps, stageId: 's2', hiringStage: 'Technical', interviewStage: 'Rejected After Interview' });
+  expect(result.items.map(i => i.state)).toEqual(['ok', 'bad', 'none']);
+  expect(result.label).toBe('Rejected After Interview');
+  expect(result.tone).toBe('bad');
+});
+
+test('a rejection without a recorded step still marks the first step', () => {
+  const result = buildStages({ screeningStatus: 'rejected', steps, stageId: null });
+  expect(result.items[0].state).toBe('bad');
+  expect(result.label).toBe('Rejected');
+});
