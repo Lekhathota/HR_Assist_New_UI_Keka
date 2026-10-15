@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
-import StageTrackerDelivery from '../components/StageTrackerDelivery.jsx';
+import KebabMenu from '../components/KebabMenu.jsx';
 import SendAssessmentModal from '../components/SendAssessmentModal.jsx';
 import { TALENT_CACHE_KEY, apiGet, readSessionCache, writeSessionCache, apiPost } from '../api.js';
 import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import '../styles/candidates.css';
+import '../styles/talent_table.css';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType } from 'docx';
@@ -13,7 +14,8 @@ import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { currentReportId, issueReportId } from '../utils/reportId.js';
 import { useRoleCategories } from '../utils/useRoleCategories.js';
-import { dedupeCandidates, candidateMatchesSelection, stageRecordsByJob } from '../utils/candidateGrouping.js';
+import { dedupeCandidates, candidateMatchesSelection } from '../utils/candidateGrouping.js';
+import { appliedTime, formatApplied, initialsOf, locationOf, pageWindow, roleOf, scoreOf, scoreTone, stageOf } from '../utils/talentTable.js';
 
 
 const ROLE_CATEGORY_FILTER_LABELS = {
@@ -34,6 +36,9 @@ const ROLE_CATEGORY_FILTER_LABELS = {
 // their applied roles, so the Talent page shows one candidate with every role
 // they've applied for underneath their name instead of duplicate cards.
 
+const EMPTY_QUICK_FILTERS = { stage: '', role: '', location: '', client: '' };
+const PAGE_SIZES = [10, 20, 50, 100];
+
 const EMPTY_FILTERS = { clientId: '', projectId: '', status: '', stageId: '', uploadFrom: '', uploadTo: '', interviewFrom: '', interviewTo: '' };
 
 function Candidates() {
@@ -41,20 +46,16 @@ function Candidates() {
   const roleCategories = useRoleCategories(candidates.map(candidate => candidate.primary_category));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
-  const [selectionCategory, setSelectionCategory] = useState('all');
+  const [quickFilters, setQuickFilters] = useState(EMPTY_QUICK_FILTERS);
+  const [sortDir, setSortDir] = useState('desc');
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1);
 
   // --- TEMPORARY: bulk select + delete. Remove this whole block (and its
   // JSX usages) when no longer needed. ---
   const confirm = useConfirm();
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  // Rows whose other jobs' stage trackers are expanded.
-  const [expandedRows, setExpandedRows] = useState(() => new Set());
   const [assessmentCandidate, setAssessmentCandidate] = useState(null);
-  const toggleExpanded = (id) => setExpandedRows(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -63,15 +64,16 @@ function Candidates() {
       return next;
     });
   };
-  const toggleSelectAll = (rows) => {
-    setSelectedIds(prev => (rows.every(c => prev.has(c.id)) ? new Set() : new Set(rows.map(c => c.id))));
-  };
-  const deleteSelected = async () => {
-    const rows = visibleSelected;
+  const deleteSelected = () => deleteRows(visibleSelected);
+  // Bulk delete and the row menu's Remove share this path.
+  const deleteRows = async (rows) => {
     if (!rows.length) return;
+    const single = rows.length === 1 && !selectedIds.has(rows[0].id) ? rows[0] : null;
     const approved = await confirm({
-      title: 'Remove candidates',
-      message: `Remove ${rows.length} selected candidate(s) from the repository? This cannot be undone.`,
+      title: single ? 'Remove candidate' : 'Remove candidates',
+      message: single
+        ? `Remove candidate "${single.name}" from the repository? This cannot be undone.`
+        : `Remove ${rows.length} selected candidate(s) from the repository? This cannot be undone.`,
       confirmLabel: 'Remove Candidates',
       icon: 'fas fa-user-times',
       danger: true,
@@ -89,7 +91,7 @@ function Candidates() {
       setCandidates(prev => prev.filter(c => !isGone(c)));
       writeSessionCache(TALENT_CACHE_KEY, (readSessionCache(TALENT_CACHE_KEY) || []).filter(c => !removedIds.has(c.id)));
       setServerFiltered(prev => (prev ? prev.filter(c => !isGone(c)) : prev));
-      setSelectedIds(new Set());
+      setSelectedIds(prev => new Set([...prev].filter(id => !rows.some(row => row.id === id && isGone(row)))));
       toast(failedCount
         ? { type: 'error', message: `${removedRows} removed, ${failedCount} could not be fully removed.` }
         : { type: 'success', message: `${removedRows} candidate(s) removed.` });
@@ -227,15 +229,26 @@ function Candidates() {
     const matchCategory = !filterCategory || c.primary_category === filterCategory;
     return matchSearch && matchCategory;
   });
-  const categoryCounts = {
-    all: matchingRows.length,
-    selected: matchingRows.filter(c => candidateMatchesSelection(c, 'selected')).length,
-    rejected: matchingRows.filter(c => candidateMatchesSelection(c, 'rejected')).length,
-  };
-  const filtered = matchingRows.filter(c => candidateMatchesSelection(c, selectionCategory));
+  const decorated = matchingRows.map(c => ({
+    c, stage: stageOf(c), role: roleOf(c), location: locationOf(c), score: scoreOf(c), applied: appliedTime(c),
+  }));
+  // Quick filters (Stage / Role / Location / Client) and the Applied On sort run in the browser.
+  const rows = decorated
+    .filter(row => (!quickFilters.stage || row.stage.label === quickFilters.stage)
+      && (!quickFilters.role || row.role.primary === quickFilters.role || row.role.others.includes(quickFilters.role))
+      && (!quickFilters.location || row.location === quickFilters.location)
+      && (!quickFilters.client || row.c.client_name === quickFilters.client))
+    .sort((a, b) => {
+      const diff = (a.applied?.getTime() ?? 0) - (b.applied?.getTime() ?? 0);
+      return sortDir === 'desc' ? -diff : diff;
+    });
+  // Reports and bulk actions cover exactly the rows the table shows.
+  const filtered = rows.map(row => row.c);
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   // Selections hidden by a later search or filter are never acted on.
   const visibleSelected = filtered.filter(c => selectedIds.has(c.id));
-  const allVisibleSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
 
   // ============================================================
   // CANDIDATES STATISTICS
@@ -1329,246 +1342,279 @@ function Candidates() {
     );
   };
 
+  const stageOptions = [...new Set(decorated.map(row => row.stage.label))].sort();
+  const roleOptions = [...new Set(decorated.flatMap(row => [row.role.primary, ...row.role.others]).filter(Boolean))].sort();
+  const locationOptions = [...new Set(decorated.map(row => row.location).filter(Boolean))].sort();
+  const clientOptions = [...new Set(decorated.map(row => row.c.client_name).filter(Boolean))].sort();
+  const quickActive = Object.values(quickFilters).some(Boolean);
+  const anyFilterActive = quickActive || activeFilterCount > 0 || Boolean(searchTerm);
+  const clearAllFilters = () => {
+    setQuickFilters(EMPTY_QUICK_FILTERS);
+    setSearchTerm('');
+    clearFilters();
+    setPage(1);
+  };
+  const setQuick = (key, value) => { setQuickFilters(prev => ({ ...prev, [key]: value })); setPage(1); };
+  const inProcessCount = candidates.filter(c => candidateMatchesSelection(c, 'selected') && !c.on_hold).length;
+  const firstEntry = rows.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastEntry = Math.min(currentPage * pageSize, rows.length);
+  const pageAllSelected = pageRows.length > 0 && pageRows.every(row => selectedIds.has(row.c.id));
+
+  const QUICK_FILTERS = [
+    ['stage', 'Stage', stageOptions],
+    ['role', 'Role', roleOptions],
+    ['location', 'Location', locationOptions],
+    ['client', 'Client', clientOptions],
+  ];
+
   return (
     <Layout>
-      <div className="candidates-container">
-        <div className="candidates-header">
-          <div>
-            <h1><i className="fas fa-users"></i> Candidate Repository</h1>
-            <p className="candidates-subtitle">
-              Manage and view all candidates and their screening results
-            </p>
-          </div>
-        </div>
-
-        {listError && <div className="analyze-submit-error" role="alert">{listError}</div>}
-
-        {candidates.length > 0 ? (
-          <>
-            <div className="candidates-selection-categories" role="group" aria-label="Candidate selection categories">
-              {[['selected', 'Selected'], ['rejected', 'Rejected'], ['all', 'All']].map(([value, label]) => (
-                <button key={value} type="button" aria-pressed={selectionCategory === value}
-                  className={`candidates-selection-category${selectionCategory === value ? ' active' : ''}`}
-                  onClick={() => { setSelectionCategory(value); setSelectedIds(new Set()); }}>
-                  {label} <span>{categoryCounts[value]}</span>
-                </button>
-              ))}
+      <div className="tl-page">
+        <section className="tl-card">
+          <header className="tl-header">
+            <div className="tl-heading">
+              <h1>Talent</h1>
+              <p className="tl-summary">
+                <span className="tl-dot" aria-hidden="true"></span>
+                {inProcessCount} in process · {candidates.length} candidate{candidates.length === 1 ? '' : 's'}
+              </p>
             </div>
-            <div className="candidates-filter-bar">
-              <input type="text" placeholder="Search candidates by name or client..." value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} />
-              <div className="candidates-filters-anchor" ref={filterAnchorRef}>
-                <button type="button" className="candidates-filters-toggle" onClick={() => setPanelOpen(o => !o)}>
-                  <i className="fas fa-sliders"></i> Filters
-                  {activeFilterCount > 0 && <span className="candidates-filters-badge">{activeFilterCount}</span>}
+            <div className="tl-toolbar">
+              <label className="tl-search">
+                <i className="fas fa-search" aria-hidden="true"></i>
+                <input type="search" className="tl-input" placeholder="Search candidates..." value={searchTerm} aria-label="Search candidates"
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }} />
+              </label>
+              <div className="candidates-filters-anchor tl-filters-anchor" ref={filterAnchorRef}>
+                <button type="button" className="tl-btn tl-btn-outline" aria-expanded={panelOpen} onClick={() => setPanelOpen(o => !o)}>
+                  <i className="fas fa-filter" aria-hidden="true"></i> Filters
+                  {activeFilterCount > 0 && <span className="tl-badge">{activeFilterCount}</span>}
                 </button>
                 {panelOpen && (
-              <div className="candidates-filters-panel">
-                <div className="candidates-filters-grid">
-                  <label>Role Category
-                    <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                      <option value="">All Role Categories</option>
-                      {roleCategories.map(category => (
-                        <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>Client
-                    <select value={draftFilters.clientId} onChange={(e) => handleClientChange(e.target.value)}>
-                      <option value="">All Clients</option>
-                      {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
-                    </select>
-                  </label>
-                  <label>Requirement
-                    <select value={draftFilters.projectId} onChange={(e) => handleProjectChange(e.target.value)} disabled={!draftFilters.clientId}>
-                      <option value="">{draftFilters.clientId ? 'All Requirements' : 'Select a client first'}</option>
-                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </label>
-                  <label>Status
-                    <select value={draftFilters.status} onChange={(e) => setDraftFilters(f => ({ ...f, status: e.target.value }))}>
-                      <option value="">All Status</option>
-                      <option value="selected">Selected</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="on hold">On Hold</option>
-                      <option value="in process">In Process</option>
-                    </select>
-                  </label>
-                  <label>Stage
-                    <select value={draftFilters.stageId} onChange={(e) => setDraftFilters(f => ({ ...f, stageId: e.target.value }))}>
-                      <option value="">All Stages</option>
-                      {stageGroups.map(group => (
-                        <optgroup key={group.project_id ?? 'none'} label={group.project_name || 'Unassigned'}>
-                          {group.steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="candidates-filters-dates">
-                  <fieldset>
-                    <legend>Upload Date</legend>
-                    <input type="date" value={draftFilters.uploadFrom} onChange={(e) => setDraftFilters(f => ({ ...f, uploadFrom: e.target.value }))} />
-                    <span>to</span>
-                    <input type="date" value={draftFilters.uploadTo} onChange={(e) => setDraftFilters(f => ({ ...f, uploadTo: e.target.value }))} />
-                  </fieldset>
-                  <fieldset>
-                    <legend>Interview Date</legend>
-                    <input type="date" value={draftFilters.interviewFrom} onChange={(e) => setDraftFilters(f => ({ ...f, interviewFrom: e.target.value }))} />
-                    <span>to</span>
-                    <input type="date" value={draftFilters.interviewTo} onChange={(e) => setDraftFilters(f => ({ ...f, interviewTo: e.target.value }))} />
-                  </fieldset>
-                </div>
-                {dateError && <div className="candidates-filters-error">{dateError}</div>}
-                <div className="candidates-filters-actions">
-                  <button type="button" className="btn btn-success jd-table-btn" disabled={applying} onClick={applyFilters}>
-                    {applying ? 'Applying...' : 'Apply'}
-                  </button>
-                  <button type="button" className="btn btn-secondary jd-table-btn" onClick={clearFilters}>Clear</button>
-                </div>
-              </div>
+                  <div className="candidates-filters-panel">
+                    <div className="candidates-filters-grid">
+                      <label>Role Category
+                        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                          <option value="">All Role Categories</option>
+                          {roleCategories.map(category => (
+                            <option key={category} value={category}>{ROLE_CATEGORY_FILTER_LABELS[category] || category}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>Client
+                        <select value={draftFilters.clientId} onChange={(e) => handleClientChange(e.target.value)}>
+                          <option value="">All Clients</option>
+                          {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+                        </select>
+                      </label>
+                      <label>Requirement
+                        <select value={draftFilters.projectId} onChange={(e) => handleProjectChange(e.target.value)} disabled={!draftFilters.clientId}>
+                          <option value="">{draftFilters.clientId ? 'All Requirements' : 'Select a client first'}</option>
+                          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </label>
+                      <label>Status
+                        <select value={draftFilters.status} onChange={(e) => setDraftFilters(f => ({ ...f, status: e.target.value }))}>
+                          <option value="">All Status</option>
+                          <option value="selected">Selected</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="on hold">On Hold</option>
+                          <option value="in process">In Process</option>
+                        </select>
+                      </label>
+                      <label>Stage
+                        <select value={draftFilters.stageId} onChange={(e) => setDraftFilters(f => ({ ...f, stageId: e.target.value }))}>
+                          <option value="">All Stages</option>
+                          {stageGroups.map(group => (
+                            <optgroup key={group.project_id ?? 'none'} label={group.project_name || 'Unassigned'}>
+                              {group.steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="candidates-filters-dates">
+                      <fieldset>
+                        <legend>Upload Date</legend>
+                        <input type="date" value={draftFilters.uploadFrom} onChange={(e) => setDraftFilters(f => ({ ...f, uploadFrom: e.target.value }))} />
+                        <span>to</span>
+                        <input type="date" value={draftFilters.uploadTo} onChange={(e) => setDraftFilters(f => ({ ...f, uploadTo: e.target.value }))} />
+                      </fieldset>
+                      <fieldset>
+                        <legend>Interview Date</legend>
+                        <input type="date" value={draftFilters.interviewFrom} onChange={(e) => setDraftFilters(f => ({ ...f, interviewFrom: e.target.value }))} />
+                        <span>to</span>
+                        <input type="date" value={draftFilters.interviewTo} onChange={(e) => setDraftFilters(f => ({ ...f, interviewTo: e.target.value }))} />
+                      </fieldset>
+                    </div>
+                    {dateError && <div className="candidates-filters-error">{dateError}</div>}
+                    <div className="candidates-filters-actions">
+                      <button type="button" className="btn btn-success jd-table-btn" disabled={applying} onClick={() => { setPage(1); applyFilters(); }}>
+                        {applying ? 'Applying...' : 'Apply'}
+                      </button>
+                      <button type="button" className="btn btn-secondary jd-table-btn" onClick={clearFilters}>Clear</button>
+                    </div>
+                  </div>
                 )}
               </div>
+              <KebabMenu label="More actions" className="tl-page-menu" items={[
+                { label: 'Generate report', icon: 'fa-file-export', onSelect: () => setShowModal(true), disabled: candidates.length === 0 },
+                { label: visibleSelected.length ? `Delete selected (${visibleSelected.length})` : 'Delete selected', icon: 'fa-trash',
+                  danger: true, disabled: !visibleSelected.length || bulkDeleting, title: visibleSelected.length ? undefined : 'Select candidates first', onSelect: deleteSelected },
+                { label: 'Clear selection', icon: 'fa-square-minus', disabled: !selectedIds.size, onSelect: () => setSelectedIds(new Set()) },
+              ]} />
+              <Link to="/analyze" className="tl-btn tl-btn-primary">
+                <i className="fas fa-plus" aria-hidden="true"></i> Add Candidate
+              </Link>
             </div>
+          </header>
 
-            <div className="candidates-result-count">
-              {filtered.length} candidate{filtered.length === 1 ? '' : 's'} found
-              {/* TEMPORARY: bulk delete bar — remove with the rest of this block */}
-              {visibleSelected.length > 0 && (
-                <span className="candidates-bulk-bar">
-                  <span>{visibleSelected.length} selected</span>
-                  <button type="button" className="btn btn-danger candidates-bulk-delete-btn" disabled={bulkDeleting} onClick={deleteSelected}>
-                    {bulkDeleting ? 'Removing...' : <><i className="fas fa-trash"></i> Delete Selected</>}
+          {listError && <div className="analyze-submit-error" role="alert">{listError}</div>}
+
+          {candidates.length > 0 ? (
+            <>
+              <div className="tl-quick-filters" role="group" aria-label="Quick filters">
+                {QUICK_FILTERS.map(([key, label, options]) => (
+                  <label key={key} className={`tl-select${quickFilters[key] ? ' is-active' : ''}`}>
+                    <select className="tl-input" value={quickFilters[key]} onChange={(e) => setQuick(key, e.target.value)} aria-label={label}>
+                      <option value="">{label}</option>
+                      {options.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                    <i className="fas fa-chevron-down" aria-hidden="true"></i>
+                  </label>
+                ))}
+                {anyFilterActive && (
+                  <button type="button" className="tl-clear" onClick={clearAllFilters}>
+                    <i className="fas fa-rotate-left" aria-hidden="true"></i> Clear Filters
                   </button>
-                </span>
-              )}
-            </div>
-
-            {filtered.length === 0 ? (
-              <div className="candidates-empty-state">
-                <i className="fas fa-filter-circle-xmark empty-state-icon"></i>
-                <h2 className="empty-state-title">No Matching Candidates</h2>
-                <p className="empty-state-subtitle">Try adjusting or clearing your filters.</p>
+                )}
+                {visibleSelected.length > 0 && (
+                  <span className="tl-selection-bar" role="status">
+                    {visibleSelected.length} selected
+                    <button type="button" className="tl-btn tl-btn-danger" disabled={bulkDeleting} onClick={deleteSelected}>
+                      {bulkDeleting ? 'Removing…' : <><i className="fas fa-trash" aria-hidden="true"></i> Delete</>}
+                    </button>
+                  </span>
+                )}
               </div>
-            ) : (<>
 
-            <div className="candidates-list-container">
-              <table className="candidates-simple-table">
-                <thead>
-                  <tr>
-                    <th className="candidates-select-col">
-                      <input type="checkbox" checked={allVisibleSelected}
-                        onChange={() => toggleSelectAll(filtered)} aria-label="Select all candidates" />
-                    </th>
-                    <th>Candidate Name</th><th>Client</th><th className="candidates-simple-stage-col">Stage</th><th>All Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(c => (
-                    <tr key={c.id}>
-                      <td className="candidates-select-col">
-                        <input type="checkbox" checked={selectedIds.has(c.id)}
-                          onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.name}`} />
-                      </td>
-                      <td className="candidates-simple-name">
-                        {c.name}
-                        <div className="candidates-job-statuses">
-                          {(c.job_applications || []).map(job => (
-                            <div key={job.jd_id ?? job.jd_title}>{job.jd_title} · {job.status}</div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="candidates-simple-client">{c.client_name || 'No client'}</td>
-                      <td className="candidates-simple-stage" data-label="Stage">
-                        {(() => {
-                          const jobs = stageRecordsByJob(c);
-                          const expanded = expandedRows.has(c.id);
-                          const shown = expanded ? jobs : jobs.slice(0, 1);
-                          return (<>
-                            {shown.map(record => (
-                              <div key={record.id} className="candidates-stage-record">
-                                {jobs.length > 1 && record.jd_title && (
-                                  <div className="candidates-stage-record-title">{record.jd_title}</div>
-                                )}
-                                <StageTrackerDelivery screeningStatus={record.screening_status ?? null} steps={record.hiring_process_steps}
-                                  stageId={record.stage_id} hiringStage={record.hiring_stage} interviewStage={record.interview_stage}
-                                  onHold={Boolean(record.on_hold)} assessmentStatus={record.assessment_status} />
-                              </div>
-                            ))}
-                            {jobs.length > 1 && (
-                              <button type="button" className="candidates-stage-more" aria-expanded={expanded}
-                                onClick={() => toggleExpanded(c.id)}>
-                                {expanded ? 'Show less' : `+${jobs.length - 1} more job${jobs.length > 2 ? 's' : ''}`}
-                                <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} aria-hidden="true"></i>
-                              </button>
-                            )}
-                          </>);
-                        })()}
-                      </td>
-                      <td className="candidates-simple-actions">
-                        <div className="candidates-actions-group">
-                          <button type="button" className="btn btn-secondary candidates-simple-btn" onClick={() => setAssessmentCandidate(c)}
-                            title="Generate a JD-based assessment and email the test link">
-                            <i className="fas fa-clipboard-question"></i> Send Assessment
+              {rows.length === 0 ? (
+                <div className="candidates-empty-state">
+                  <i className="fas fa-filter-circle-xmark empty-state-icon"></i>
+                  <h2 className="empty-state-title">No Matching Candidates</h2>
+                  <p className="empty-state-subtitle">Try adjusting or clearing your filters.</p>
+                </div>
+              ) : (
+                <div className="tl-table-wrap">
+                  <table className="tl-table">
+                    <thead>
+                      <tr>
+                        <th className="tl-col-select">
+                          <input type="checkbox" checked={pageAllSelected} aria-label="Select all candidates on this page"
+                            onChange={() => setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              pageRows.forEach(row => (pageAllSelected ? next.delete(row.c.id) : next.add(row.c.id)));
+                              return next;
+                            })} />
+                        </th>
+                        <th>Candidate Name</th>
+                        <th>Role</th>
+                        <th>Stage</th>
+                        <th>AI Score</th>
+                        <th aria-sort={sortDir === 'desc' ? 'descending' : 'ascending'}>
+                          <button type="button" className="tl-sort" onClick={() => setSortDir(dir => (dir === 'desc' ? 'asc' : 'desc'))}
+                            title={sortDir === 'desc' ? 'Newest first' : 'Oldest first'}>
+                            Applied On <i className={`fas fa-arrow-${sortDir === 'desc' ? 'down-wide-short' : 'up-short-wide'}`} aria-hidden="true"></i>
                           </button>
-                          <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">
-                            <i className="fas fa-eye"></i> All Details
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </>)}
-          </>
-        ) : listError ? (
-          <div className="candidates-empty-state">
-            <i className="fas fa-triangle-exclamation empty-state-icon"></i>
-            <h2 className="empty-state-title">Could Not Load Candidates</h2>
-            <p className="empty-state-subtitle">{listError}</p>
-          </div>
-        ) : (
-          <div className="candidates-empty-state">
-            <i className="fas fa-inbox empty-state-icon"></i>
-            <h2 className="empty-state-title">No Candidates Yet</h2>
-            <p className="empty-state-subtitle">Upload resumes to get started</p>
-            <Link to="/analyze" className="btn btn-primary"><i className="fas fa-upload"></i> Upload Resumes</Link>
-          </div>
-        )}
+                        </th>
+                        <th>Location</th>
+                        <th className="tl-col-actions">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageRows.map(({ c, stage, role, location, score, applied }) => (
+                        <tr key={c.id} className={selectedIds.has(c.id) ? 'is-selected' : ''}>
+                          <td className="tl-col-select">
+                            <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.name}`} />
+                          </td>
+                          <td data-label="Candidate">
+                            <Link to={`/talent/${c.id}`} className="tl-person">
+                              <span className="tl-avatar" aria-hidden="true">{initialsOf(c.name)}</span>
+                              <span className="tl-name">{c.name || c.email || 'Unnamed candidate'}</span>
+                            </Link>
+                          </td>
+                          <td data-label="Role">
+                            <span className="tl-role">{role.primary || '—'}</span>
+                            {role.others.length > 0 && <small className="tl-more" title={role.others.join(', ')}>+{role.others.length} more</small>}
+                          </td>
+                          <td data-label="Stage"><span className={`tl-stage tl-stage-${stage.kind}`} title={stage.title}>{stage.label}</span></td>
+                          <td data-label="AI Score">
+                            {score === null ? <span className="tl-muted">—</span> : <span className={`tl-score tl-score-${scoreTone(score)}`}>{score}%</span>}
+                          </td>
+                          <td data-label="Applied On" className="tl-date">{formatApplied(applied)}</td>
+                          <td data-label="Location">
+                            {location ? <span className="tl-location"><i className="fas fa-location-dot" aria-hidden="true"></i>{location}</span> : <span className="tl-muted">—</span>}
+                          </td>
+                          <td className="tl-col-actions">
+                            <KebabMenu label={`Actions for ${c.name || 'candidate'}`} items={[
+                              { label: 'All Details', icon: 'fa-eye', to: `/talent/${c.id}` },
+                              { label: 'Send Assessment', icon: 'fa-clipboard-question', onSelect: () => setAssessmentCandidate(c) },
+                              { label: 'Remove', icon: 'fa-user-xmark', danger: true, disabled: bulkDeleting, onSelect: () => deleteRows([c]) },
+                            ]} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-        {/* Generate Candidates Report Button at Bottom */}
-        {candidates.length > 0 && (
-          <div style={{ 
-            marginTop: '40px', 
-            display: 'flex', 
-            justifyContent: 'center',
-            padding: '20px 0',
-            borderTop: '1px solid #e2e8f0'
-          }}>
-            <button 
-              className="btn btn-primary reports-generate-btn"
-              onClick={() => setShowModal(true)}
-              style={{ 
-                padding: '16px 48px', 
-                fontSize: '18px',
-                borderRadius: '14px',
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                color: 'white',
-                border: 'none',
-                boxShadow: '0 4px 16px rgba(249, 115, 22, 0.35)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                fontWeight: '600'
-              }}
-            >
-              <i className="fas fa-plus-circle"></i> Generate Candidates Report
-            </button>
-          </div>
-        )}
+              {rows.length > 0 && (
+                <footer className="tl-footer">
+                  <div className="tl-rows">
+                    <span>Showing</span>
+                    <label className="tl-select tl-select-sm">
+                      <select className="tl-input" value={pageSize} aria-label="Rows per page" onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
+                        {PAGE_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                      <i className="fas fa-chevron-down" aria-hidden="true"></i>
+                    </label>
+                    <span>Rows</span>
+                    <span className="tl-divider" aria-hidden="true"></span>
+                    <span>{firstEntry}-{lastEntry} of {rows.length} Entries</span>
+                  </div>
+                  <nav className="tl-pages" aria-label="Pagination">
+                    <span>Page</span>
+                    <button type="button" className="tl-page-btn" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+                      <i className="fas fa-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    {pageWindow(currentPage, pageCount).map(number => (
+                      <button key={number} type="button" className={`tl-page-btn${number === currentPage ? ' is-current' : ''}`}
+                        aria-current={number === currentPage ? 'page' : undefined} onClick={() => setPage(number)}>{number}</button>
+                    ))}
+                    <button type="button" className="tl-page-btn" aria-label="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>
+                      <i className="fas fa-chevron-right" aria-hidden="true"></i>
+                    </button>
+                    <span>of {pageCount}</span>
+                  </nav>
+                </footer>
+              )}
+            </>
+          ) : listError ? (
+            <div className="candidates-empty-state">
+              <i className="fas fa-triangle-exclamation empty-state-icon"></i>
+              <h2 className="empty-state-title">Could Not Load Candidates</h2>
+              <p className="empty-state-subtitle">{listError}</p>
+            </div>
+          ) : (
+            <div className="candidates-empty-state">
+              <i className="fas fa-inbox empty-state-icon"></i>
+              <h2 className="empty-state-title">No Candidates Yet</h2>
+              <p className="empty-state-subtitle">Upload resumes to get started</p>
+              <Link to="/analyze" className="btn btn-primary"><i className="fas fa-upload"></i> Upload Resumes</Link>
+            </div>
+          )}
+        </section>
 
         {ReportModal()}
         {assessmentCandidate && (
