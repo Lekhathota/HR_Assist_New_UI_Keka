@@ -49,7 +49,7 @@ const $ = selector => container.querySelector(selector);
 const $$ = selector => [...container.querySelectorAll(selector)];
 const button = text => $$('button').find(b => b.textContent.trim().includes(text));
 const names = () => $$('.tl-name').map(n => n.textContent);
-const menuItem = text => $$('[role="menuitem"]').find(item => item.textContent.includes(text));
+const menuItem = text => [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent.includes(text));
 
 function choose(select, value) {
   act(() => {
@@ -231,6 +231,21 @@ describe('pagination', () => {
 });
 
 describe('actions', () => {
+  test('row menu renders outside the animated table row so it is positioned against the viewport', async () => {
+    await render();
+    const trigger = $('button[aria-label="Actions for Archana Rao"]');
+    await act(async () => trigger.click());
+    const menu = document.querySelector('.kebab-dropdown');
+    expect(menu.parentElement).toBe(document.body);
+    expect(trigger.closest('tr').contains(menu)).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    // Pressing inside the portalled menu must not count as an outside click.
+    await act(async () => menuItem('Send Assessment').dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(document.querySelector('.kebab-dropdown')).toBeTruthy();
+    await act(async () => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(document.querySelector('.kebab-dropdown')).toBeNull();
+  });
+
   test('row menu: All Details, Send Assessment and Remove', async () => {
     await render();
     await act(async () => $('button[aria-label="Actions for Archana Rao"]').click());

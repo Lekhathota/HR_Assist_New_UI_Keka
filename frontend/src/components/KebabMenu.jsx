@@ -1,10 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 
 const MENU_WIDTH = 210;
 
 // "⋮" actions menu. items: [{ label, icon, onSelect | to, danger, disabled, title }].
-// The menu is fixed to the viewport so table/card containers with overflow do not clip it.
+// The dropdown is portalled to <body> and fixed to the viewport. Rendering it in place does not
+// work: every table row runs a fill-mode transform animation (style.css), and a transformed
+// ancestor turns position: fixed into row-relative positioning, so the menu ended up off-screen.
 function KebabMenu({ items, label = 'Actions', className = '' }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
@@ -31,7 +34,9 @@ function KebabMenu({ items, label = 'Actions', className = '' }) {
     if (!open) return undefined;
     const enabled = () => [...(menu.current?.querySelectorAll('[role="menuitem"]:not([aria-disabled="true"])') || [])];
     enabled()[0]?.focus();
-    const onPointerDown = (event) => { if (!container.current?.contains(event.target)) close(); };
+    const onPointerDown = (event) => {
+      if (!container.current?.contains(event.target) && !menu.current?.contains(event.target)) close();
+    };
     const onKeyDown = (event) => {
       if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
       if (event.key === 'Tab') { close(); return; }
@@ -61,7 +66,7 @@ function KebabMenu({ items, label = 'Actions', className = '' }) {
         aria-label={label} title={label} onClick={() => setOpen(prev => !prev)}>
         <i className="fas fa-ellipsis-vertical" aria-hidden="true"></i>
       </button>
-      {open && (
+      {open && createPortal(
         <div ref={menu} className="kebab-dropdown" role="menu" aria-label={label}
           style={position ? { top: position.top, left: position.left, width: MENU_WIDTH } : { visibility: 'hidden', width: MENU_WIDTH }}>
           {items.filter(Boolean).map(item => {
@@ -78,7 +83,8 @@ function KebabMenu({ items, label = 'Actions', className = '' }) {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -59,10 +59,10 @@ afterEach(() => { act(() => root.unmount()); container.remove(); localStorage.cl
 test('Talent row actions menu offers Send Assessment', async () => {
   await render('/talent');
   await act(async () => container.querySelector('button[aria-label="Actions for Asha Rao"]').click());
-  const items = [...container.querySelectorAll('[role="menuitem"]')].map(item => item.textContent.trim());
+  const items = [...document.querySelectorAll('[role="menuitem"]')].map(item => item.textContent.trim());
   expect(items).toEqual(['All Details', 'Send Assessment', 'Remove']);
 
-  await act(async () => [...container.querySelectorAll('[role="menuitem"]')].find(item => item.textContent.includes('Send Assessment')).click());
+  await act(async () => [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent.includes('Send Assessment')).click());
   expect(container.textContent).toContain('Generate Assessment');
   expect(container.querySelector('#sa-jd').value).toBe('20');
   await act(async () => button('Generate & Send Assessment').click());
