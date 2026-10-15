@@ -1,0 +1,61 @@
+[1mdiff --git a/docs/interview_recovery.md b/docs/interview_recovery.md[m
+[1mindex e3c2963..006e2cb 100644[m
+[1m--- a/docs/interview_recovery.md[m
+[1m+++ b/docs/interview_recovery.md[m
+[36m@@ -1,54 +1,37 @@[m
+ # Automated Interview Rescheduling & No-Show Recovery[m
+[31m-[m
+ Reschedule requests and no-shows are handled without the recruiter. The recruiter is pulled in only when automation cannot finish (attempts exhausted, no mutual slot, unrecoverable delivery/integration failure).[m
+[31m-[m
+ Code: `backend/interview_recovery/` (config, models, repository, providers, slots, service), routes in `backend/routes/interview_recovery_routes.py`, candidate page `frontend/src/pages/InterviewResponse.jsx` (`/interview/:token`), recruiter UI in `frontend/src/pages/Interviews.jsx` (Hiring Pipeline → Interviews).[m
+[31m-[m
+ ## How candidates reach it[m
+[31m-[m
+ Each interview gets a private **manage link** `<CANDIDATE_TEST_BASE_URL>/interview/<token>` (same token model as assessment links).[m
+[31m-[m
+ - New interviews: the link is appended to the invitation email when `CANDIDATE_TEST_BASE_URL` is set to a public URL.[m
+ - Existing interviews: a token is created the first time automation emails the candidate.[m
+ - Candidates who email or phone the recruiter instead: the recruiter clicks **Candidate asked to reschedule** on the interview card; automation takes over from there.[m
+[31m-[m
+ ## Workflow[m
+[31m-[m
+ ```[m
+ Reschedule request ─► PENDING ─► slot search ─► SLOT_PROPOSED ─► candidate picks ─► re-check ─► RESCHEDULED[m
+[31m-No-show            ─► PENDING ─► outreach    ─► AWAITING_RESPONSE ─► "yes" ─► SLOT_PROPOSED ─► ... ─► RECOVERED[m
+[31m-                                                                   └► "no"  ─► CLOSED (recruiter informed)[m
+[32m+[m[32mNo-show            ─► PENDING ─► outreach    ─► AWAITING_RESPONSE ─► "yes" ─► SLOT_PROPOSED ─► ... ─► RECOVERED[m
+[32m+[m[32m                                                                   └► "no"  ─► CLOSED (recruiter informed)[m
+ No slots / no reply / delivery failure ─► RETRY_SCHEDULED ─► ... ─► ESCALATED (recruiter notified once)[m
+ ```[m
+[31m-[m
+ 1. **Reschedule request** (candidate page or recruiter-logged) creates a case and runs the slot search *in the same request*, so options go out within seconds. No recruiter action.[m
+ 2. **Slot search** uses the recruiter's booked interviews (and the candidate's other interviews), interview duration, working hours/days, minimum notice and any availability windows the candidate entered. It offers up to `SLOT_COUNT` slots spread across different days and never re-offers the current time or slots found to be taken.[m
+ 3. **Confirmation** re-checks availability under a per-recruiter booking lock before updating the *existing* interview record (no duplicate interview). If the slot was taken meanwhile it is not booked; fresh options are shown instead.[m
+ 4. **After booking**: candidate gets a confirmation email; the recruiter gets an in-app notification (informational, no action needed) and is asked to tell the interviewer, because interviewers are free-text names without contact details.[m
+ 5. **No-show**: after `INTERVIEW_NO_SHOW_GRACE_MINUTES`, the interview is marked `No Show` and the candidate is emailed asking whether they want a new time (Yes → slot proposal flow, No → case closed, recruiter informed).[m
+ 6. **Stops automatically** when the interview is cancelled, completed (Selected/Rejected), rescheduled by the recruiter, marked attended, or deleted.[m
+[31m-[m
+ ### No-show detection[m
+[31m-[m
+ HR Assist has no attendance feed from a meeting provider, so a no-show is only ever acted on from an **explicit attendance outcome**. It is never inferred just because the scheduled time passed.[m
+[31m-[m
+ - After an interview's **scheduled end** + `INTERVIEW_NO_SHOW_GRACE_MINUTES`, the interviewer or recruiter clicks **Attended** or **No-show** on the interview (Hiring Pipeline → Interviews). The outcome is saved on the interview (`attendance_status`, `attendance_recorded_at`, `attendance_recorded_by`).[m
+ - **No-show** opens the recovery case and sends the follow-up immediately. The scheduled sweep (below) also picks up any interview recorded as a no-show that has no case yet: outcomes recorded late (within `INTERVIEW_NO_SHOW_LOOKBACK_HOURS`, default 7 days), or a request that failed midway.[m
+ - Never processed: interviews that are cancelled, completed (Selected/Rejected), rescheduled to a new time, marked attended, or still in progress or inside the grace period.[m
+ - `INTERVIEW_NO_SHOW_DETECTION=auto` (opt-in) additionally treats ended interviews with **no** recorded attendance as no-shows. Use it only if interviewers reliably click **Attended**.[m
+ - Idempotent: each interview occurrence (interview + original start time) gets at most one no-show case, enforced by a unique index on open cases. Concurrent sweeps cannot create a second case or send a second initial email.[m
+[31m-[m
+ ### Follow-up email[m
+[31m-[m
+[31m-Sent automatically through the existing SMTP integration (and SMS when Twilio is configured), using the interview's real data:[m
+[31m-[m
+[32m+[m[32mSent automatically through the existing SMTP integration (no-show follow-ups are email-only; reschedule requests retain optional Twilio SMS), using the interview's real data:[m
+ > Subject: Follow-Up Regarding Your Interview[m
+ > Hi {candidate name}, We noticed that you were unable to attend your scheduled interview for the {job title} position on {original date and time} ({INTERVIEW_TIMEZONE}). … choose a new interview time using the link below: {secure /interview/<token> link} … Best regards, {COMPANY_NAME} Talent Acquisition Team[m
+[31m-[m
+[31m-The link is the existing candidate reschedule page. It is tokenized per interview, so a candidate can only see and change their own interview. Reminders (until `INTERVIEW_RECOVERY_MAX_ATTEMPTS`) use the subject "Reminder: Follow-Up Regarding Your Interview". An email counts as sent only when the SMTP server accepts it; failures are recorded with the reason and retried with backoff. Once the candidate reschedules, declines, or a recruiter resolves the case, no further messages are sent.[m
+[31m-[m
+[31m-Each attempt is stored in `interview_recovery_attempts` with interview id, candidate id, attempt number, message type, timestamp, delivery status and failure reason. The case stores `detected_at` and `last_outreach_at`.[m
+[31m-[m
+[32m+[m[32mThe link is the existing candidate reschedule page. It is tokenized per interview, so a candidate can only view and manage their own interview. No-show recovery has a hard limit of 2 outreach emails total, including the initial follow-up: one initial email and at most one reminder. If the candidate has not responded or rescheduled by the configured retry interval, the system sends the reminder with the subject "Reminder: Follow-Up Regarding Your Interview". An email attempt is recorded with its delivery status and any failure reason. Confirmed transient delivery failures use bounded backoff and do not count as candidate outreach attempts; uncertain SMTP acceptance is not blindly resent. Once the candidate reschedules, declines, or a recruiter resolves the case, no further candidate outreach is sent. If the case remains unresolved after the second outreach attempt and its response window expires, automatic outreach stops and the case is escalated to the recruiter.[m
+[32m+[m[32mEach attempt is stored in `interview_recovery_attempts` with interview id, candidate id, attempt number, message type, timestamp, delivery status and failure reason. The case stores `detected_at`, `last_outreach_at`, `last_attempt_at`, `email_delivery_status` (`pending`, `sending`, `sent`, `failed`, `unknown`), and the next action/response deadline. Recruiter APIs expose `next_retry_at`; it is empty once two emails have been delivered or outreach has stopped. The Hiring Pipeline di

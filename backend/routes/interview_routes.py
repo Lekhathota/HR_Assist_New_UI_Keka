@@ -432,8 +432,10 @@ def _update_interview_outcome(interview_id: int, payload: dict | None = None):
 
     data = payload if payload is not None else (request.get_json(silent=True) or {})
     outcome = str(data.get("outcome") or "").strip().lower()
+    if outcome in CANDIDATE_STATUSES:
+        return _update_candidate_status(interview, outcome, user)
     if outcome not in {"selected", "rejected"}:
-        return jsonify({"error": "Outcome must be selected or rejected."}), 400
+        return jsonify({"error": "Outcome must be selected, rejected or a valid candidate status."}), 400
 
     status = "Client Interview Pending" if outcome == "selected" else "Rejected After Interview"
     action = "Interview Candidate Selected" if outcome == "selected" else "Interview Candidate Rejected"
@@ -468,6 +470,46 @@ def _update_interview_outcome(interview_id: int, payload: dict | None = None):
     if stage_error:
         response["stage_update_error"] = stage_error
     return jsonify(response)
+
+
+# Recruiter-set labels. They leave the interview status, hiring stage and any
+# automated recovery case (including its outreach attempt count) untouched.
+CANDIDATE_STATUSES = {
+    "interested": "Interested",
+    "not_interested": "Not Interested",
+    "follow_up": "Follow-up",
+    "awaiting_reply": "Outreach Sent · Awaiting Reply",
+    "pending_review": "Pending Review",
+}
+_FINAL_INTERVIEW_STATUSES = {"cancelled", "canceled", "client interview pending", "rejected after interview"}
+
+
+def _update_candidate_status(interview: dict, candidate_status: str, user: dict):
+    interview_id = int(interview["id"])
+    if str(interview.get("status") or "").strip().lower() in _FINAL_INTERVIEW_STATUSES:
+        return jsonify({"error": f"This interview is already {interview.get('status')}; its status can no longer be changed."}), 409
+    try:
+        db.update_interview(
+            interview_id,
+            {
+                "candidate_status": candidate_status,
+                "candidate_status_updated_at": db._now(),
+                "candidate_status_updated_by": user.get("username") or "",
+            },
+        )
+    except Exception as exc:
+        return jsonify({"error": f"Could not update candidate status: {exc}"}), 500
+    try:
+        db.log_audit(
+            "Interview Candidate Status Updated",
+            user.get("username") or "",
+            f"Marked '{interview.get('candidate_name') or interview.get('to_email')}' as {CANDIDATE_STATUSES[candidate_status]}.",
+            int(interview["jd_id"]) if interview.get("jd_id") not in {None, ""} else None,
+        )
+    except Exception:
+        pass
+    updated = db.get_interview_by_id(interview_id) or {**interview, "candidate_status": candidate_status}
+    return jsonify({"success": True, "interview": _public_interview(_with_candidate_phone(updated))})
 
 
 @interview_bp.route("/api/interviews/<int:interview_id>/generate-cancellation", methods=["POST"], endpoint="api_generate_cancellation")

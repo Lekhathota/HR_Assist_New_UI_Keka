@@ -2963,10 +2963,16 @@ def update_interview(interview_id: int, data: dict) -> bool:
         "cancellation_body",
         "cancellation_status",
         "cancellation_sent_at",
+        "candidate_status",
+        "candidate_status_updated_at",
+        "candidate_status_updated_by",
     }
     patch = {key: value for key, value in (data or {}).items() if key in allowed}
     if not patch:
         return False
+    # A workflow status change (outcome, reschedule, cancel, no-show) supersedes the recruiter-set label.
+    if "status" in patch and "candidate_status" not in patch:
+        patch["candidate_status"] = None
     before = _database().interviews.find_one(
         {"id": int(interview_id)}, {"status": 1, "candidate_id": 1, "candidate_name": 1, "jd_id": 1, "interview_start": 1}
     ) if "status" in patch else None

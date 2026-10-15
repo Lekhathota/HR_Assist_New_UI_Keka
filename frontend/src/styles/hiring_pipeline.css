@@ -239,3 +239,53 @@ body.theme-shimento .app-shell .hp-page .hp-empty p { margin: 0; font-size: 14px
 .app-shell .hp-page .hp-pill-btn i { margin-right: 5px; }
 .app-shell .hp-page .hp-pill-btn:hover:not(:disabled) { filter: brightness(.97); text-decoration: underline; }
 .app-shell .hp-page .hp-recovery-meta { flex: 0 0 100%; min-width: 0; font-size: 11.5px; line-height: 1.4; color: #6b7280; white-space: normal; overflow-wrap: anywhere; }
+
+/* Candidate status dropdown (interview rows) */
+.app-shell .hp-page .hp-status-menu { position: relative; display: inline-grid; gap: 4px; justify-items: end; }
+.app-shell .hp-page .hp-status-trigger {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 230px;
+  min-height: 34px; padding: 0 10px 0 12px;
+  border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: var(--hp-text);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.app-shell .hp-page .hp-status-trigger:hover:not(:disabled) { border-color: #fdba74; }
+.app-shell .hp-page .hp-status-trigger:focus-visible { outline: 2px solid var(--hp-accent); outline-offset: 1px; }
+.app-shell .hp-page .hp-status-trigger:disabled { opacity: .6; cursor: not-allowed; }
+.app-shell .hp-page .hp-status-trigger-label { overflow: hidden; text-overflow: ellipsis; }
+.app-shell .hp-page .hp-status-caret { margin-left: 2px; color: var(--hp-muted); font-size: 10px; }
+.app-shell .hp-page .hp-status-trigger.good { background: #ecfdf3; border-color: #bbe5cc; color: #15803d; }
+.app-shell .hp-page .hp-status-trigger.bad { background: #fdf1ef; border-color: #f3c7c2; color: #c6382d; }
+.app-shell .hp-page .hp-status-trigger.warn { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.app-shell .hp-page .hp-status-trigger.info { background: #eef5fd; border-color: #c7dbf7; color: #1d4ed8; }
+.app-shell .hp-page .hp-status-trigger.is-empty { color: var(--hp-muted); }
+.app-shell .hp-page .hp-status-dropdown {
+  position: fixed; z-index: 1000; display: grid; gap: 1px; padding: 6px;
+  max-height: min(420px, calc(100vh - 16px)); overflow-y: auto;
+  background: #fff; border: 1px solid var(--hp-line); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(17, 24, 39, .14);
+}
+.app-shell .hp-page .hp-status-option {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--hp-ink);
+  font-family: inherit; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer;
+}
+.app-shell .hp-page .hp-status-option:hover:not([aria-disabled="true"]),
+.app-shell .hp-page .hp-status-option:focus-visible { background: var(--hp-soft); outline: none; }
+.app-shell .hp-page .hp-status-option.is-current { background: #fff7ed; font-weight: 700; }
+.app-shell .hp-page .hp-status-option[aria-disabled="true"] { cursor: not-allowed; color: #9ca3af; }
+.app-shell .hp-page .hp-status-option-icon { width: 16px; text-align: center; font-size: 13px; }
+.app-shell .hp-page .hp-status-option.good .hp-status-option-icon { color: #16a34a; }
+.app-shell .hp-page .hp-status-option.bad .hp-status-option-icon { color: #dc2626; }
+.app-shell .hp-page .hp-status-option.warn .hp-status-option-icon { color: #c2410c; }
+.app-shell .hp-page .hp-status-option.info .hp-status-option-icon { color: #1d4ed8; }
+.app-shell .hp-page .hp-status-option.muted .hp-status-option-icon { color: var(--hp-muted); }
+.app-shell .hp-page .hp-status-option[aria-disabled="true"] .hp-status-option-icon { color: #d1d5db; }
+.app-shell .hp-page .hp-status-option-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.app-shell .hp-page .hp-status-option-text small { color: var(--hp-muted); font-size: 11px; font-weight: 500; }
+.app-shell .hp-page .hp-status-option-check { color: var(--hp-accent-dark); font-size: 11px; }
+.app-shell .hp-page .hp-status-error { max-width: 230px; color: #c6382d; font-size: 11.5px; line-height: 1.3; text-align: right; }
+@media (max-width: 760px) {
+  .app-shell .hp-page .hp-status-menu { justify-items: start; }
+  .app-shell .hp-page .hp-status-error { text-align: left; }
+}

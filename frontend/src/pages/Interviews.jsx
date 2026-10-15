@@ -9,6 +9,7 @@ import {
   isAssessmentScoreVisible,
 } from '../utils/assessmentDisplay.js';
 import { initials } from '../utils/userDisplay.js';
+import InterviewStatusMenu, { INTERVIEW_STATUS_OPTIONS } from '../components/InterviewStatusMenu.jsx';
 import '../styles/hiring_pipeline.css';
 
 function formatDateTime(value) {
@@ -214,6 +215,50 @@ function isOutcomeLocked(interview) {
   return status === 'rejected after interview' || status === 'client interview pending';
 }
 
+// Recruiter-set labels persisted as `candidate_status`; they never touch recovery or outreach attempts.
+const CANDIDATE_LABELS = ['interested', 'not_interested', 'follow_up', 'awaiting_reply', 'pending_review'];
+
+function isNoShow(interview) {
+  return normalizeStatus(interview?.status) === 'no show' || interview?.attendance_status === 'no_show';
+}
+
+// Status shown in the dropdown: final outcomes first, then the recruiter label, then workflow state.
+function candidateStatusOf(interview) {
+  const status = normalizeStatus(interview?.status);
+  if (status === 'client interview pending' || status === 'selected') return 'selected';
+  if (status === 'rejected after interview' || status === 'rejected') return 'rejected';
+  if (isCancelled(interview)) return 'cancelled';
+  if (CANDIDATE_LABELS.includes(interview?.candidate_status)) return interview.candidate_status;
+  const recoveryStatus = interview?.recovery?.status;
+  if (recoveryStatus === 'AWAITING_RESPONSE') return 'awaiting_reply';
+  if (recoveryStatus === 'RESCHEDULED' || recoveryStatus === 'RECOVERED' || status === 'rescheduled') return 'rescheduled';
+  if (isNoShow(interview)) return 'no_show';
+  if (isPastInterview(interview)) return 'pending_review';
+  return null;
+}
+
+// Options that cannot be chosen for this interview, with the reason shown in the menu.
+function statusDisabledReasons(interview) {
+  const past = isPastInterview(interview);
+  const reasons = {};
+  if (isOutcomeLocked(interview)) {
+    // The outcome is final; only the follow-up email stays available.
+    INTERVIEW_STATUS_OPTIONS.forEach(({ value }) => { if (value !== 'follow_up') reasons[value] = 'Interview outcome already recorded'; });
+    return reasons;
+  }
+  if (!past) {
+    reasons.selected = 'Available after the interview';
+    reasons.rejected = 'Available after the interview';
+    reasons.no_show = 'Available after the interview';
+  } else {
+    reasons.rescheduled = 'Past interviews are rescheduled through the no-show follow-up';
+    reasons.cancelled = 'Only upcoming interviews can be cancelled';
+    if (isNoShow(interview)) reasons.no_show = 'No-show already recorded';
+    else if (interview?.attendance_status === 'attended') reasons.no_show = 'Candidate marked as attended';
+  }
+  return reasons;
+}
+
 function deliveryStatus(item, key) {
   const value = item[key];
   if (!value || value === 'pending' || value === 'not_configured') {
@@ -265,6 +310,7 @@ function HiringPipeline() {
   const [rescheduleError, setRescheduleError] = useState('');
   const [rescheduleSuccess, setRescheduleSuccess] = useState(null);
   const [outcomeBusyId, setOutcomeBusyId] = useState(null);
+  const [statusErrors, setStatusErrors] = useState({});
   const [highlightedInterviewId, setHighlightedInterviewId] = useState(null);
   const [scheduleActive, setScheduleActive] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -683,32 +729,57 @@ function HiringPipeline() {
     }
   };
 
+  // outcome: 'selected' / 'rejected' (final, stops recovery) or a recruiter label from CANDIDATE_LABELS.
   const setInterviewOutcome = async (interview, outcome) => {
+    const isFinal = outcome === 'selected' || outcome === 'rejected';
     setOutcomeBusyId(interview.id);
+    setStatusErrors(prev => ({ ...prev, [interview.id]: '' }));
     try {
       let response = await apiPost(`/api/interviews/${interview.id}/outcome`, { outcome });
       if (!response.ok && response.status === 404) {
         response = await apiPost('/api/interviews/outcome', { interview_id: interview.id, outcome });
       }
       const { ok, status, data } = response;
-      if (!ok || !data.success) {
-        const detail = data.error || `Request failed with status ${status}`;
-        throw new Error(`Could not update interview outcome. ${detail}`);
+      if (!ok || !data?.success) {
+        const detail = data?.error || `Request failed with status ${status}`;
+        throw new Error(`Could not update ${isFinal ? 'interview outcome' : 'candidate status'}. ${detail}`);
       }
-      const updated = data.interview || {
-        ...interview,
-        status: outcome === 'selected' ? 'Client Interview Pending' : 'Rejected After Interview',
-      };
+      const updated = isFinal
+        ? data.interview || { ...interview, status: outcome === 'selected' ? 'Client Interview Pending' : 'Rejected After Interview' }
+        // Keep the recovery summary (outreach attempts) the outcome response does not include.
+        : { ...interview, ...(data.interview || {}), candidate_status: outcome, recovery: interview.recovery };
       setInterviews(prev => prev.map(item => (item.id === interview.id ? updated : item)));
+      const label = INTERVIEW_STATUS_OPTIONS.find(option => option.value === outcome)?.label || outcome;
       toast({
         type: 'success',
-        message: outcome === 'selected' ? 'Candidate moved to client interview pending.' : 'Candidate marked rejected after interview.',
+        message: outcome === 'selected' ? 'Candidate moved to client interview pending.'
+          : outcome === 'rejected' ? 'Candidate marked rejected after interview.'
+            : `Status updated to ${label}.`,
       });
+      return true;
     } catch (err) {
-      toast({ type: 'error', message: err.message || 'Could not update interview outcome.' });
+      const message = err.message || 'Could not update the status.';
+      setStatusErrors(prev => ({ ...prev, [interview.id]: message }));
+      toast({ type: 'error', message });
+      return false;
     } finally {
       setOutcomeBusyId(null);
     }
+  };
+
+  const changeCandidateStatus = async (interview, value) => {
+    const current = candidateStatusOf(interview);
+    if (value === 'follow_up') {
+      // Opening the composer never depends on the label being saved.
+      if (current !== 'follow_up' && !isOutcomeLocked(interview)) await setInterviewOutcome(interview, 'follow_up');
+      openFollowup(interview);
+      return;
+    }
+    if (value === current) return;
+    if (value === 'no_show') { await markAttendance(interview, 'no_show'); return; }
+    if (value === 'rescheduled') { openReschedule(interview); return; }
+    if (value === 'cancelled') { openCancel(interview); return; }
+    await setInterviewOutcome(interview, value);
   };
 
   const updateRescheduleField = (key, value) => {
@@ -1080,24 +1151,21 @@ function HiringPipeline() {
                                     </button>
                                   </>
                                 )}
-                                {past && !cancelled && !lockedOutcome && (
-                                  <>
-                                    <button type="button" className="hp-btn hp-btn-success" onClick={() => setInterviewOutcome(item, 'selected')} disabled={outcomeBusyId === item.id}>
-                                      <i className={`fas ${outcomeBusyId === item.id ? 'fa-spinner fa-spin' : 'fa-check'}`} aria-hidden="true"></i> Selected
-                                    </button>
-                                    <button type="button" className="hp-btn hp-btn-danger" onClick={() => setInterviewOutcome(item, 'rejected')} disabled={outcomeBusyId === item.id}>
-                                      <i className={`fas ${outcomeBusyId === item.id ? 'fa-spinner fa-spin' : 'fa-xmark'}`} aria-hidden="true"></i> Rejected
-                                    </button>
-                                  </>
-                                )}
                                 {!past && !cancelled && (
                                   <button type="button" className="hp-btn hp-btn-ghost" onClick={() => openReschedule(item)}>
                                     <i className="fas fa-calendar-plus" aria-hidden="true"></i> Reschedule
                                   </button>
                                 )}
-                                <button type="button" className="hp-btn hp-btn-ghost" onClick={() => openFollowup(item)} disabled={cancelled}>
-                                  <i className="fas fa-reply" aria-hidden="true"></i> Follow-up
-                                </button>
+                                <InterviewStatusMenu
+                                  value={candidateStatusOf(item)}
+                                  onChange={(value) => changeCandidateStatus(item, value)}
+                                  busy={outcomeBusyId === item.id || attendanceBusyId === item.id}
+                                  disabled={cancelled}
+                                  disabledTitle="This interview was cancelled"
+                                  disabledReasons={statusDisabledReasons(item)}
+                                  error={statusErrors[item.id]}
+                                  label={`Status for ${item.candidate_name || 'candidate'}`}
+                                />
                                 {!past && !cancelled && (
                                   <button type="button" className="hp-icon-btn hp-icon-danger" onClick={() => openCancel(item)} aria-label={`Cancel interview with ${item.candidate_name || 'candidate'}`} title="Cancel interview">
                                     <i className="fas fa-ban" aria-hidden="true"></i>
