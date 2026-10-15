@@ -126,14 +126,106 @@ afterEach(() => { act(() => root.unmount()); container.remove(); jest.restoreAll
 describe('Coding Questions panel', () => {
   test.each([1, 2, 5, 10])('adds and generates %i coding questions, each from its own prompt', async (count) => {
     await mount();
-    expect(heading()).toContain('Coding Questions: 2');
+    expect(heading()).toContain('Coding Questions (2)');
     for (let i = 0; i < count; i += 1) await addAndGenerate(`Client requirement number ${i}`);
     expect($$('.ab-coding-card')).toHaveLength(count);
-    expect(heading()).toContain(`Coding Questions: ${2 + count}`);
+    expect(heading()).toContain(`Coding Questions (${2 + count})`);
     const generateCalls = apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'));
     expect(generateCalls.map(([, body]) => body.prompt)).toEqual(Array.from({ length: count }, (_, i) => `Client requirement number ${i}`));
     expect(onQuestionsChanged).toHaveBeenCalledTimes(count);
     expect(container.textContent).toContain(`${count} generated`);
+  });
+
+  test('bottom add action is present with zero, one, two, three and more entries', async () => {
+    await mount();
+    for (let count = 0; count <= 5; count += 1) {
+      expect($$('.ab-coding-card')).toHaveLength(count);
+      expect(heading()).toContain(`Coding Questions (${2 + count})`);
+      expect($$('.ab-coding-footer button')).toHaveLength(1);
+      expect($('.ab-coding-footer button').textContent).toBe('+ Add Coding Question');
+      expect($('.ab-coding-footer button').disabled).toBe(false);
+      expect($$('.ab-coding-head-actions button').some(b => b.textContent.includes('+ Add Coding Question'))).toBe(true);
+      if (count < 5) {
+        await click($('.ab-coding-footer button'));
+        expect(document.activeElement).toBe($$('.ab-coding-card textarea').at(-1));
+      }
+    }
+  });
+
+  test('more than two questions can be edited, saved, generated, removed and restored', async () => {
+    await mount();
+    for (let i = 0; i < 4; i += 1) await addAndGenerate(`Requirement ${i}`);
+    await click(button('Collapse all'));
+    const third = $$('.ab-coding-card')[2];
+    await click(third.querySelector('[aria-label="Edit coding question 3"]'));
+    expect(document.activeElement).toBe(third.querySelector('textarea'));
+    type(third.querySelector('textarea'), 'Updated third requirement');
+    type(third.querySelector('select[id^="ab-coding-lang"]'), 'java');
+    type(third.querySelector('select[id^="ab-coding-diff"]'), 'Hard');
+    await click([...third.querySelectorAll('button')].find(b => b.textContent.includes('Save changes')));
+    expect(apiPut).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s3', {
+      prompt: 'Updated third requirement', language: 'java', difficulty: 'Hard',
+    });
+    await click([...third.querySelectorAll('button')].find(b => b.textContent.includes('Regenerate')));
+    expect(third.textContent).toContain('Generated for: Updated third requirement');
+    const fourth = $$('.ab-coding-card')[3];
+    await click(fourth.querySelector('[aria-label="Edit coding question 4"]'));
+    await click([...fourth.querySelectorAll('button')].find(b => b.textContent.includes('Remove')));
+    expect(apiDelete).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s4');
+    act(() => root.unmount());
+    root = createRoot(container);
+    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    expect($$('.ab-coding-card')).toHaveLength(3);
+    expect(heading()).toContain('Coding Questions (5)');
+    await click($$('.ab-coding-card')[2].querySelector('[aria-label="Edit coding question 3"]'));
+    expect($$('.ab-coding-card')[2].querySelector('textarea').value).toBe('Updated third requirement');
+    expect($$('.ab-coding-card')[2].querySelector('select[id^="ab-coding-lang"]').value).toBe('java');
+    expect($$('.ab-coding-card')[2].querySelector('select[id^="ab-coding-diff"]').value).toBe('Hard');
+    expect(container.textContent).not.toContain('Requirement 3');
+  });
+
+  test('pending question prompts are saved and restored before generation', async () => {
+    await mount();
+    for (let i = 0; i < 4; i += 1) {
+      await click($('.ab-coding-footer button'));
+      const card = $$('.ab-coding-card').at(-1);
+      type(card.querySelector('textarea'), `Draft prompt ${i}`);
+      await click([...card.querySelectorAll('button')].find(b => b.textContent.includes('Save changes')));
+    }
+    act(() => root.unmount()); root = createRoot(container);
+    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    expect($$('.ab-coding-card')).toHaveLength(4);
+    expect(heading()).toContain('Coding Questions (6)');
+    for (let i = 0; i < 4; i += 1) expect($$('.ab-coding-card')[i].textContent).toContain(`Draft prompt ${i}`);
+    expect(server.specs.every(spec => spec.status === 'pending')).toBe(true);
+  });
+
+  test('generation saves the current shared instructions before generating each individual question', async () => {
+    await mount();
+    type($('#ab-client-prompt'), 'Shared Java performance requirements');
+    for (let i = 0; i < 4; i += 1) await addAndGenerate(`Individual prompt ${i}`);
+    expect(apiPut).toHaveBeenCalledWith('/api/assessment/1/coding/client-prompt', {
+      prompt: 'Shared Java performance requirements', save_as_client_default: false,
+    });
+    expect(apiPut.mock.invocationCallOrder[0]).toBeLessThan(apiPost.mock.invocationCallOrder[1]);
+    expect(server.clientPrompt).toBe('Shared Java performance requirements');
+    expect(server.specs.map(spec => spec.prompt)).toEqual(Array.from({ length: 4 }, (_, i) => `Individual prompt ${i}`));
+    act(() => root.unmount()); root = createRoot(container);
+    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    expect($('#ab-client-prompt').value).toBe('Shared Java performance requirements');
+  });
+
+  test('failed shared-instruction save prevents generation and keeps unsaved input', async () => {
+    await mount();
+    await click($('.ab-coding-footer button'));
+    type($('#ab-client-prompt'), 'Unsaved shared instructions');
+    type($('.ab-coding-card textarea'), 'Unsaved individual prompt');
+    apiPut.mockResolvedValueOnce({ ok: false, data: { error: 'Could not save instructions' } });
+    await click(button('Generate Question'));
+    expect(apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'))).toHaveLength(0);
+    expect($('.ab-coding-card textarea').value).toBe('Unsaved individual prompt');
+    expect($('#ab-client-prompt').value).toBe('Unsaved shared instructions');
+    expect($('[role="alert"]').textContent).toContain('Could not save instructions');
   });
 
   test('language, difficulty and the prompt are sent with generation and the preview shows the question', async () => {
@@ -177,7 +269,7 @@ describe('Coding Questions panel', () => {
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('generated question is removed'));
     expect(apiDelete).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s1');
     expect($$('.ab-coding-card')).toHaveLength(0);
-    expect(heading()).toContain('Coding Questions: 2');
+    expect(heading()).toContain('Coding Questions (2)');
     expect(onQuestionsChanged).toHaveBeenCalledTimes(2);
   });
 

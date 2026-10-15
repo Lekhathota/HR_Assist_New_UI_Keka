@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiDelete, apiGet, apiPost, apiPut } from '../api.js';
 
 const PROMPT_HINT = [
@@ -31,6 +31,14 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
   const [clientMessage, setClientMessage] = useState('');
   const [adding, setAdding] = useState(false);
   const [panelError, setPanelError] = useState('');
+  const focusPrompt = useRef(null);
+
+  useEffect(() => {
+    if (focusPrompt.current) {
+      document.getElementById(`ab-coding-prompt-${focusPrompt.current}`)?.focus();
+      focusPrompt.current = null;
+    }
+  }, [config, open]);
 
   const apply = useCallback((next) => {
     setConfig(next);
@@ -63,6 +71,7 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
 
   const { specs, limits, languages, difficulties, client } = config;
   const generatedCount = specs.filter(spec => spec.status === 'generated').length;
+  const questionCount = config.coding_question_count + specs.length - generatedCount;
   const atLimit = specs.length >= limits.max_coding_questions;
   const valueOf = (spec, key) => (drafts[spec.id] && key in drafts[spec.id] ? drafts[spec.id][key] : spec[key]);
   const dirty = spec => Boolean(drafts[spec.id]) && Object.keys(drafts[spec.id]).some(key => drafts[spec.id][key] !== spec[key]);
@@ -85,6 +94,7 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
       const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/coding/specs`,
         { prompt: '', language: '', difficulty: 'Medium', points: 15 });
       if (!ok) throw new Error(data.error || 'Could not add a coding question.');
+      focusPrompt.current = data.spec.id;
       apply(data.config);
       setOpen(prev => new Set(prev).add(data.spec.id));
     } catch (err) {
@@ -117,6 +127,8 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
     setSpecBusy(spec.id, 'generate');
     setErrors(prev => ({ ...prev, [spec.id]: '' }));
     try {
+      // The generation API reads the persisted shared prompt. Save current instructions first.
+      if (clientDirty || saveAsDefault) await persistClientPrompt();
       const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/coding/specs/${spec.id}/generate`, drafts[spec.id] || {});
       if (!ok) throw new Error(data.error || 'Generation failed.');
       apply(data.config);
@@ -124,8 +136,8 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
       onQuestionsChanged?.();
     } catch (err) {
       setErrors(prev => ({ ...prev, [spec.id]: err.message }));
-      await load();  // shows the stored failure state; the typed prompt was saved by the server
-      clearDraft(spec.id);
+      // Refresh server failure state without discarding unsaved question or shared prompts.
+      try { apply(await apiGet(`/api/assessment/${assessmentId}/coding`)); } catch { /* keep the original error */ }
     } finally {
       setSpecBusy(spec.id, null);
     }
@@ -149,7 +161,7 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
     }
   };
 
-  const saveClientPrompt = async () => {
+  const persistClientPrompt = async () => {
     setClientBusy(true);
     setClientMessage('');
     try {
@@ -160,11 +172,13 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
       setClientPrompt(data.client_prompt || '');
       setClientMessage(saveAsDefault && client ? `Saved, and set as ${client.name}'s default.` : 'Saved for this assessment.');
       setSaveAsDefault(false);
-    } catch (err) {
-      setClientMessage(err.message);
     } finally {
       setClientBusy(false);
     }
+  };
+
+  const saveClientPrompt = async () => {
+    try { await persistClientPrompt(); } catch (err) { setClientMessage(err.message); }
   };
 
   const clientDirty = clientPrompt !== (config.client_prompt || '');
@@ -173,7 +187,7 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
     <section className="white-card ab-coding-panel" aria-labelledby="ab-coding-title">
       <div className="ab-coding-head">
         <div>
-          <h2 id="ab-coding-title"><i className="fas fa-code" aria-hidden="true" /> Coding Questions: {config.coding_question_count}</h2>
+          <h2 id="ab-coding-title"><i className="fas fa-code" aria-hidden="true" /> Coding Questions ({questionCount})</h2>
           <p className="ab-muted">
             {specs.length} custom {specs.length === 1 ? 'entry' : 'entries'} · {generatedCount} generated · limit {limits.max_coding_questions}.
             {' '}Each question is generated from the JD{config.jd?.title ? ` (${config.jd.title})` : ''}, the client instructions and its own prompt.
@@ -227,7 +241,8 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
             const question = spec.question;
             return (
               <li key={spec.id} className={`ab-coding-card ab-coding-${spec.status}`}>
-                <button type="button" className="ab-coding-summary" aria-expanded={isOpen} onClick={() => toggle(spec.id)}>
+                <div className="ab-coding-card-head">
+                <button type="button" className="ab-coding-summary" aria-controls={`ab-coding-body-${spec.id}`} aria-expanded={isOpen} onClick={() => toggle(spec.id)}>
                   <span className="ab-q-num">#{index + 1}</span>
                   <span className="ab-coding-title">{summaryOf(prompt) || 'New coding question'}</span>
                   <span className={`ab-coding-status ab-coding-status-${spec.status}`}>{STATUS_LABELS[spec.status] || spec.status}</span>
@@ -235,8 +250,14 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
                   <span className="ab-skill">{languages.find(l => l.key === valueOf(spec, 'language'))?.label || 'Any language'}</span>
                   <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'}`} aria-hidden="true" />
                 </button>
+                <button type="button" className="btn btn-secondary btn-sm ab-coding-edit" aria-label={`Edit coding question ${index + 1}`}
+                  disabled={Boolean(working)} onClick={() => {
+                    focusPrompt.current = spec.id;
+                    setOpen(prev => new Set(prev).add(spec.id));
+                  }}>Edit</button>
+                </div>
                 {isOpen && (
-                  <div className="ab-coding-body">
+                  <div className="ab-coding-body" id={`ab-coding-body-${spec.id}`}>
                     <label className="ab-label" htmlFor={`ab-coding-prompt-${spec.id}`}>Question prompt (client requirements)</label>
                     <textarea id={`ab-coding-prompt-${spec.id}`} rows={6} value={prompt} placeholder={PROMPT_HINT}
                       maxLength={limits.max_prompt_chars} disabled={Boolean(working)}
@@ -291,7 +312,7 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
                           {working === 'save' ? 'Saving…' : 'Save changes'}
                         </button>
                       )}
-                      <button type="button" className="btn btn-primary" onClick={() => generateEntry(spec)} disabled={Boolean(working)}>
+                      <button type="button" className="btn btn-primary" onClick={() => generateEntry(spec)} disabled={Boolean(working) || clientBusy}>
                         {working === 'generate' ? <><i className="fas fa-spinner fa-spin" /> Generating…</>
                           : spec.status === 'generated' ? <><i className="fas fa-rotate" /> Regenerate</>
                             : <><i className="fas fa-magic" /> Generate Question</>}
@@ -304,11 +325,13 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
           })}
         </ol>
       )}
-      {specs.length > 3 && (
-        <div className="ab-coding-footer">
-          <button type="button" className="btn btn-primary" onClick={addEntry} disabled={adding || atLimit}>+ Add Coding Question</button>
-        </div>
-      )}
+      <div className="ab-coding-footer">
+        <button type="button" className="btn btn-primary" onClick={addEntry} disabled={adding || atLimit}
+          title={atLimit ? `Limit of ${limits.max_coding_questions} reached` : undefined}>
+          {adding ? 'Adding...' : '+ Add Coding Question'}
+        </button>
+        {atLimit && <p className="ab-muted" role="status">Limit of {limits.max_coding_questions} custom coding questions reached.</p>}
+      </div>
     </section>
   );
 }
