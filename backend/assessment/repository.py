@@ -6,11 +6,11 @@ Uses the shared Recruitment Assist database connection and counter sequences.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from pymongo import ASCENDING, DESCENDING, ReturnDocument
-from pymongo.errors import OperationFailure
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 import activity_feed
 import database as db
@@ -74,6 +74,8 @@ def ensure_assessment_indexes() -> None:
 
     mongo.assessment_results.create_index([("id", ASCENDING)], unique=True)
     mongo.assessment_results.create_index([("assessment_id", ASCENDING)], unique=True)
+    # One in-flight "generate & send" per candidate and JD (see claim_send_request).
+    mongo.assessment_send_requests.create_index([("candidate_id", ASCENDING), ("jd_id", ASCENDING)], unique=True)
 
     from assessment.proctoring_media import ensure_proctoring_indexes
     ensure_proctoring_indexes()
@@ -111,6 +113,10 @@ def create_assessment(data: dict[str, Any]) -> int:
         "created_at": _now(),
         "updated_at": _now(),
     }
+    # Optional provenance for assessments sent outside the normal screening flow.
+    for key in ("source", "screening_override", "initiated_by"):
+        if data.get(key) is not None:
+            doc[key] = data[key]
     token = str(data.get("access_token") or "").strip()
     if token:
         doc["access_token"] = token
@@ -198,6 +204,10 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
         "candidate_email",
         "terms_accepted_at",
         "terms_version",
+        "email_delivery_status",
+        "email_delivery_error",
+        "email_sent_at",
+        "send_request_id",
     }
     update_doc: dict[str, Any] = {}
     unset_doc: dict[str, int] = {}
@@ -230,6 +240,51 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
             activity_feed.emit("assessment", assessment_id=int(assessment_id), jd_id=before.get("jd_id"),
                                name=before.get("candidate_name") or "", status=new_status)
     return result.modified_count > 0
+
+
+def push_delivery_event(assessment_id: int, event: dict[str, Any]) -> None:
+    """Append-only email delivery history shown to recruiters."""
+    _database().assessments.update_one(
+        {"id": int(assessment_id)},
+        {"$push": {"delivery_history": {**event, "at": _now()}}, "$set": {"updated_at": _now()}},
+    )
+
+
+def get_assessments_for_candidate(candidate_id: int) -> list[dict]:
+    rows = _database().assessments.find({"candidate_id": int(candidate_id)}).sort("created_at", DESCENDING)
+    return _serialize_docs(list(rows))
+
+
+def claim_send_request(candidate_id: int, jd_id: int, request_id: str, lease_seconds: int) -> Optional[dict]:
+    """Atomically take the candidate/JD send lease; None while another request holds it."""
+    now = _now()
+    try:
+        row = _database().assessment_send_requests.find_one_and_update(
+            {"candidate_id": int(candidate_id), "jd_id": int(jd_id),
+             "$or": [{"lease_until": {"$lte": now}}, {"lease_until": None}]},
+            {"$set": {"request_id": request_id, "state": "processing", "lease_until": now + timedelta(seconds=lease_seconds),
+                      "updated_at": now},
+             "$setOnInsert": {"created_at": now}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+    except DuplicateKeyError:
+        return None
+    return _serialize_doc(row)
+
+
+def finish_send_request(candidate_id: int, jd_id: int, request_id: str, *, state: str, error: str = "",
+                        assessment_id: int | None = None) -> None:
+    """Release the lease and remember the outcome (generation failures have no assessment row)."""
+    _database().assessment_send_requests.update_one(
+        {"candidate_id": int(candidate_id), "jd_id": int(jd_id), "request_id": request_id},
+        {"$set": {"state": state, "last_error": error, "assessment_id": assessment_id,
+                  "lease_until": _now(), "updated_at": _now()}},
+    )
+
+
+def get_send_requests_for_candidate(candidate_id: int) -> list[dict]:
+    return _serialize_docs(list(_database().assessment_send_requests.find({"candidate_id": int(candidate_id)})))
 
 
 def begin_candidate_attempt(assessment_id: int) -> Optional[dict]:

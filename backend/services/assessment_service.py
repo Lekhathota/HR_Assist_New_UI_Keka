@@ -104,6 +104,14 @@ def record_candidate_outcome(assessment: dict[str, Any], status: str) -> None:
     candidate_id = int(assessment.get("candidate_id") or 0)
     if not candidate_id:
         return
+    if assessment.get("screening_override"):
+        # Sent to a candidate who was not selected at screening: the recruiter reviews
+        # the result and decides; the hiring stage is never moved automatically.
+        db.log_audit("Assessment Result Ready", "",
+                     f"Assessment #{assessment.get('id')} finished as {status}; awaiting recruiter review "
+                     "(sent outside resume screening, hiring stage unchanged).",
+                     int(assessment.get("jd_id") or 0) or None)
+        return
     db.update_candidate(candidate_id, {"hiring_stage": ASSESSMENT_STAGE_LABELS.get(status, status.title())})
     if status == AssessmentStatus.PASSED:
         from services.hiring_process_service import advance_after_assessment
@@ -253,16 +261,17 @@ def _candidate_selected_for_jd(candidate_id: int, jd_id: int) -> bool:
     return False
 
 
-def _load_context(candidate_id: int, jd_id: int) -> dict[str, Any]:
+def _load_context(candidate_id: int, jd_id: int, *, require_selected: bool = True) -> dict[str, Any]:
     candidate = db.get_candidate_by_id(candidate_id)
     jd = db.get_jd_by_id(jd_id, include_raw_text=True)
     if not candidate:
         raise AssessmentServiceError("Candidate not found.")
     if not jd:
         raise AssessmentServiceError("Job description not found.")
-    if not _candidate_selected_for_jd(candidate_id, jd_id):
+    if require_selected and not _candidate_selected_for_jd(candidate_id, jd_id):
         raise AssessmentServiceError("Only selected candidates can receive assessments.")
-    if not candidate.get("email"):
+    # The send-anyway path validates (or takes the recruiter's corrected) address itself.
+    if require_selected and not candidate.get("email"):
         raise AssessmentServiceError("Candidate email is missing.")
     candidate = {**candidate, "email": normalize_email(candidate.get("email"))}
     return {"candidate": candidate, "jd": jd}
@@ -355,8 +364,12 @@ def generate_assessment(
     passing_score: int,
     time_limit_minutes: int,
     title: str = "",
+    require_selected: bool = True,
+    provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ctx = _load_context(candidate_id, jd_id)
+    """require_selected=False is the recruiter's explicit "send assessment anyway" path
+    (candidate_assessment_service); provenance is stored on the assessment record."""
+    ctx = _load_context(candidate_id, jd_id, require_selected=require_selected)
     candidate = ctx["candidate"]
     jd = ctx["jd"]
 
@@ -389,6 +402,7 @@ def generate_assessment(
             "experience_required": generated_exam["experience_required"],
             "passing_score": passing_score,
             "time_limit_minutes": time_limit_minutes,
+            **(provenance or {}),
         }
     )
 
@@ -638,7 +652,8 @@ def _ensure_assessment_link_in_body(body: str, link: str) -> str:
     return generated
 
 
-def _build_invite_email(assessment: dict[str, Any], link: str, from_email: str) -> dict[str, str]:
+def _build_invite_email(assessment: dict[str, Any], link: str, from_email: str,
+                        *, expires_at: datetime | None = None, instructions: bool = False) -> dict[str, str]:
     if not is_candidate_test_url(link):
         raise AssessmentServiceError("Candidate test link is invalid.")
 
@@ -658,8 +673,15 @@ def _build_invite_email(assessment: dict[str, Any], link: str, from_email: str) 
         f"{link}\n\n"
         f"Assessment: {title}\n"
         f"Time limit: {time_limit} minutes\n"
-        f"Passing score: {passing_score}%\n\n"
-        "Please complete the assessment at your earliest convenience.\n\n"
+        f"Passing score: {passing_score}%\n"
+        + (f"Complete by: {expires_at:%d %b %Y, %H:%M} UTC (the link expires after this time)\n" if expires_at else "")
+        + "\n"
+        + ("Instructions:\n"
+           "- Use a laptop or desktop with a stable internet connection, camera and microphone.\n"
+           "- The timer starts when you begin and cannot be paused; answers are saved as you go.\n"
+           "- Stay on the test tab: leaving it or exiting full screen is recorded and can end the attempt.\n"
+           "- The link is personal to you; do not share it.\n\n" if instructions else "")
+        + "Please complete the assessment at your earliest convenience.\n\n"
         "Best regards,\n"
         f"{company} Recruitment Team\n"
         f"{from_email}"

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import StageTrackerDelivery from '../components/StageTrackerDelivery.jsx';
+import SendAssessmentModal from '../components/SendAssessmentModal.jsx';
 import { TALENT_CACHE_KEY, apiGet, readSessionCache, writeSessionCache, apiPost } from '../api.js';
 import { toast, useConfirm } from '../components/EnterpriseFeedback.jsx';
 import '../styles/candidates.css';
@@ -48,6 +49,7 @@ function Candidates() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   // Rows whose other jobs' stage trackers are expanded.
   const [expandedRows, setExpandedRows] = useState(() => new Set());
+  const [assessmentCandidate, setAssessmentCandidate] = useState(null);
   const toggleExpanded = (id) => setExpandedRows(prev => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -1504,9 +1506,15 @@ function Candidates() {
                         })()}
                       </td>
                       <td className="candidates-simple-actions">
-                        <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">
-                          <i className="fas fa-eye"></i> All Details
-                        </Link>
+                        <div className="candidates-actions-group">
+                          <button type="button" className="btn btn-secondary candidates-simple-btn" onClick={() => setAssessmentCandidate(c)}
+                            title="Generate a JD-based assessment and email the test link">
+                            <i className="fas fa-clipboard-question"></i> Send Assessment
+                          </button>
+                          <Link to={`/talent/${c.id}`} className="btn btn-primary candidates-simple-btn">
+                            <i className="fas fa-eye"></i> All Details
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1563,6 +1571,9 @@ function Candidates() {
         )}
 
         {ReportModal()}
+        {assessmentCandidate && (
+          <SendAssessmentModal candidate={assessmentCandidate} onClose={() => setAssessmentCandidate(null)} />
+        )}
 
         <style>{`
           @keyframes slideUp {

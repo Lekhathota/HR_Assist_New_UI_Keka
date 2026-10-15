@@ -1,0 +1,90 @@
+/* Send Assessment modal (Talent + All Details) and the All Details "Assessments" card.
+   The modal reuses the shared .jd-modal-* look; the layout rules below are repeated
+   here because jd_details_extra.css only loads with the JD details page. */
+.sa-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: clamp(1rem, 5vh, 3rem) 1rem 1rem;
+  background: rgba(15, 23, 42, .62);
+}
+.sa-modal {
+  width: min(560px, 100%); max-height: 92vh; overflow: auto;
+  padding: 1.5rem; background: #fff; border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+}
+.sa-modal .jd-modal-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  margin-bottom: .5rem; padding-bottom: .9rem; border-bottom: 1px solid #e5e7eb;
+}
+.sa-modal .jd-modal-header h2 { display: flex; align-items: center; gap: .55rem; margin: 0; font-size: 1.2rem; color: #141416; }
+.sa-modal .jd-modal-header h2 i { color: var(--accent-color, #f97316); }
+.sa-modal .jd-modal-close { width: 36px; height: 36px; border: 0; border-radius: 6px; background: #f1f5f9; color: #334155; cursor: pointer; }
+.sa-modal .jd-modal-close:disabled { opacity: .5; cursor: not-allowed; }
+.sa-modal .jd-modal-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+.sa-modal .form-group { margin-bottom: 1.1rem; }
+.sa-modal-sub { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin: 0 0 1.1rem; color: #4b5563; font-size: .92rem; }
+.sa-chip { padding: 2px 9px; border-radius: 999px; background: #fdf1ef; color: #c6382d; font-size: .75rem; font-weight: 700; }
+.sa-muted { margin: .4rem 0 0; color: #6b7280; font-size: .82rem; line-height: 1.45; }
+.sa-jd-meta { margin-top: .45rem; }
+.sa-explainer { margin: 0 0 .25rem; }
+.sa-field-error { margin: .4rem 0 0; color: #c6382d; font-size: .82rem; font-weight: 600; }
+.sa-email-row {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .7rem .8rem; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa; font-size: .92rem;
+}
+.sa-email-row span { display: inline-flex; align-items: center; gap: .5rem; min-width: 0; overflow-wrap: anywhere; }
+.sa-link-btn { padding: 0; border: 0; background: none; color: var(--accent-dark, #c2410c); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.sa-link-btn:hover:not(:disabled) { text-decoration: underline; }
+.sa-banner {
+  display: flex; align-items: flex-start; gap: .6rem; margin: .75rem 0 0; padding: .75rem .9rem;
+  border-radius: 8px; font-size: .88rem; line-height: 1.45;
+}
+.sa-banner > i { margin-top: .15rem; }
+.sa-banner > span { flex: 1; min-width: 0; }
+.sa-banner.good { background: #ecfdf3; color: #15803d; }
+.sa-banner.bad { background: #fdf1ef; color: #b42318; }
+.sa-banner.warn { background: #fff7ed; color: #c2410c; }
+.sa-banner.info { background: #eef5fd; color: #1d4ed8; }
+.sa-inline-btn { min-height: 32px !important; padding: .35rem .8rem !important; font-size: .8rem !important; }
+.sa-link { display: flex; gap: .5rem; margin-top: 1rem; }
+.sa-link input {
+  flex: 1; min-width: 0; padding: .65rem .75rem; border: 1px solid #e5e7eb; border-radius: 6px;
+  background: #fafafa; color: #374151; font: inherit; font-size: .85rem;
+}
+.sa-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem 1rem; margin: 1rem 0 0; }
+.sa-facts div { min-width: 0; }
+.sa-facts dt { color: #6b7280; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.sa-facts dd { margin: .15rem 0 0; color: #111827; font-size: .86rem; overflow-wrap: anywhere; }
+
+/* All Details card */
+.sa-panel .sa-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.sa-item { padding: 14px 16px; border: 1px solid #eceef1; border-radius: 12px; background: #fcfcfb; }
+.sa-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.sa-item-head strong { display: block; color: #111827; font-size: .95rem; }
+.sa-item-head small { display: block; margin-top: 2px; color: #6b7280; font-size: .8rem; }
+.sa-pill { flex: none; padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.sa-pill.good { background: #ecfdf3; color: #15803d; }
+.sa-pill.bad { background: #fdf1ef; color: #c6382d; }
+.sa-pill.warn { background: #fff7ed; color: #c2410c; }
+.sa-pill.info { background: #eef5fd; color: #1d4ed8; }
+.sa-pill.muted { background: #f3f4f6; color: #4b5563; }
+.sa-override { display: flex; gap: .45rem; }
+.sa-result { display: flex; align-items: baseline; gap: .6rem; margin-top: 10px; font-size: .86rem; color: #374151; }
+.sa-result b { font-size: 1.3rem; }
+.sa-result b.good { color: #15803d; }
+.sa-result b.bad { color: #c6382d; }
+.sa-item .sa-facts { margin-top: 10px; }
+.sa-item-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.sa-item-actions a.cp-btn { text-decoration: none; color: inherit; }
+.sa-history { display: grid; gap: 8px; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px dashed #e5e7eb; list-style: none; }
+.sa-history li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #374151; font-size: .82rem; }
+.sa-history small { flex-basis: 100%; color: #b42318; }
+
+/* Talent table: Send Assessment shares the existing actions cell (no extra column). */
+.candidates-simple-actions .candidates-actions-group { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+
+@media (max-width: 720px) {
+  .sa-link { flex-direction: column; }
+  .sa-modal .jd-modal-actions .btn { flex: 1 1 100%; }
+  .candidates-simple-actions .candidates-actions-group { display: grid; width: 100%; }
+}

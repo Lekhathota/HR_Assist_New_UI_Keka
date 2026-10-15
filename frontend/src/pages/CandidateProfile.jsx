@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import StageTrackerDelivery from '../components/StageTrackerDelivery.jsx';
+import SendAssessmentModal from '../components/SendAssessmentModal.jsx';
+import CandidateAssessments from '../components/CandidateAssessments.jsx';
 import { toast, useConfirm, SkeletonBlock } from '../components/EnterpriseFeedback.jsx';
 import { apiGet, apiPost } from '../api.js';
 import { getCurrentRole } from '../roleAccess.js';
@@ -39,6 +41,8 @@ function CandidateProfile() {
   const [deleting, setDeleting] = useState(false);
   const [loadError, setLoadError] = useState('');
   const canEditStage = ['recruiter', 'admin'].includes(getCurrentRole());
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
+  const [assessmentsVersion, setAssessmentsVersion] = useState(0);
 
   const updateHiringState = async (body) => {
     const { ok, data } = await apiPost(`/api/candidates/${candidateId}/hiring-state`, body);
@@ -1112,6 +1116,11 @@ function CandidateProfile() {
             </div>
           </div>
           <div className="cp-hero-actions">
+            {canEditStage && (
+              <button type="button" className="cp-btn cp-btn-ghost" onClick={() => setAssessmentOpen(true)}>
+                <i className="fas fa-clipboard-question" aria-hidden="true" /> Send assessment
+              </button>
+            )}
             <button type="button" className="cp-btn cp-btn-primary" onClick={() => setShowModal(true)}>
               <i className="fas fa-file-export" aria-hidden="true" /> Generate report
             </button>
@@ -1186,6 +1195,10 @@ function CandidateProfile() {
                 </div>
               ) : <p className="cp-empty">No screening results yet.</p>}
             </section>
+
+            {canEditStage && (
+              <CandidateAssessments candidateId={candidateId} refreshKey={assessmentsVersion} onSend={() => setAssessmentOpen(true)} />
+            )}
 
             <section className="cp-card">
               <header className="cp-card-head"><h2><i className="fas fa-file-lines" aria-hidden="true" /> Resume</h2></header>
@@ -1345,6 +1358,10 @@ function CandidateProfile() {
         </div>
 
         {ReportModal()}
+        {assessmentOpen && (
+          <SendAssessmentModal candidate={{ ...candidate, id: Number(candidateId) }} onClose={() => setAssessmentOpen(false)}
+            onSent={() => setAssessmentsVersion(version => version + 1)} />
+        )}
         <style>{`
           @keyframes slideUp {
             from { opacity: 0; transform: translateY(30px); }

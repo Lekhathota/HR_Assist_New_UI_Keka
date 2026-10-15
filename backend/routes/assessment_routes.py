@@ -50,7 +50,12 @@ from services.assessment_service import (
     store_recording_chunk,
     update_question,
 )
-from services.auth_service import api_login_required, current_user
+from services.auth_service import api_login_required, current_user, role_required
+from services.candidate_assessment_service import (
+    AssessmentWorkflowError,
+    list_candidate_assessments,
+    send_assessment_to_candidate,
+)
 
 assessment_bp = Blueprint("assessment_routes", __name__)
 
@@ -117,6 +122,52 @@ def api_assessment_generate():
     except Exception as exc:
         return _json_error(f"Could not generate assessment: {exc}", 500)
     return jsonify({"success": True, **result})
+
+
+@assessment_bp.route("/api/candidates/<int:candidate_id>/assessments", methods=["GET"],
+                     endpoint="api_candidate_assessments")
+@api_login_required
+@role_required("recruiter")
+def api_candidate_assessments(candidate_id: int):
+    try:
+        return jsonify(list_candidate_assessments(candidate_id))
+    except AssessmentWorkflowError as exc:
+        return jsonify(exc.payload()), exc.status_code
+    except Exception:
+        return _json_error("Could not load assessments for this candidate.", 500)
+
+
+# Shared by the Talent table and All Details: generate (or reuse) and email an assessment for a chosen JD.
+@assessment_bp.route("/api/candidates/<int:candidate_id>/assessments/send", methods=["POST"],
+                     endpoint="api_candidate_assessment_send")
+@api_login_required
+@role_required("recruiter")
+def api_candidate_assessment_send(candidate_id: int):
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    try:
+        jd_id = int(data.get("jd_id") or 0)
+    except (TypeError, ValueError):
+        jd_id = 0
+    if jd_id < 1:
+        return jsonify({"error": "Select a job description.", "code": "invalid_jd"}), 400
+    try:
+        result = send_assessment_to_candidate(
+            candidate_id,
+            jd_id=jd_id,
+            recruiter=user,
+            request_id=str(data.get("request_id") or ""),
+            to_email=str(data.get("to_email") or ""),
+            resend=data.get("resend") is True,
+        )
+    except AssessmentWorkflowError as exc:
+        return jsonify(exc.payload()), exc.status_code
+    except AssessmentServiceError as exc:
+        return jsonify({"error": str(exc), "code": "invalid_request"}), getattr(exc, "status_code", 400)
+    except Exception:
+        return jsonify({"error": "Could not send the assessment. Please retry.", "code": "server_error"}), 500
+    # 202: the link is live but delivery could not be confirmed.
+    return jsonify(result), 202 if result.get("code") == "delivery_unknown" else 200
 
 
 @assessment_bp.route("/api/assessment/exam/generate", methods=["POST"])
