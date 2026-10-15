@@ -14,7 +14,6 @@ jest.mock('../api.js', () => ({
 }));
 jest.mock('../components/Layout.jsx', () => ({ children }) => <main>{children}</main>);
 jest.mock('../components/EnterpriseFeedback.jsx', () => ({ toast: jest.fn(), useConfirm: () => jest.fn(), SkeletonBlock: () => null }));
-jest.mock('../components/StageTrackerDelivery.jsx', () => () => <span>stage</span>);
 jest.mock('../utils/useRoleCategories.js', () => ({ useRoleCategories: () => [] }));
 jest.mock('jspdf', () => function JsPdf() {});
 jest.mock('jspdf-autotable', () => ({}));
@@ -57,17 +56,13 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); localStorage.clear(); jest.clearAllMocks(); });
 
-test('Talent table keeps its columns and offers Send Assessment in the existing actions cell', async () => {
+test('Talent row actions menu offers Send Assessment', async () => {
   await render('/talent');
-  const headers = [...container.querySelectorAll('.candidates-simple-table thead th')].map(th => th.textContent.trim());
-  expect(headers).toEqual(['', 'Candidate Name', 'Client', 'Stage', 'All Details']);
-  const row = container.querySelector('.candidates-simple-table tbody tr');
-  expect(row.querySelectorAll('td')).toHaveLength(5);
-  const actions = row.querySelector('.candidates-simple-actions');
-  expect(actions.textContent).toContain('Send Assessment');
-  expect(actions.textContent).toContain('All Details');
+  await act(async () => container.querySelector('button[aria-label="Actions for Asha Rao"]').click());
+  const items = [...container.querySelectorAll('[role="menuitem"]')].map(item => item.textContent.trim());
+  expect(items).toEqual(['All Details', 'Send Assessment', 'Remove']);
 
-  await act(async () => button('Send Assessment').click());
+  await act(async () => [...container.querySelectorAll('[role="menuitem"]')].find(item => item.textContent.includes('Send Assessment')).click());
   expect(container.textContent).toContain('Generate Assessment');
   expect(container.querySelector('#sa-jd').value).toBe('20');
   await act(async () => button('Generate & Send Assessment').click());
