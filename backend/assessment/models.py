@@ -4,6 +4,8 @@ Domain models and constants for the Assessment module.
 
 from __future__ import annotations
 
+import os
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -69,6 +71,31 @@ SQL_COUNT = 2
 TOTAL_GENERATED_QUESTIONS = MCQ_COUNT + CODING_COUNT + SQL_COUNT
 MCQ_MEDIUM_COUNT = 4
 MCQ_HARD_COUNT = 6
+
+# Recruiter-defined coding questions (Coding Questions panel) come on top of the fixed mix above.
+CODING_DIFFICULTIES = ("Easy", "Medium", "Hard")
+MAX_CODING_PROMPT_CHARS = 4000
+MAX_CLIENT_CODING_PROMPT_CHARS = 4000
+# Question fields that record how a recruiter-defined coding question was generated.
+CUSTOM_CODING_FIELDS = ("source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot")
+
+
+def _env_limit(name: str, default: int, *, low: int, high: int) -> int:
+    try:
+        value = int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        value = default
+    return max(low, min(value, high))
+
+
+def max_coding_questions() -> int:
+    """Recruiter-defined coding questions per assessment (ASSESSMENT_MAX_CODING_QUESTIONS, default 20)."""
+    return _env_limit("ASSESSMENT_MAX_CODING_QUESTIONS", 20, low=1, high=100)
+
+
+def max_assessment_questions() -> int:
+    """All questions per assessment (ASSESSMENT_MAX_QUESTIONS, default 60)."""
+    return _env_limit("ASSESSMENT_MAX_QUESTIONS", 60, low=TOTAL_GENERATED_QUESTIONS, high=500)
 
 
 @dataclass

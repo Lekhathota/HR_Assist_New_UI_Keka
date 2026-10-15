@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import ReferenceSolutionPanel from '../components/ReferenceSolutionPanel.jsx';
+import CodingQuestionsPanel from '../components/CodingQuestionsPanel.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
 import ProctoringEvidence from '../components/ProctoringEvidence.jsx';
 import { downloadAssessmentPdf } from '../utils/assessmentPdf.js';
@@ -130,6 +131,7 @@ function AssessmentBuilder() {
   const [candidateAnswers, setCandidateAnswers] = useState({});
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
+  const [codingConfig, setCodingConfig] = useState(null);
 
   const isDraft = assessment?.status === 'DRAFT';
   const isReviewable = ['PASSED', 'FAILED', 'COMPLETED'].includes(assessment?.status);
@@ -172,6 +174,16 @@ function AssessmentBuilder() {
 
   useEffect(() => { loadAssessment(); }, [loadAssessment]);
 
+  // Refresh just the question list (after a coding question is generated or removed) without a full reload.
+  const refreshQuestions = useCallback(async () => {
+    try {
+      const data = await apiGet(`/api/assessment/${assessmentId}`);
+      setQuestions(data.questions || []);
+    } catch (err) {
+      setError(err.message || 'Could not refresh questions.');
+    }
+  }, [assessmentId]);
+
   useEffect(() => {
     if (!notice) return undefined;
     const t = window.setTimeout(() => setNotice(''), 3500);
@@ -212,7 +224,8 @@ function AssessmentBuilder() {
   };
 
   const handleRegenerate = async () => {
-    if (!window.confirm('Replace this draft with 14 JD-based questions: 10 MCQs, 2 moderate coding and 2 moderate SQL questions?')) return;
+    if (!window.confirm('Replace the JD-based questions with a fresh set of 14 (10 MCQs, 2 moderate coding and 2 moderate SQL)? '
+      + 'Questions from the Coding Questions panel and the client instructions are kept; questions you added manually are replaced.')) return;
     setBusy(true);
     setError('');
     try {
@@ -363,6 +376,8 @@ function AssessmentBuilder() {
   };
 
   const openSendModal = async () => {
+    const ungenerated = (codingConfig?.specs || []).filter(spec => spec.status !== 'generated').length;
+    if (ungenerated && !window.confirm(`${ungenerated} coding question ${ungenerated === 1 ? 'entry has' : 'entries have'} no generated question and will not be in the assessment. Send anyway?`)) return;
     setSendForm({
       to_email: assessment?.candidate_email || '',
       from_email: '',
@@ -676,6 +691,10 @@ function AssessmentBuilder() {
 
         {addType && renderQuestionForm(addForm, setAddForm, handleAddQuestion, () => setAddType(null))}
 
+        {isDraft && (
+          <CodingQuestionsPanel assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} onConfigChange={setCodingConfig} />
+        )}
+
         <div className="ab-questions">
           <h2>Questions ({sortedQuestions.length})</h2>
           {showAnswers && <p className="ab-answer-summary">
@@ -687,7 +706,7 @@ function AssessmentBuilder() {
             <div className="ab-empty">No questions yet. Generate or add questions to begin.</div>
           ) : (
             sortedQuestions.map((q, index) => (
-              <div key={q.id} className="ab-question-card white-card">
+              <div key={q.id} id={`ab-q-${q.id}`} className="ab-question-card white-card">
                 <div className="ab-question-header">
                   <span className="ab-q-num">Q{index + 1}</span>
                   <span className={`ab-badge ${typeBadgeClass(q.question_type)}`}>
@@ -695,6 +714,7 @@ function AssessmentBuilder() {
                   </span>
                   {q.skill_tag && <span className="ab-skill">{q.skill_tag}</span>}
                   {q.difficulty && <span className="ab-badge">{q.difficulty}</span>}
+                  {q.source === 'custom_coding' && <span className="ab-badge ab-badge-custom" title={q.generation_prompt}>Custom prompt</span>}
                   {q.scenario_type && <span className="ab-skill">{q.scenario_type}</span>}
                   <span className="ab-points">{q.points} pts</span>
                   {isDraft && (
@@ -714,6 +734,9 @@ function AssessmentBuilder() {
                   : (
                     <>
                       <p className="ab-question-text">{q.question_text}</p>
+                      {q.source === 'custom_coding' && q.generation_prompt && (
+                        <p className="ab-custom-prompt"><strong>Recruiter prompt:</strong> {q.generation_prompt}</p>
+                      )}
                       {q.explanation && <p><strong>Explanation:</strong> {q.explanation}</p>}
                       {q.jd_requirement && <p><strong>JD requirement:</strong> {q.jd_requirement}</p>}
                       {q.evaluation_focus?.length > 0 && <p><strong>Evaluation focus:</strong> {q.evaluation_focus.join(", ")}</p>}

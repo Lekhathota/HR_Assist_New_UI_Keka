@@ -14,7 +14,7 @@ from pymongo.errors import DuplicateKeyError, OperationFailure
 
 import activity_feed
 import database as db
-from assessment.models import AssessmentStatus
+from assessment.models import CUSTOM_CODING_FIELDS, AssessmentStatus
 from assessment.utilities import utc_now
 
 
@@ -208,6 +208,8 @@ def update_assessment(assessment_id: int, patch: dict[str, Any]) -> bool:
         "email_delivery_error",
         "email_sent_at",
         "send_request_id",
+        "coding_specs",
+        "client_coding_prompt",
     }
     update_doc: dict[str, Any] = {}
     unset_doc: dict[str, int] = {}
@@ -377,6 +379,7 @@ def create_question(data: dict[str, Any]) -> int:
         "skill_tag": data.get("skill_tag") or "",
         **{key: data.get(key) for key in ("question_id", "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement") if data.get(key) is not None},
         **{key: data.get(key) for key in EXECUTABLE_QUESTION_FIELDS if data.get(key) is not None},
+        **{key: data.get(key) for key in CUSTOM_CODING_FIELDS if data.get(key) is not None},
         "sort_order": int(data.get("sort_order") or 0),
         "created_at": _now(),
         "updated_at": _now(),
@@ -416,6 +419,8 @@ def update_question(question_id: int, patch: dict[str, Any]) -> bool:
         "skill_tag",
         "sort_order",
         *EXECUTABLE_QUESTION_FIELDS,
+        *CUSTOM_CODING_FIELDS,
+        "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement",
     }
     update_doc: dict[str, Any] = {}
     for key, value in patch.items():

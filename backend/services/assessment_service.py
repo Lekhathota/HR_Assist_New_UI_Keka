@@ -19,6 +19,7 @@ from assessment.models import (
     DEFAULT_PASSING_SCORE,
     QuestionType,
     TOTAL_GENERATED_QUESTIONS,
+    max_assessment_questions,
 )
 from assessment.schemas import SchemaValidationError
 from assessment.generation import normalized_jd, requirement_catalog, validate_exam
@@ -414,6 +415,13 @@ def generate_assessment(
         assessment_repo.delete_assessment_cascade(assessment_id)
         raise
     if existing_draft_id:
+        # Recruiter-defined coding questions are not part of the JD exam: keep them on the new draft.
+        from services.coding_question_service import carry_over_custom_coding
+        try:
+            carry_over_custom_coding(existing, assessment_id)
+        except Exception:
+            assessment_repo.delete_assessment_cascade(assessment_id)
+            raise
         assessment_repo.delete_assessment_cascade(existing_draft_id)
 
     db.log_audit(
@@ -488,6 +496,8 @@ def add_question(payload: dict[str, Any]) -> dict[str, Any]:
         raise AssessmentServiceError("Assessment not found.")
     if assessment.get("status") not in AssessmentStatus.editable_states():
         raise AssessmentServiceError("Questions can only be added while the assessment is in DRAFT status.")
+    if assessment_repo.count_questions_for_assessment(int(assessment["id"])) >= max_assessment_questions():
+        raise AssessmentServiceError(f"An assessment can have at most {max_assessment_questions()} questions.")
 
     if not payload.get("sort_order"):
         payload["sort_order"] = assessment_repo.count_questions_for_assessment(int(assessment["id"]))

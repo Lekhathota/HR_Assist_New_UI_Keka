@@ -1052,6 +1052,7 @@ def update_client(client_id: int, data: dict) -> bool:
         "account_owner",
         "status",
         "notes",
+        "coding_assessment_prompt",
     }
     patch = {key: data[key] for key in allowed if key in data}
     if not patch:

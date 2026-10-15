@@ -51,6 +51,14 @@ from services.assessment_service import (
     update_question,
 )
 from services.auth_service import api_login_required, current_user, role_required
+from services.coding_question_service import (
+    add_spec,
+    generate_spec_question,
+    get_coding_config,
+    remove_spec,
+    save_client_prompt,
+    update_spec,
+)
 from services.candidate_assessment_service import (
     AssessmentWorkflowError,
     list_candidate_assessments,
@@ -168,6 +176,60 @@ def api_candidate_assessment_send(candidate_id: int):
         return jsonify({"error": "Could not send the assessment. Please retry.", "code": "server_error"}), 500
     # 202: the link is live but delivery could not be confirmed.
     return jsonify(result), 202 if result.get("code") == "delivery_unknown" else 200
+
+
+def _coding_call(action):
+    """Shared error mapping for the Coding Questions endpoints."""
+    if not current_user():
+        return _json_error("Unauthorized", 401)
+    try:
+        return jsonify({"success": True, **action()})
+    except AssessmentServiceError as exc:
+        return _json_error(str(exc), getattr(exc, "status_code", 400))
+    except Exception:
+        return _json_error("Could not update coding questions. Please retry.", 500)
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding", methods=["GET"], endpoint="api_assessment_coding_config")
+@api_login_required
+def api_assessment_coding_config(assessment_id: int):
+    return _coding_call(lambda: get_coding_config(assessment_id))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/client-prompt", methods=["PUT"],
+                     endpoint="api_assessment_coding_client_prompt")
+@api_login_required
+def api_assessment_coding_client_prompt(assessment_id: int):
+    data = request.get_json(silent=True) or {}
+    return _coding_call(lambda: save_client_prompt(assessment_id, data.get("prompt", ""),
+                                                   save_as_client_default=data.get("save_as_client_default") is True))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs", methods=["POST"], endpoint="api_assessment_coding_spec_add")
+@api_login_required
+def api_assessment_coding_spec_add(assessment_id: int):
+    return _coding_call(lambda: add_spec(assessment_id, request.get_json(silent=True) or {}))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs/<spec_id>", methods=["PUT"],
+                     endpoint="api_assessment_coding_spec_update")
+@api_login_required
+def api_assessment_coding_spec_update(assessment_id: int, spec_id: str):
+    return _coding_call(lambda: update_spec(assessment_id, spec_id, request.get_json(silent=True) or {}))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs/<spec_id>", methods=["DELETE"],
+                     endpoint="api_assessment_coding_spec_remove")
+@api_login_required
+def api_assessment_coding_spec_remove(assessment_id: int, spec_id: str):
+    return _coding_call(lambda: remove_spec(assessment_id, spec_id))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs/<spec_id>/generate", methods=["POST"],
+                     endpoint="api_assessment_coding_spec_generate")
+@api_login_required
+def api_assessment_coding_spec_generate(assessment_id: int, spec_id: str):
+    return _coding_call(lambda: generate_spec_question(assessment_id, spec_id, request.get_json(silent=True) or {}))
 
 
 @assessment_bp.route("/api/assessment/exam/generate", methods=["POST"])
