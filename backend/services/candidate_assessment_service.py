@@ -1,9 +1,11 @@
 """
 "Send Assessment" from the Talent page and a candidate's All Details view.
 
-One workflow for both entry points: pick a JD, generate (or reuse) a validated
-AI assessment, activate a candidate-specific link and email it. Works for
-candidates rejected at resume screening; it never changes their hiring stage.
+One workflow for both entry points: pick a JD and generate (or reuse) a validated AI
+assessment as a DRAFT. Nothing is emailed here: the recruiter reviews, edits and validates
+it in the Preview Assessment dialog and sends it from there (assessment_service.send_assessment).
+An explicit resend of an assessment that was already sent re-emails the same link.
+Works for candidates rejected at resume screening; it never changes their hiring stage.
 
 Duplicate protection:
 - a lease per candidate/JD stops concurrent requests from generating twice;
@@ -326,6 +328,14 @@ def send_assessment_to_candidate(
                 state, error, assessment_id = "generation_failed", "Generated assessment was incomplete.", None
                 raise AssessmentWorkflowError("The generated assessment was incomplete and was discarded. Please retry.",
                                               code="generation_failed", status_code=502)
+        current = assessment_repo.get_assessment_by_id(int(assessment_id)) or {}
+        if current.get("status") == AssessmentStatus.DRAFT:
+            # Generated (or an earlier unsent draft): the recruiter reviews it before anything is emailed.
+            if email and normalize_email(email) != normalize_email(current.get("candidate_email") or ""):
+                assessment_repo.update_assessment(int(assessment_id), {"candidate_email": normalize_email(email)})
+                current = assessment_repo.get_assessment_by_id(int(assessment_id)) or current
+            state = "draft_ready"
+            return _response(current, "draft_ready", "The assessment was generated as a draft. Review it in the preview, then send it.")
         response = _deliver(assessment_id, recruiter=recruiter, to_email=email, request_id=request_id)
         state = response["code"]
         return response

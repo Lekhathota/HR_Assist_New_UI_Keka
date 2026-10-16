@@ -1,8 +1,9 @@
 """Send Assessment from Talent / All Details, including candidates rejected at screening.
 
-Runs the real workflow (candidate_assessment_service) and the real send preparation,
-link building and invite template against an in-memory assessment repository.
-AI generation and SMTP are fakes: nothing is generated or emailed.
+Talent generates a DRAFT only; the first email goes out when the recruiter reviews,
+validates and confirms it in Preview Assessment (assessment_service.send_assessment).
+Runs the real workflow, publish check, send preparation, link building and invite template
+against an in-memory assessment repository. AI generation and SMTP are fakes.
 """
 from __future__ import annotations
 
@@ -30,8 +31,8 @@ ENV = {"SMTP_USER": "hr@example.com", "SMTP_PASS": "secret", "CANDIDATE_TEST_BAS
 
 
 def question(i, **overrides):
-    return {"id": 100 + i, "question_text": f"Question {i}", "question_type": "mcq", "options": ["A", "B", "C", "D"],
-            "correct_answer": "A", "points": 5, **overrides}
+    return {"id": 100 + i, "assessment_id": 1, "question_text": f"Question {i}", "question_type": "mcq", "options": ["A", "B", "C", "D"],
+            "correct_answer": "A", "explanation": "A is right.", "points": 5, **overrides}
 
 
 def stored(value):
@@ -96,6 +97,15 @@ class FakeRepo:
                 row[key] = stored(value)
         return True
 
+    def activate_assessment(self, assessment_id, expected_status, patch_doc):
+        if self.assessments[int(assessment_id)]["status"] != stored(expected_status):
+            return False
+        return self.update_assessment(assessment_id, patch_doc)
+
+    def create_assessment_version(self, data):
+        self.versions = getattr(self, "versions", []) + [copy.deepcopy(data)]
+        return data["version"]
+
     def push_delivery_event(self, assessment_id, event):
         self.assessments[int(assessment_id)].setdefault("delivery_history", []).append(dict(event))
 
@@ -140,7 +150,7 @@ class WorkflowTestBase(unittest.TestCase):
         for name in ("get_assessment_by_id", "get_latest_assessment_for_candidate_jd", "get_active_assessment_for_candidate_jd",
                      "get_assessments_for_candidate", "get_questions_for_assessment", "get_result_by_assessment_id",
                      "update_assessment", "push_delivery_event", "delete_assessment_cascade", "claim_send_request",
-                     "finish_send_request", "get_send_requests_for_candidate"):
+                     "finish_send_request", "get_send_requests_for_candidate", "activate_assessment", "create_assessment_version"):
             self.stack.enter_context(patch.object(workflow.assessment_repo, name, side_effect=getattr(self.repo, name)))
         self.stack.enter_context(patch.object(workflow.db, "get_candidate_by_id", side_effect=lambda i: copy.deepcopy(self.candidates.get(int(i)))))
         self.stack.enter_context(patch.object(workflow.db, "get_jd_by_id", side_effect=lambda i, include_raw_text=False: copy.deepcopy(self.jds.get(int(i)))))
@@ -149,6 +159,7 @@ class WorkflowTestBase(unittest.TestCase):
         self.stack.enter_context(patch.object(workflow, "_candidate_selected_for_jd", side_effect=lambda c, j: self.selected))
         self.stack.enter_context(patch.object(workflow, "generate_assessment", side_effect=self.fake_generate))
         self.stack.enter_context(patch.object(workflow, "send_email", side_effect=self.fake_send))
+        self.stack.enter_context(patch.object(assessment_service, "send_email", side_effect=self.fake_send))
 
     def tearDown(self):
         self.stack.close()
@@ -178,6 +189,14 @@ class WorkflowTestBase(unittest.TestCase):
         kwargs.setdefault("request_id", str(uuid.uuid4()))
         return workflow.send_assessment_to_candidate(10, recruiter=RECRUITER, **kwargs)
 
+    def review_and_send(self, assessment_id=1, *, fingerprint=None, **kwargs):
+        """What Preview Assessment does: validate, show the confirmation, send the reviewed version."""
+        check = assessment_service.publication_check(assessment_id)
+        kwargs.setdefault("request_id", str(uuid.uuid4()))
+        kwargs.setdefault("confirm", True)
+        return assessment_service.send_assessment(assessment_id, recruiter=RECRUITER,
+                                                  reviewed_fingerprint=fingerprint or check["fingerprint"], **kwargs)
+
     def assert_error(self, code, status, **kwargs):
         with self.assertRaises(AssessmentWorkflowError) as ctx:
             self.send(**kwargs)
@@ -191,39 +210,40 @@ class WorkflowTestBase(unittest.TestCase):
 
 
 class RejectedCandidateTests(WorkflowTestBase):
-    def test_rejected_candidate_gets_a_generated_assessment_and_one_email(self):
+    def test_talent_generates_a_draft_and_nothing_is_emailed_until_the_preview_send(self):
         result = self.send()
-        self.assertEqual(result["code"], "sent")
+        self.assertEqual(result["code"], "draft_ready")
         self.assertEqual(len(self.generate_calls), 1)
         call = self.generate_calls[0]
         self.assertFalse(call["require_selected"])
         self.assertEqual((call["candidate_id"], call["jd_id"], call["recruiter_id"]), (10, 20, 7))
         self.assertTrue(call["provenance"]["screening_override"])
         self.assertEqual(call["provenance"]["initiated_by"], "rec")
-
         row = self.only
-        self.assertEqual(row["status"], S.SENT)
-        self.assertEqual(row["email_delivery_status"], "sent")
+        self.assertEqual(row["status"], S.DRAFT)
+        self.assertNotIn("access_token", row)
+        self.assertEqual(self.sent, [])
+        self.assertEqual(result["assessment"]["lifecycle"], "generated")
+        # Clicking Send Assessment on Talent again opens the same draft: no second generation.
+        self.assertEqual(self.send()["code"], "draft_ready")
+        self.assertEqual(len(self.generate_calls), 1)
+
+        sent = self.review_and_send()
+        row = self.only
+        self.assertEqual((row["status"], row["email_delivery_status"], row["published_version"]), (S.SENT, "sent", 1))
         self.assertEqual([e["status"] for e in row["delivery_history"]], ["sent"])
         link = f"https://hr.example.com/assessment/{row['access_token']}"
+        self.assertEqual(sent["assessment_link"], link)
         self.assertEqual(len(self.sent), 1)
         email = self.sent[0]
-        self.assertEqual(email["to"], "asha@example.com")
-        self.assertEqual(email["link"], link)
-        self.assertIn(link, email["body"])
-        self.assertIn("QA Engineer", email["body"])
-        self.assertIn("Complete by:", email["body"])
-        self.assertIn("Instructions:", email["body"])
-        self.assertIn("Time limit: 90 minutes", email["body"])
-
-        view = result["assessment"]
-        self.assertEqual(view["lifecycle"], "awaiting_response")
-        self.assertEqual(view["assessment_link"], link)
+        self.assertEqual((email["to"], email["link"]), ("asha@example.com", link))
+        for text in (link, "QA Engineer", "Complete by:", "Instructions:", "Time limit: 90 minutes"):
+            self.assertIn(text, email["body"])
+        view = workflow.list_candidate_assessments(10)["assessments"][0]
+        self.assertEqual((view["lifecycle"], view["assessment_link"]), ("awaiting_response", link))
         self.assertEqual((view["jd_title"], view["client_name"]), ("QA Engineer", "Acme"))
-        # The link carries only the random token: no candidate data, ids or secrets.
         self.assertNotIn("asha", link)
         self.assertNotIn("secret", link)
-        # Generating or sending never moves the hiring stage.
         self.update_candidate.assert_not_called()
 
     def test_selected_candidate_is_not_flagged_as_override(self):
@@ -233,7 +253,7 @@ class RejectedCandidateTests(WorkflowTestBase):
 
 
 class EmailValidationTests(WorkflowTestBase):
-    def test_missing_email_asks_the_recruiter_and_sends_nothing(self):
+    def test_missing_email_asks_the_recruiter_and_generates_nothing(self):
         self.candidates[10]["email"] = ""
         self.assert_error("email_missing", 422)
         self.assertEqual((self.generate_calls, self.sent), ([], []))
@@ -248,9 +268,18 @@ class EmailValidationTests(WorkflowTestBase):
     def test_recruiter_corrected_email_is_used_for_this_assessment_only(self):
         self.candidates[10]["email"] = ""
         self.send(to_email="  asha.rao@example.com ")
-        self.assertEqual(self.sent[0]["to"], "asha.rao@example.com")
         self.assertEqual(self.only["candidate_email"], "asha.rao@example.com")
+        self.review_and_send()
+        self.assertEqual(self.sent[0]["to"], "asha.rao@example.com")
         self.update_candidate.assert_not_called()
+
+    def test_an_invalid_candidate_email_blocks_publication(self):
+        self.send()
+        self.repo.assessments[1]["candidate_email"] = "not-an-email"
+        self.assertIn("The candidate email is missing or invalid.", assessment_service.publication_check(1)["problems"])
+        with self.assertRaises(assessment_service.AssessmentServiceError):
+            self.review_and_send()
+        self.assertEqual(self.sent, [])
 
 
 class JdValidationTests(WorkflowTestBase):
@@ -271,7 +300,7 @@ class JdValidationTests(WorkflowTestBase):
 
 
 class GenerationFailureTests(WorkflowTestBase):
-    def test_generation_failure_sends_nothing_and_can_be_retried(self):
+    def test_generation_failure_creates_nothing_and_can_be_retried(self):
         self.generate_effect = assessment_service.AssessmentServiceError("AI assessment generation failed.")
         error = self.assert_error("generation_failed", 502)
         self.assertIn("AI assessment generation failed", str(error))
@@ -280,8 +309,8 @@ class GenerationFailureTests(WorkflowTestBase):
         self.assertEqual([f["jd_title"] for f in failures], ["QA Engineer"])
 
         self.generate_effect = None
-        self.assertEqual(self.send()["code"], "sent")
-        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.send()["code"], "draft_ready")
+        self.assertEqual(self.sent, [])
         self.assertEqual(workflow.list_candidate_assessments(10)["generation_failures"], [])
 
     def test_incomplete_assessment_is_discarded(self):
@@ -295,43 +324,96 @@ class GenerationFailureTests(WorkflowTestBase):
         self.assertEqual(self.sent, [])
 
 
+class PreviewSendTests(WorkflowTestBase):
+    def setUp(self):
+        super().setUp()
+        self.send()
+
+    def test_nothing_is_sent_without_explicit_confirmation(self):
+        for confirm in (False, None):
+            with self.subTest(confirm=confirm), self.assertRaisesRegex(assessment_service.AssessmentServiceError, "Confirm"):
+                self.review_and_send(confirm=confirm)
+        self.assertEqual((self.sent, self.only["status"]), ([], S.DRAFT))
+
+    def test_changes_after_validation_require_validating_again(self):
+        stale = assessment_service.publication_check(1)["fingerprint"]
+        self.repo.questions[1][0]["question_text"] = "Edited after the recruiter validated"
+        with self.assertRaisesRegex(assessment_service.AssessmentServiceError, "changed after you validated"):
+            self.review_and_send(fingerprint=stale)
+        self.assertEqual(self.sent, [])
+        self.review_and_send()
+        self.assertEqual(len(self.sent), 1)
+
+    def test_invalid_mcq_blocks_sending(self):
+        self.repo.questions[1][0]["correct_answer"] = "E"
+        check = assessment_service.publication_check(1)
+        self.assertEqual(check["questions"][0]["number"], 1)
+        with self.assertRaisesRegex(assessment_service.AssessmentServiceError, "cannot be sent"):
+            self.review_and_send()
+        self.assertEqual(self.sent, [])
+
+    def test_a_retried_send_is_not_emailed_twice(self):
+        first = self.review_and_send(request_id="preview-send-0001")
+        replay = self.review_and_send(request_id="preview-send-0001")
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["assessment_link"], first["assessment_link"])
+        self.assertEqual(len(self.sent), 1)
+        with self.assertRaisesRegex(assessment_service.AssessmentServiceError, "already sent"):
+            self.review_and_send(request_id="another-click-0002")
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual([v["version"] for v in self.repo.versions], [1])
+
+    def test_concurrent_sends_email_once(self):
+        original = self.repo.activate_assessment
+
+        def race(assessment_id, expected, patch_doc):
+            self.repo.assessments[assessment_id]["status"] = stored(S.SENT)  # another tab won the race
+            return original(assessment_id, expected, patch_doc)
+        with patch.object(workflow.assessment_repo, "activate_assessment", side_effect=race):
+            with self.assertRaisesRegex(assessment_service.AssessmentServiceError, "already being sent"):
+                self.review_and_send()
+        self.assertEqual(self.sent, [])
+
+
 class DeliveryTests(WorkflowTestBase):
-    def test_email_failure_keeps_the_attempt_and_retry_does_not_regenerate(self):
+    def test_email_failure_keeps_the_draft_and_retry_does_not_regenerate(self):
+        self.send()
         self.send_effects = [RuntimeError("SMTP authentication failed.")]
-        error = self.assert_error("delivery_failed", 502)
-        self.assertEqual(error.extra["assessment_id"], 1)
+        with self.assertRaises(RuntimeError):
+            self.review_and_send()
         row = self.only
         self.assertEqual(row["status"], S.DRAFT)
         self.assertNotIn("access_token", row)
         self.assertEqual(row["email_delivery_status"], "failed")
         self.assertEqual(workflow.list_candidate_assessments(10)["assessments"][0]["lifecycle"], "delivery_failed")
-
-        self.send()
+        self.assertEqual(self.send()["code"], "draft_ready")
+        self.review_and_send()
         self.assertEqual(len(self.generate_calls), 1)
         self.assertEqual(len(self.sent), 1)
         self.assertEqual(self.only["status"], S.SENT)
         self.assertEqual([e["status"] for e in self.only["delivery_history"]], ["failed", "sent"])
 
     def test_uncertain_delivery_is_never_resent_without_confirmation(self):
+        self.send()
         self.send_effects = [EmailDeliveryUnknown("connection lost after DATA")]
-        result = self.send()
-        self.assertEqual(result["code"], "delivery_unknown")
-        self.assertEqual(result["assessment"]["lifecycle"], "delivery_unknown")
-        token = self.only["access_token"]
+        result = self.review_and_send()
+        self.assertTrue(result["delivery_unknown"])
         self.assertEqual(self.only["status"], S.SENT)
-
+        self.assertEqual(workflow.list_candidate_assessments(10)["assessments"][0]["lifecycle"], "delivery_unknown")
+        token = self.only["access_token"]
         error = self.assert_error("already_sent", 409)
         self.assertEqual(error.extra["assessment"]["lifecycle"], "delivery_unknown")
         self.assertEqual(self.sent, [])
-
         self.send(resend=True)
         self.assertEqual(len(self.sent), 1)
         self.assertEqual(self.only["access_token"], token)
         self.assertEqual(len(self.generate_calls), 1)
 
-    def test_retried_request_returns_the_first_outcome(self):
+    def test_retried_talent_request_returns_the_first_outcome(self):
         request_id = str(uuid.uuid4())
         self.send(request_id=request_id)
+        self.review_and_send()
+        self.only["send_request_id"] = request_id
         replay = self.send(request_id=request_id)
         self.assertEqual(replay["code"], "replayed")
         self.assertEqual(len(self.sent), 1)
@@ -344,6 +426,7 @@ class DeliveryTests(WorkflowTestBase):
 
     def test_already_sent_requires_explicit_resend_of_the_same_link(self):
         self.send()
+        self.review_and_send()
         token = self.only["access_token"]
         self.assert_error("already_sent", 409)
         self.assertEqual(len(self.sent), 1)
@@ -354,6 +437,7 @@ class DeliveryTests(WorkflowTestBase):
 
     def test_expired_link_is_reported_and_resend_reactivates_it(self):
         self.send()
+        self.review_and_send()
         self.only["token_expires_at"] = utc_now() - timedelta(minutes=1)
         error = self.assert_error("already_sent", 409)
         self.assertEqual(error.extra["assessment"]["lifecycle"], "expired")
@@ -362,22 +446,25 @@ class DeliveryTests(WorkflowTestBase):
 
     def test_started_or_submitted_attempts_cannot_be_replaced(self):
         self.send()
+        self.review_and_send()
         for status, code in ((S.IN_PROGRESS, "attempt_in_progress"), (S.COMPLETED, "attempt_submitted")):
             self.only["status"] = stored(status)
             self.assert_error(code, 409, resend=True)
         self.assertEqual(len(self.sent), 1)
 
-    def test_a_finished_attempt_allows_a_new_one(self):
+    def test_a_finished_attempt_allows_a_new_draft(self):
         self.send()
+        self.review_and_send()
         self.only["status"] = stored(S.FAILED)
-        self.send()
+        self.assertEqual(self.send()["code"], "draft_ready")
         self.assertEqual(len(self.repo.assessments), 2)
-        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(len(self.sent), 1)
 
 
 class LifecycleTests(WorkflowTestBase):
     def test_lifecycle_and_results_are_listed_for_the_recruiter(self):
         self.send()
+        self.review_and_send()
         listing = workflow.list_candidate_assessments(10)
         view = listing["assessments"][0]
         self.assertEqual(view["lifecycle_label"], "Email sent · awaiting candidate")
@@ -423,10 +510,12 @@ class RouteTests(WorkflowTestBase):
         body.setdefault("request_id", str(uuid.uuid4()))
         return self.client.post("/api/candidates/10/assessments/send", json=body)
 
-    def test_recruiter_can_send_and_list(self):
+    def test_recruiter_can_generate_a_draft_and_list(self):
         response = self.post()
         self.assertEqual(response.status_code, 200, response.get_json())
-        self.assertEqual(response.get_json()["code"], "sent")
+        self.assertEqual(response.get_json()["code"], "draft_ready")
+        self.assertEqual(response.get_json()["assessment"]["id"], 1)
+        self.assertEqual(self.sent, [])
         listing = self.client.get("/api/candidates/10/assessments").get_json()
         self.assertEqual(len(listing["assessments"]), 1)
 
@@ -447,10 +536,24 @@ class RouteTests(WorkflowTestBase):
         self.assertEqual((response.status_code, response.get_json()["code"]), (422, "email_missing"))
         self.assertEqual(self.client.get("/api/candidates/999/assessments").status_code, 404)
 
-    def test_uncertain_delivery_returns_202(self):
+    def test_uncertain_resend_returns_202(self):
+        self.post()
+        self.review_and_send()
         self.send_effects = [EmailDeliveryUnknown("lost")]
-        response = self.post()
+        response = self.post(resend=True)
         self.assertEqual((response.status_code, response.get_json()["code"]), (202, "delivery_unknown"))
+
+    def test_preview_send_route_requires_confirmation(self):
+        self.post()
+        fingerprint = assessment_service.publication_check(1)["fingerprint"]
+        refused = self.client.post("/api/assessment/1/send", json={"reviewed_fingerprint": fingerprint})
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual(self.sent, [])
+        sent = self.client.post("/api/assessment/1/send", json={"reviewed_fingerprint": fingerprint, "confirm": True,
+                                                                "request_id": "route-send-0001"})
+        self.assertEqual(sent.status_code, 200, sent.get_json())
+        self.assertEqual((sent.get_json()["status"], sent.get_json()["published_version"]), ("SENT", 1))
+        self.assertEqual(len(self.sent), 1)
 
 
 if __name__ == "__main__":

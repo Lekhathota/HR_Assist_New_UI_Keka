@@ -48,7 +48,7 @@ function typeEmail(value) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
-async function clickSend(label = 'Generate & Send Assessment') {
+async function clickSend(label = 'Generate & Review Assessment') {
   await act(async () => button(label).click());
 }
 
@@ -61,6 +61,18 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); jest.clearAllMocks(); });
 
 describe('Generate Assessment modal', () => {
+  test('generation stops at a draft and links to the preview; nothing is emailed', async () => {
+    apiPost.mockResolvedValue(reply(200, { success: true, code: 'draft_ready', message: 'The assessment was generated as a draft. Review it in the preview, then send it.',
+      assessment: { ...sentAssessment, id: 77, lifecycle_label: 'Assessment generated', assessment_link: '' } }));
+    await openModal();
+    await clickSend();
+    expect(container.textContent).toContain('generated as a draft');
+    expect(container.textContent).toContain('Will be sent to');
+    const review = [...container.querySelectorAll('a')].find(a => a.textContent.includes('Review & Send'));
+    expect(review.getAttribute('href')).toBe('/hiring-pipeline/assessment/77?preview=1');
+    expect(container.textContent).not.toContain('Copy link');
+  });
+
   test('lists JDs from the API with client, preselects the candidate JD and disables closed JDs', async () => {
     await openModal();
     expect(apiGet).toHaveBeenCalledWith('/api/jds');
@@ -76,9 +88,9 @@ describe('Generate Assessment modal', () => {
 
   test('Generate & Send is disabled until a JD is selected', async () => {
     await openModal({ ...rejected, jd_id: null });
-    expect(button('Generate & Send Assessment').disabled).toBe(true);
+    expect(button('Generate & Review Assessment').disabled).toBe(true);
     selectJd(21);
-    expect(button('Generate & Send Assessment').disabled).toBe(false);
+    expect(button('Generate & Review Assessment').disabled).toBe(false);
   });
 
   test('sends a rejected candidate the assessment and offers the link to copy', async () => {
@@ -117,7 +129,7 @@ describe('Generate Assessment modal', () => {
     apiPost.mockResolvedValue(reply(200, { success: true, code: 'sent', message: 'Sent', assessment: sentAssessment }));
     await openModal({ ...rejected, email: '' });
     expect($('#sa-email')).toBeTruthy();
-    expect(button('Generate & Send Assessment').disabled).toBe(true);
+    expect(button('Generate & Review Assessment').disabled).toBe(true);
     typeEmail('asha.rao@example.com');
     await clickSend();
     expect(sendCalls()[0][1].to_email).toBe('asha.rao@example.com');

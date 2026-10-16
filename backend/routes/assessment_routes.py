@@ -35,6 +35,7 @@ from services.assessment_service import (
     lookup_assessment,
     preview_assessment,
     regrade_assessment,
+    regenerate_question,
     approve_assessment,
     get_assessment_versions,
     get_code_attempts,
@@ -430,11 +431,14 @@ def api_assessment_send(assessment_id: int):
             body=payload["body"],
             regenerate_email=payload["regenerate_email"],
             to_email_override=payload["to_email"],
+            confirm=payload["confirm"],
+            reviewed_fingerprint=payload["reviewed_fingerprint"],
+            request_id=payload["request_id"],
         )
     except SchemaValidationError as exc:
         return _json_error(str(exc), 400)
     except AssessmentServiceError as exc:
-        return _json_error(str(exc), 400)
+        return _json_error(str(exc), exc.status_code)
     except RuntimeError as exc:
         return _json_error(str(exc), 503)
     except Exception as exc:
@@ -521,6 +525,13 @@ def _recruiter_call(action, failure: str):
 def api_assessment_publish_check(assessment_id: int):
     """Recruiter: what must be fixed before the assessment can be approved and sent."""
     return _recruiter_call(lambda actor: publication_check(assessment_id), "Could not check the assessment.")
+
+
+@assessment_bp.route("/api/assessment/question/<int:question_id>/regenerate", methods=["POST"], endpoint="api_assessment_question_regenerate")
+@api_login_required
+def api_assessment_question_regenerate(question_id: int):
+    """Recruiter: replace one draft question with a freshly generated one (same position and marks)."""
+    return _recruiter_call(lambda actor: regenerate_question(question_id, actor=actor), "Could not regenerate the question.")
 
 
 @assessment_bp.route("/api/assessment/<int:assessment_id>/approve", methods=["POST"], endpoint="api_assessment_approve")

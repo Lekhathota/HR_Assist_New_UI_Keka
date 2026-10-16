@@ -43,6 +43,7 @@ function makeServer({ max = 20, status = 'DRAFT' } = {}) {
     ready: state.ready, problems: state.ready ? [] : ['1 generated coding question(s) are still awaiting review: save or cancel them.'],
     questions: state.ready ? [] : [{ question_id: 14, number: 2, question_type: 'sql', problems: ['Add at least one hidden test case.'] }],
     mcq_questions: 1, coding_questions: state.saved.length, approval: { current: state.approved, by: state.approved ? 'rec' : undefined },
+    fingerprint: 'fp-1',
   });
   const editable = () => state.status === 'DRAFT';
   const view = s => ({ ...s, status: s.draft ? 'review' : s.status });
@@ -61,7 +62,8 @@ function makeServer({ max = 20, status = 'DRAFT' } = {}) {
   apiGet.mockImplementation(path => {
     if (path === '/api/assessment/1/coding') return Promise.resolve(config());
     if (path === '/api/assessment/1') return Promise.resolve({
-      assessment: { id: 1, status: state.status, title: 'Exam', candidate_id: 9, jd_id: 20, scoring_policy: state.policy || null },
+      assessment: { id: 1, status: state.status, title: 'Exam', candidate_id: 9, jd_id: 20, scoring_policy: state.policy || null,
+        candidate_name: 'Asha Rao', candidate_email: 'c@example.com', job_role: 'Backend Engineer', time_limit_minutes: 90, passing_score: 70 },
       questions: [...BASE_QUESTIONS, ...state.saved], answers: [],
     });
     if (path === '/api/assessment/1/publish-check') return Promise.resolve(check());
@@ -114,6 +116,11 @@ function makeServer({ max = 20, status = 'DRAFT' } = {}) {
     if (path === '/api/assessment/1/return-to-draft') {
       state.status = 'DRAFT';
       return ok({});
+    }
+    if (path === '/api/assessment/1/send') {
+      state.sendCalls = (state.sendCalls || 0) + 1;
+      state.status = 'SENT';
+      return ok({ status: 'SENT', published_version: 1, assessment_link: 'https://hr.example.com/assessment/tok', email: { to_email: body.to_email } });
     }
     if (path === '/api/assessment/1/generate-email') return ok({ to_email: 'c@example.com', subject: 'Test', body: 'Link', candidate_test_link: 'https://x/assessment/t' });
     return ok({});
@@ -561,22 +568,47 @@ describe('Assessment Builder integration', () => {
     expect(button('Edit questions (return to draft)')).toBeUndefined();
   });
 
-  test('sending requires validation and approval; problems block approval', async () => {
+  test('Send Assessment opens the preview; nothing is emailed until the recruiter confirms', async () => {
+    await mountBuilder();
+    await addGenerateAndSave('Builder-level requirement');
+    await click(button('Send Assessment', $('.ab-topbar')));
+    const dialog = $('.pv-dialog');
+    expect(dialog).toBeTruthy();
+    expect(apiGet).toHaveBeenCalledWith('/api/assessment/1/publish-check');  // validated on open
+    expect(dialog.textContent).toContain('Coding Questions (2)');            // SQL Q14 + the saved coding question
+    expect(server.sendCalls).toBeUndefined();
+    await click(button('Send Assessment', $('.pv-footer')));
+    expect(server.sendCalls).toBeUndefined();
+    await click(button('Confirm & Send', $('.pv-confirm')));
+    expect(apiPost).toHaveBeenCalledWith('/api/assessment/1/send', expect.objectContaining({ confirm: true, reviewed_fingerprint: 'fp-1' }));
+    expect(server.sendCalls).toBe(1);
+    expect($('.pv-success').textContent).toContain('Version 1 published');
+    await click(button('Close Preview'));
+    expect($('.ab-notice').textContent).toContain('Version 1 published');
+    expect($('.ab-sent-link-input').value).toBe('https://hr.example.com/assessment/tok');
+  });
+
+  test('validation problems block sending from the preview', async () => {
     await mountBuilder();
     server.ready = false;
-    await click(button('Send Assessment'));
-    expect(calls(apiPost, '/generate-email')).toHaveLength(0);
-    const publish = $('.ab-publish');
-    expect(publish.textContent).toContain('Add at least one hidden test case.');
-    expect(publish.textContent).toContain('still awaiting review');
-    expect(button('Approve for sending', publish).disabled).toBe(true);
-    server.ready = true;
-    await click(button('Validate', publish));
-    await click(button('Approve for sending', publish));
-    expect(apiPost).toHaveBeenCalledWith('/api/assessment/1/approve', {});
-    expect(publish.textContent).toContain('Approved by rec');
-    await click(button('Send Assessment'));
-    expect(calls(apiPost, '/generate-email')).toHaveLength(1);
+    await click(button('Validate', $('.ab-publish')));
+    expect($('.ab-publish').textContent).toContain('Add at least one hidden test case.');
+    await click(button('Preview & Send', $('.ab-publish')));
+    expect($('.pv-invalid').textContent).toContain('still awaiting review');
+    expect(button('Send Assessment', $('.pv-footer')).disabled).toBe(true);
+  });
+
+  test('arriving from Talent with ?preview=1 opens the preview of the draft', async () => {
+    server = makeServer();
+    container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
+    await act(async () => root.render(
+      <MemoryRouter initialEntries={['/hiring-pipeline/assessment/1?preview=1']}>
+        <Routes><Route path="/hiring-pipeline/assessment/:assessmentId" element={<AssessmentBuilder />} /></Routes>
+      </MemoryRouter>,
+    ));
+    expect($('.pv-dialog')).toBeTruthy();
+    expect($('.pv-status').textContent).toBe('Draft — Not Sent');
+    expect($('.pv-summary').textContent).toContain('Asha Rao');
   });
 
   test('the scoring policy is saved with the draft', async () => {
@@ -629,17 +661,6 @@ describe('Assessment Builder integration', () => {
     expect(result.textContent).toContain('At least 2 test case(s) passed');
     expect(result.textContent).toContain('Attempt history (2)');
     expect(result.textContent).toContain('Final submission');
-  });
-
-  test('sending warns about entries that were not saved to the assessment', async () => {
-    await mountBuilder();
-    server.approved = true;
-    await addGenerateAndSave('Saved one');
-    await addAndGenerate('Generated but not saved');
-    window.confirm.mockReturnValueOnce(false);
-    await click(button('Send Assessment'));
-    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('1 coding question entry has an unsaved or ungenerated question'));
-    expect(calls(apiPost, '/generate-email')).toHaveLength(0);
   });
 
   test('a new MCQ needs four options, exactly one correct answer and an explanation', async () => {

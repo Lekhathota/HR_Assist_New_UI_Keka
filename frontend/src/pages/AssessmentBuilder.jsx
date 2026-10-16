@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import ReferenceSolutionPanel from '../components/ReferenceSolutionPanel.jsx';
 import CodingQuestionsPanel from '../components/CodingQuestionsPanel.jsx';
+import AssessmentPreviewModal from '../components/AssessmentPreviewModal.jsx';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api.js';
 import ProctoringEvidence from '../components/ProctoringEvidence.jsx';
 import { downloadAssessmentPdf } from '../utils/assessmentPdf.js';
+import { mcqProblem } from '../utils/assessmentValidation.js';
 import '../styles/assessment_builder.css';
 
 const TYPE_LABELS = {
@@ -33,17 +35,7 @@ const DEFAULT_POLICY = {
   section_weights: null, min_mcq_score: 0, min_coding_score: 0, coding_section_mandatory: false, require_coding_qualification: false,
 };
 
-// Same rules as the server's validate_mcq: four distinct options, exactly one correct, an explanation.
-export function mcqProblem(form) {
-  if (form.question_type !== 'mcq') return '';
-  if (!String(form.question_text || '').trim()) return 'Enter the question text.';
-  const options = form.options || [];
-  if (options.length !== 4 || options.some(o => !String(o).trim())) return 'An MCQ needs exactly four non-empty options.';
-  if (new Set(options.map(o => String(o).trim().toLowerCase().replace(/\s+/g, ' '))).size !== 4) return 'The four MCQ options must be different from each other.';
-  if (options.filter(o => o === form.correct_answer).length !== 1) return 'Select exactly one of the four options as the correct answer.';
-  if (!String(form.explanation || '').trim()) return 'Add an explanation of why the correct answer is right.';
-  return '';
-}
+export { mcqProblem };
 
 const METHOD_LABELS = {
   executed: 'Executed in sandbox',
@@ -149,30 +141,28 @@ function CodingResultBreakdown({ result, questions, attempts }) {
   );
 }
 
-// Validate → Approve → Send: what still blocks publishing, and the approval state.
-function PublishChecklist({ check, busy, onValidate, onApprove }) {
+// Validate → Preview → Send: what still blocks publishing. Sending is confirmed in Preview Assessment.
+function PublishChecklist({ check, busy, onValidate, onPreview }) {
   return (
     <section className="white-card ab-publish" aria-labelledby="ab-publish-title">
       <div className="ab-publish-head">
         <h2 id="ab-publish-title"><i className="fas fa-clipboard-check" aria-hidden="true" /> Review &amp; approve</h2>
         <div className="ab-publish-actions">
           <button type="button" className="btn btn-secondary" onClick={onValidate} disabled={busy}>Validate</button>
-          <button type="button" className="btn btn-primary" onClick={onApprove} disabled={busy || !check?.ready || check?.approval?.current}>
-            {check?.approval?.current ? 'Approved' : 'Approve for sending'}
+          <button type="button" className="btn btn-primary" onClick={onPreview} disabled={busy}>
+            <i className="fas fa-eye" aria-hidden="true" /> Preview &amp; Send
           </button>
         </div>
       </div>
-      {!check && <p className="ab-muted">Validate the assessment before approving it. Sending requires a current approval.</p>}
+      {!check && <p className="ab-muted">Nothing is emailed until you review the assessment in the preview, validate it and confirm sending.</p>}
       {check && check.ready && (
-        <p className={check.approval?.current ? 'ab-success-text' : 'ab-muted'}>
-          {check.approval?.current
-            ? `Approved${check.approval.by ? ` by ${check.approval.by}` : ''}. Any change to questions, tests or scoring needs a new approval.`
-            : `All ${check.mcq_questions} MCQs and ${check.coding_questions} coding questions are valid. Approve to enable sending.`}
+        <p className="ab-success-text">
+          All {check.mcq_questions} MCQs and {check.coding_questions} coding questions are valid. Open the preview to review and send.
         </p>
       )}
       {check && !check.ready && (
         <div className="ab-error" role="alert">
-          <strong>Fix these before the assessment can be approved:</strong>
+          <strong>Fix these before the assessment can be sent:</strong>
           <ul>
             {check.problems.map(p => <li key={p}>{p}</li>)}
             {check.questions.map(q => <li key={q.question_id}><a href={`#ab-q-${q.question_id}`}>Q{q.number}</a> ({q.question_type}): {q.problems.join(' ')}</li>)}
@@ -233,17 +223,14 @@ function AssessmentBuilder() {
   const [addType, setAddType] = useState(null);
   const [addForm, setAddForm] = useState({ ...EMPTY_QUESTION });
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewData, setPreviewData] = useState(null);
-  const [sendOpen, setSendOpen] = useState(false);
-  const [sendForm, setSendForm] = useState({ to_email: '', from_email: '', subject: '', body: '', assessment_link: '' });
+  const [previewValidate, setPreviewValidate] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lastSent, setLastSent] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [generatingEmail, setGeneratingEmail] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState(null);
   const [candidateAnswers, setCandidateAnswers] = useState({});
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
-  const [codingConfig, setCodingConfig] = useState(null);
   const [formError, setFormError] = useState('');
   const [publishCheck, setPublishCheck] = useState(null);
   const [attempts, setAttempts] = useState([]);
@@ -295,6 +282,15 @@ function AssessmentBuilder() {
   }, [assessmentId]);
 
   useEffect(() => { loadAssessment(); }, [loadAssessment]);
+
+  // Talent "Generate & Review" lands here with ?preview=1: open the preview once the draft is loaded.
+  useEffect(() => {
+    if (loading || searchParams.get('preview') !== '1') return;
+    openPreview(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('preview');
+    setSearchParams(next, { replace: true });
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refresh just the question list (after a coding question is saved or removed) without a full reload.
   const refreshQuestions = useCallback(async (saved) => {
@@ -379,8 +375,10 @@ function AssessmentBuilder() {
       if (!ok) throw new Error(data.error || 'Save failed.');
       setAssessment(data.assessment || assessment);
       showNotice('Draft saved.');
+      return true;
     } catch (err) {
       setError(err.message || 'Could not save draft.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -476,39 +474,17 @@ function AssessmentBuilder() {
     }
   };
 
-  const handlePreview = async () => {
-    setBusy(true);
-    try {
-      const data = await apiGet(`/api/assessment/${assessmentId}/preview`);
-      setPreviewData(data);
-      setPreviewOpen(true);
-    } catch (err) {
-      setError(err.message || 'Could not load preview.');
-    } finally {
-      setBusy(false);
-    }
+  const openPreview = (validate = false) => {
+    setPreviewValidate(validate);
+    setPreviewOpen(true);
   };
 
-  const loadEmailForSend = async (toEmail = '') => {
-    setGeneratingEmail(true);
-    setError('');
-    try {
-      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/generate-email`, {
-        to_email: toEmail || assessment?.candidate_email || '',
-      });
-      if (!ok) throw new Error(data.error || 'Could not generate email.');
-      setSendForm({
-        to_email: data.to_email || toEmail || assessment?.candidate_email || '',
-        from_email: data.from_email || '',
-        subject: data.subject || '',
-        body: data.body || '',
-        assessment_link: data.candidate_test_link || data.assessment_link || '',
-      });
-    } catch (err) {
-      setError(err.message || 'Could not generate email.');
-    } finally {
-      setGeneratingEmail(false);
-    }
+  const handlePreviewSent = (data) => {
+    const toEmail = data.email?.to_email || assessment?.candidate_email || '';
+    setLastSent({ toEmail, link: data.assessment_link || '' });
+    setAssessment(prev => ({ ...prev, status: data.status || 'SENT', candidate_email: toEmail,
+      published_version: data.published_version ?? prev?.published_version, sent_at: data.sent_at ?? prev?.sent_at }));
+    showNotice(`Assessment email sent to ${toEmail}. Version ${data.published_version} published.`);
   };
 
   const handleValidate = async () => {
@@ -521,22 +497,6 @@ function AssessmentBuilder() {
     } catch (err) {
       setError(err.message || 'Could not validate the assessment.');
       return null;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleApprove = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/approve`, {});
-      if (!ok) throw new Error(data.error || 'Could not approve the assessment.');
-      setPublishCheck(data);
-      showNotice('Assessment approved. You can now send it.');
-    } catch (err) {
-      setError(err.message || 'Could not approve the assessment.');
-      handleValidate();
     } finally {
       setBusy(false);
     }
@@ -555,67 +515,6 @@ function AssessmentBuilder() {
       setError(err.message || 'Could not return the assessment to draft.');
     } finally {
       setBusy(false);
-    }
-  };
-
-  const openSendModal = async () => {
-    const check = await handleValidate();
-    if (!check) return;
-    if (!check.ready || !check.approval?.current) {
-      setError(check.ready ? 'Approve the assessment before sending it.' : 'Fix the problems listed under Review & approve before sending.');
-      document.getElementById('ab-publish-title')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    const unsaved = (codingConfig?.specs || []).filter(spec => !spec.question || spec.draft).length;
-    if (unsaved && !window.confirm(`${unsaved} coding question ${unsaved === 1 ? 'entry has' : 'entries have'} an unsaved or ungenerated question that will not be in the assessment. Send anyway?`)) return;
-    setSendForm({
-      to_email: assessment?.candidate_email || '',
-      from_email: '',
-      subject: '',
-      body: '',
-      assessment_link: '',
-    });
-    setSendOpen(true);
-    await loadEmailForSend(assessment?.candidate_email || '');
-  };
-
-  const handleRegenerateEmail = async () => {
-    await loadEmailForSend(sendForm.to_email);
-  };
-
-  const handleSend = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/send`, {
-        to_email: sendForm.to_email,
-        regenerate_email: true,
-      });
-      if (!ok) throw new Error(data.error || 'Send failed.');
-      setSendOpen(false);
-      const toEmail = data.email?.to_email || sendForm.to_email;
-      const link = data.assessment_link || '';
-      setAssessment(prev => ({ ...prev, status: 'SENT', candidate_email: toEmail }));
-      setLastSent({ toEmail, link });
-      showNotice(
-        link
-          ? `Assessment email sent to ${toEmail}. Check inbox and spam folder.`
-          : `Assessment email sent to ${toEmail}.`,
-      );
-    } catch (err) {
-      setError(err.message || 'Could not send assessment.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const copySendLink = async () => {
-    if (!sendForm.assessment_link) return;
-    try {
-      await navigator.clipboard.writeText(sendForm.assessment_link);
-      showNotice('Assessment link copied.');
-    } catch {
-      showNotice('Could not copy link — select and copy it manually.');
     }
   };
 
@@ -827,7 +726,7 @@ function AssessmentBuilder() {
                 <i className="fas fa-file-pdf" aria-hidden="true" /> {downloadingPdf ? pdfProgress : 'Download test PDF'}
               </button>
             )}
-            <button type="button" className="btn btn-secondary" onClick={handlePreview} disabled={busy}>
+            <button type="button" className="btn btn-secondary" onClick={() => openPreview(false)} disabled={busy}>
               <i className="fas fa-eye" /> Preview
             </button>
             {assessment?.status === 'SENT' && !assessment?.started_at && (
@@ -844,8 +743,8 @@ function AssessmentBuilder() {
                 <button type="button" className="btn btn-secondary" onClick={handleSaveDraft} disabled={busy}>
                   <i className="fas fa-save" /> Save Draft
                 </button>
-                <button type="button" className="btn btn-success" onClick={openSendModal} disabled={busy || !questions.length}
-                  title={publishCheck?.approval?.current ? undefined : 'Validate and approve the assessment first'}>
+                <button type="button" className="btn btn-success" onClick={() => openPreview(true)} disabled={busy || !questions.length}
+                  title="Review, validate and confirm in the preview before anything is emailed">
                   <i className="fas fa-paper-plane" /> Send Assessment
                 </button>
               </>
@@ -921,7 +820,7 @@ function AssessmentBuilder() {
           {renderScoringPolicy()}
         </div>
 
-        {isDraft && <PublishChecklist check={publishCheck} busy={busy} onValidate={handleValidate} onApprove={handleApprove} />}
+        {isDraft && <PublishChecklist check={publishCheck} busy={busy} onValidate={handleValidate} onPreview={() => openPreview(true)} />}
 
         {canEditQuestions && (
           <div className="ab-add-bar">
@@ -1024,108 +923,19 @@ function AssessmentBuilder() {
         {/* Below the last question card, so it stays reachable however many questions there are. */}
         {assessment && (
           // Keyed by status: the panel reloads its editable state when the assessment is sent or returned to draft.
-          <CodingQuestionsPanel key={assessment.status} assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} onConfigChange={setCodingConfig} />
+          <CodingQuestionsPanel key={assessment.status} assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} />
         )}
 
-        {previewOpen && previewData && (
-          <div className="ab-modal-overlay" onClick={() => setPreviewOpen(false)}>
-            <div className="ab-modal" onClick={e => e.stopPropagation()}>
-              <div className="ab-modal-head">
-                <h2><i className="fas fa-eye" /> Preview (Candidate View)</h2>
-                <button type="button" className="ab-icon-btn" onClick={() => setPreviewOpen(false)}>
-                  <i className="fas fa-times" />
-                </button>
-              </div>
-              <p className="ab-preview-meta">{previewData.assessment?.title} · {previewData.assessment?.time_limit_minutes} min</p>
-              {(previewData.questions || []).map((q, i) => (
-                <div key={q.id} className="ab-preview-q">
-                  <div className="ab-preview-q-head">
-                    <span>Q{i + 1}</span>
-                    <span className={`ab-badge ${typeBadgeClass(q.question_type)}`}>{TYPE_LABELS[q.question_type]}</span>
-                  </div>
-                  <p>{q.question_text}</p>
-                  {q.question_type === 'mcq' && (
-                    <ul>{(q.options || []).map(o => <li key={o}>{o}</li>)}</ul>
-                  )}
-                  {q.question_type === 'coding' && q.starter_code && (
-                    <pre className="ab-code-preview">{q.starter_code}</pre>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {sendOpen && (
-          <div className="ab-modal-overlay" onClick={() => !busy && !generatingEmail && setSendOpen(false)}>
-            <div className="ab-modal ab-modal-send" onClick={e => e.stopPropagation()}>
-              <div className="ab-modal-head">
-                <h2><i className="fas fa-paper-plane" /> Send Assessment</h2>
-                <button type="button" className="ab-icon-btn" onClick={() => setSendOpen(false)} disabled={busy || generatingEmail}>
-                  <i className="fas fa-times" />
-                </button>
-              </div>
-              <p>Only the <strong>candidate test link</strong> below is emailed — not the recruiter login/app URL.</p>
-              <label className="ab-label">Recipient email</label>
-              <input
-                type="email"
-                value={sendForm.to_email}
-                onChange={e => setSendForm({ ...sendForm, to_email: e.target.value })}
-                placeholder="candidate@example.com"
-                required
-                disabled={generatingEmail}
-              />
-              <label className="ab-label">From</label>
-              <input
-                type="text"
-                value={sendForm.from_email || 'Configured sender email'}
-                readOnly
-                disabled={generatingEmail}
-              />
-              <label className="ab-label">Candidate test link (sent in email)</label>
-              <div className="ab-sent-link-row">
-                <input
-                  type="text"
-                  readOnly
-                  value={sendForm.assessment_link}
-                  className="ab-sent-link-input"
-                  placeholder={generatingEmail ? 'Generating link…' : 'Assessment link'}
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={copySendLink}
-                  disabled={!sendForm.assessment_link || generatingEmail}
-                >
-                  Copy
-                </button>
-              </div>
-              <label className="ab-label">Subject (auto-generated)</label>
-              <input
-                type="text"
-                value={sendForm.subject}
-                readOnly
-                disabled={generatingEmail}
-              />
-              <label className="ab-label">Email preview (auto-generated)</label>
-              <textarea
-                rows={10}
-                value={sendForm.body}
-                readOnly
-                placeholder={generatingEmail ? 'Generating email body…' : 'Email body'}
-                disabled={generatingEmail}
-              />
-              <div className="ab-form-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setSendOpen(false)} disabled={busy || generatingEmail}>Cancel</button>
-                <button type="button" className="btn btn-primary" onClick={handleRegenerateEmail} disabled={busy || generatingEmail}>
-                  {generatingEmail ? <><i className="fas fa-spinner fa-spin" /> Generating…</> : <><i className="fas fa-magic" /> Regenerate Email</>}
-                </button>
-                <button type="button" className="btn btn-success" onClick={handleSend} disabled={busy || generatingEmail || !sendForm.assessment_link}>
-                  {busy ? 'Sending…' : 'Send Now'}
-                </button>
-              </div>
-            </div>
-          </div>
+        {previewOpen && assessment && (
+          <AssessmentPreviewModal
+            assessment={assessment}
+            questions={questions}
+            onQuestionsChange={setQuestions}
+            onSaveDraft={handleSaveDraft}
+            onClose={() => { setPreviewOpen(false); setPublishCheck(null); }}
+            onSent={handlePreviewSent}
+            autoValidate={previewValidate}
+          />
         )}
       </div>
     </Layout>

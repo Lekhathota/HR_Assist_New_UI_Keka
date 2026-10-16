@@ -121,6 +121,7 @@ def validate_question_create_payload(data: dict[str, Any]) -> dict[str, Any]:
         "points": _optional_int(data.get("points"), 10, minimum=1, maximum=100),
         "skill_tag": _optional_str(data.get("skill_tag")),
         "sort_order": _optional_int(data.get("sort_order"), 0, minimum=0, maximum=999),
+        **_question_metadata(data),
     }
 
 
@@ -147,9 +148,22 @@ def validate_question_update_payload(data: dict[str, Any]) -> dict[str, Any]:
         patch["skill_tag"] = _optional_str(data.get("skill_tag"))
     if "sort_order" in data:
         patch["sort_order"] = _optional_int(data.get("sort_order"), 0, minimum=0, maximum=999)
+    patch.update(_question_metadata(data))
     if not patch:
         raise SchemaValidationError("At least one field is required to update a question.")
     return patch
+
+
+def _question_metadata(data: dict[str, Any]) -> dict[str, Any]:
+    """Explanation and difficulty, edited by recruiters on MCQs and other questions."""
+    out: dict[str, Any] = {}
+    if "explanation" in data:
+        out["explanation"] = _optional_str(data.get("explanation"))
+    if "difficulty" in data and data.get("difficulty") not in (None, ""):
+        if data["difficulty"] not in ("Easy", "Medium", "Hard"):
+            raise SchemaValidationError("difficulty must be Easy, Medium or Hard.")
+        out["difficulty"] = data["difficulty"]
+    return out
 
 
 def validate_save_answer_payload(data: dict[str, Any]) -> dict[str, Any]:
@@ -200,10 +214,14 @@ def validate_submit_payload(data: dict[str, Any]) -> dict[str, Any]:
 
 def validate_send_payload(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
-        return {"subject": "", "body": "", "regenerate_email": True, "to_email": ""}
+        data = {}
     return {
         "subject": _optional_str(data.get("subject")),
         "body": _optional_str(data.get("body")),
         "regenerate_email": bool(data.get("regenerate_email", True)),
         "to_email": _optional_str(data.get("to_email")),
+        # Preview & Send: the recruiter's explicit confirmation, the content they reviewed, and a retry-safe id.
+        "confirm": data.get("confirm") is True,
+        "reviewed_fingerprint": _optional_str(data.get("reviewed_fingerprint")),
+        "request_id": _optional_str(data.get("request_id"))[:80],
     }

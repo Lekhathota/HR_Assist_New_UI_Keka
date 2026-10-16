@@ -47,7 +47,7 @@ from assessment.utilities import (
     validate_public_assessment_link,
 )
 from email_utils import normalize_email
-from services.interview_service import default_from_email, send_email
+from services.interview_service import EmailDeliveryUnknown, default_from_email, send_email
 from services.json_parser import parse_json_response
 from services.llm_service import LLMService
 from services.prompt_service import PromptService
@@ -747,6 +747,69 @@ def verify_reference_solution(question_id: int, *, actor: str = "") -> dict[str,
     return _reference_payload(updated, assessment)
 
 
+def regenerate_question(question_id: int, *, actor: str = "") -> dict[str, Any]:
+    """Replace one question in place (same id, position and marks) with a freshly generated one.
+
+    Uses the same generator and validation as the full exam (or the question's own recruiter prompt
+    for custom coding questions); the new text must not repeat any other question in the assessment.
+    """
+    from assessment.generation import normalized_jd, requirement_catalog
+
+    question = assessment_repo.get_question_by_id(question_id)
+    if not question:
+        raise AssessmentServiceError("Question not found.", status_code=404)
+    assessment = assessment_repo.get_assessment_by_id(int(question["assessment_id"])) or {}
+    if assessment.get("status") not in AssessmentStatus.editable_states():
+        raise AssessmentServiceError("Questions can only be regenerated while the assessment is a draft.", status_code=409)
+    kind = str(question.get("question_type") or "")
+    if kind not in {"mcq", "coding", "sql"}:
+        raise AssessmentServiceError("Only MCQ, coding and SQL questions can be regenerated.")
+    others = [q.get("question_text") or "" for q in assessment_repo.get_questions_for_assessment(int(assessment["id"]))
+              if q.get("id") != question.get("id")]
+    if question.get("source") == "custom_coding":
+        from services.coding_question_service import regenerate_custom_question
+
+        row = regenerate_custom_question(assessment, question, others)
+    else:
+        jd = db.get_jd_by_id(int(assessment.get("jd_id") or 0), include_raw_text=True)
+        if not jd:
+            raise AssessmentServiceError("The assessment's job description no longer exists.", status_code=409)
+        hard = kind == "mcq" and question.get("difficulty") == "Hard"
+        section = {"key": "replace", "mcq": int(kind == "mcq"), "coding": int(kind == "coding"), "sql": int(kind == "sql"),
+                   "mcq_medium": int(kind == "mcq" and not hard), "mcq_hard": int(hard), "total": 1, "optional_max": 1,
+                   "focus": f"a single replacement question on {question.get('skill_tag') or 'a core JD requirement'}, "
+                            "different from every existing question"}
+        context = normalized_jd(jd)
+        catalog = requirement_catalog(context)
+        try:
+            llm = LLMService(model=os.getenv("ASSESSMENT_MODEL") or "gpt-4.1", temperature=0.6)
+        except Exception as exc:
+            raise AssessmentServiceError("AI question generation is unavailable. Check the configured AI service.", status_code=503) from exc
+        feedback, row = "", None
+        for attempt in range(GENERATION_ROUNDS):
+            try:
+                _, rows = _generate_section(llm, PromptService(), context, catalog, section, feedback, others,
+                                            attempt < GENERATION_ROUNDS - 1)
+                row = rows[0]
+                break
+            except (ValueError, TypeError, KeyError) as exc:
+                feedback = str(exc)[:2000]
+            except Exception as exc:
+                raise AssessmentServiceError("AI question generation failed. Please retry; the question was kept.", status_code=502) from exc
+        if row is None:
+            raise AssessmentServiceError(f"The AI could not produce a valid replacement after three attempts. {feedback}", status_code=502)
+    for key in ("sort_order", "question_id", "points"):
+        row.pop(key, None)
+    from services.coding_question_service import EXECUTABLE_RESET
+
+    reset = {key: None for key in EXECUTABLE_RESET} if kind in {"coding", "sql"} else {}
+    assessment_repo.update_question(int(question_id), {**reset, "sql_schema": None, "order_matters": None, **row} if kind == "coding"
+                                    else {**reset, **row})
+    db.log_audit("Assessment Question Regenerated", actor, f"Regenerated question #{question_id} in assessment #{assessment['id']}.",
+                 int(assessment.get("jd_id") or 0) or None)
+    return {"question": recruiter_question_payload(assessment_repo.get_question_by_id(int(question_id)) or {})}
+
+
 def remove_question(question_id: int) -> dict[str, Any]:
     question = assessment_repo.get_question_by_id(question_id)
     if not question:
@@ -791,6 +854,14 @@ def publication_check(assessment_id: int) -> dict[str, Any]:
         normalize_scoring_policy(assessment.get("scoring_policy"))
     except ValueError as exc:
         general.append(f"Scoring policy: {exc}")
+    from email_utils import is_valid_email
+
+    if not is_valid_email(normalize_email(str(assessment.get("candidate_email") or ""))):
+        general.append("The candidate email is missing or invalid.")
+    if not 1 <= int(assessment.get("passing_score") or 0) <= 100:
+        general.append("Set a passing score between 1 and 100%.")
+    if not 5 <= int(assessment.get("time_limit_minutes") or 0) <= 480:
+        general.append("Set a time limit between 5 and 480 minutes.")
     pending = [spec for spec in assessment.get("coding_specs") or [] if spec.get("draft_question")]
     if pending:
         general.append(f"{len(pending)} generated coding question(s) are still awaiting review: save or cancel them.")
@@ -1020,14 +1091,34 @@ def send_assessment(
     body: str = "",
     regenerate_email: bool = True,
     to_email_override: str = "",
+    confirm: bool | None = None,
+    reviewed_fingerprint: str = "",
+    request_id: str = "",
 ) -> dict[str, Any]:
+    """Publish the reviewed draft and email the candidate link.
+
+    confirm=False means the recruiter did not confirm: nothing is sent. reviewed_fingerprint is the
+    content the recruiter validated in the preview; sending is refused if anything changed since.
+    A retry with the same request_id after a successful send returns that result without emailing again.
+    """
+    existing = assessment_repo.get_assessment_by_id(assessment_id) or {}
+    if request_id and existing.get("send_request_id") == request_id and existing.get("status") != AssessmentStatus.DRAFT:
+        token = normalize_access_token(str(existing.get("access_token") or ""))
+        return {"success": True, "replayed": True, "assessment_id": assessment_id, "status": existing.get("status"),
+                "assessment_link": assessment_link(token) if token else "", "published_version": existing.get("published_version"),
+                "email": {"to_email": existing.get("candidate_email") or ""}}
+    if to_email_override:
+        from email_utils import is_valid_email
+
+        if not is_valid_email(normalize_email(to_email_override)):
+            raise AssessmentServiceError("Enter a valid candidate email address.")
     assessment, current_status, token, expires_at, link, from_email, to_email = _prepare_assessment_send(
         assessment_id,
         recruiter=recruiter,
         to_email_override=to_email_override,
     )
 
-    generated = _generate_invite_email(assessment, link, from_email)
+    generated = _build_invite_email(assessment, link, from_email, expires_at=expires_at, instructions=True)
     subject = generated["subject"]
     body = generated["body"]
 
@@ -1035,6 +1126,11 @@ def send_assessment(
         raise AssessmentServiceError("Candidate test link could not be included in the email.")
 
     publish = current_status == AssessmentStatus.DRAFT
+    if not publish:
+        raise AssessmentServiceError("This assessment was already sent. Use Resend on the Talent page to email the same link again.",
+                                     status_code=409)
+    if confirm is not True:
+        raise AssessmentServiceError("Confirm sending before the assessment is emailed.", status_code=409)
     questions = assessment_repo.get_questions_for_assessment(assessment_id)
     if publish:
         assert_status_transition(current_status, AssessmentStatus.SENT)
@@ -1042,35 +1138,49 @@ def send_assessment(
         if not check["ready"]:
             details = check["problems"] + [f"Q{q['number']}: {' '.join(q['problems'])}" for q in check["questions"]]
             raise AssessmentServiceError("The assessment cannot be sent yet. " + " ".join(details)[:1500], status_code=409)
-        if not check["approval"].get("current"):
+        if reviewed_fingerprint:
+            if reviewed_fingerprint != check["fingerprint"]:
+                raise AssessmentServiceError("The assessment changed after you validated it. Validate it again before sending.", status_code=409)
+        elif not check["approval"].get("current"):
             raise AssessmentServiceError("Review and approve the assessment before sending it "
                                          "(it was changed after approval, or never approved).", status_code=409)
 
-    saved = assessment_repo.update_assessment(
-        assessment_id,
-        {
-            "status": AssessmentStatus.SENT,
-            "access_token": token,
-            "token_expires_at": expires_at,
-            "sent_at": utc_now(),
-            "candidate_email": to_email,
-        },
-    )
-
+    activation = {
+        "status": AssessmentStatus.SENT,
+        "access_token": token,
+        "token_expires_at": expires_at,
+        "candidate_email": to_email,
+        "email_delivery_status": "sending",
+        **({"sent_at": utc_now()} if publish else {}),
+        **({"send_request_id": request_id} if request_id else {}),
+    }
+    # Atomic DRAFT -> SENT: of two concurrent sends only one activates the link and emails.
+    saved = (assessment_repo.activate_assessment(assessment_id, current_status, activation) if publish
+             else assessment_repo.update_assessment(assessment_id, activation))
     if not saved:
-        raise AssessmentServiceError("Could not activate the assessment link. Email was not sent.")
+        raise AssessmentServiceError("This assessment is already being sent. Refresh to see its status.", status_code=409)
+    actor = recruiter.get("username") or ""
+    delivery_unknown = False
     try:
         send_email(to_email, subject, body, from_email, primary_link=link)
-    except Exception:
-        assessment_repo.update_assessment(assessment_id, {
-            key: assessment.get(key) for key in
-            ("status", "access_token", "token_expires_at", "sent_at", "candidate_email")
-        })
+    except EmailDeliveryUnknown as exc:
+        # The mail server may have accepted it: keep the link live and never resend automatically.
+        delivery_unknown = True
+        assessment_repo.update_assessment(assessment_id, {"email_delivery_status": "unknown", "email_delivery_error": str(exc)})
+        assessment_repo.push_delivery_event(assessment_id, {"status": "unknown", "to_email": to_email, "error": str(exc), "by": actor})
+    except Exception as exc:
+        rollback = {key: assessment.get(key) for key in
+                    ("status", "access_token", "token_expires_at", "sent_at", "candidate_email", "send_request_id")}
+        assessment_repo.update_assessment(assessment_id, {**rollback, "email_delivery_status": "failed", "email_delivery_error": str(exc)})
+        assessment_repo.push_delivery_event(assessment_id, {"status": "failed", "to_email": to_email, "error": str(exc), "by": actor})
         raise
+    if not delivery_unknown:
+        assessment_repo.update_assessment(assessment_id, {"email_delivery_status": "sent", "email_sent_at": utc_now(), "email_delivery_error": ""})
+        assessment_repo.push_delivery_event(assessment_id, {"status": "sent", "to_email": to_email, "by": actor})
 
     if publish:
-        version = _publish_version(assessment, questions, recruiter.get("username") or "")
-        assessment_repo.update_assessment(assessment_id, {"published_version": version})
+        version = _publish_version(assessment, questions, actor)
+        assessment_repo.update_assessment(assessment_id, {"published_version": version, "approval": None})
 
     db.log_audit(
         "Assessment Sent",
@@ -1087,6 +1197,9 @@ def send_assessment(
         "access_token": token,
         "assessment_link": link,
         "token_expires_at": updated.get("token_expires_at"),
+        "sent_at": updated.get("sent_at"),
+        "published_version": updated.get("published_version"),
+        "delivery_unknown": delivery_unknown,
         "email": {"from_email": from_email, "to_email": to_email, "subject": subject, "body": body},
     }
 
@@ -1593,6 +1706,7 @@ __all__ = [
     "get_assessment_result",
     "publication_check",
     "approve_assessment",
+    "regenerate_question",
     "return_to_draft",
     "get_assessment_versions",
     "get_code_attempts",

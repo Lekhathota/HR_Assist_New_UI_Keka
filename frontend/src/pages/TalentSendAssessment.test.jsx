@@ -65,7 +65,7 @@ test('Talent row actions menu offers Send Assessment', async () => {
   await act(async () => [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent.includes('Send Assessment')).click());
   expect(container.textContent).toContain('Generate Assessment');
   expect(container.querySelector('#sa-jd').value).toBe('20');
-  await act(async () => button('Generate & Send Assessment').click());
+  await act(async () => button('Generate & Review Assessment').click());
   expect(apiPost).toHaveBeenCalledWith('/api/candidates/10/assessments/send', expect.objectContaining({ jd_id: 20 }));
   expect(container.textContent).toContain('Assessment sent to asha@example.com.');
 });
@@ -79,7 +79,7 @@ test('All Details uses the same workflow, lists assessments and keeps existing a
   expect(apiGet).toHaveBeenCalledWith('/api/candidates/10/assessments');
 
   await act(async () => [...container.querySelectorAll('.cp-hero-actions button')].find(b => b.textContent.includes('Send assessment')).click());
-  await act(async () => button('Generate & Send Assessment').click());
+  await act(async () => button('Generate & Review Assessment').click());
   expect(apiPost).toHaveBeenCalledWith('/api/candidates/10/assessments/send', expect.objectContaining({ jd_id: 20 }));
   // The card reloads to show the new attempt.
   expect(apiGet.mock.calls.filter(([p]) => p === '/api/candidates/10/assessments')).toHaveLength(2);

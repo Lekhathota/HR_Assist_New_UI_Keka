@@ -430,6 +430,22 @@ def discard_draft(assessment_id: int, spec_id: str) -> dict[str, Any]:
     return get_coding_config(assessment_id)
 
 
+def regenerate_custom_question(assessment: dict[str, Any], question: dict[str, Any], others: list[str]) -> dict[str, Any]:
+    """New version of a saved recruiter-prompted coding question, from its own entry's prompt and settings."""
+    specs = list(assessment.get("coding_specs") or [])
+    spec = _find_spec(specs, str(question.get("coding_spec_id") or ""))
+    jd, client = _client_for(assessment)
+    if not jd:
+        raise AssessmentServiceError("The assessment's job description no longer exists.", status_code=409)
+    client_prompt = _client_prompt(assessment, client)
+    row = _generate_with_ai(jd, client_prompt, spec, others)
+    row.update(generation_prompt=spec["prompt"], client_prompt_snapshot=client_prompt, source=SOURCE, coding_spec_id=spec["id"],
+               time_limit_minutes=spec.get("time_limit_minutes"))
+    if spec.get("topic"):
+        row["skill_tag"] = spec["topic"]
+    return row
+
+
 def _check_room(assessment_id: int, existing: dict[str, Any] | None) -> None:
     if not existing and assessment_repo.count_questions_for_assessment(assessment_id) + 1 > max_assessment_questions():
         raise AssessmentServiceError(f"An assessment can have at most {max_assessment_questions()} questions.", status_code=409)

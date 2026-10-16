@@ -399,6 +399,14 @@ class MemoryStore:
     def get_assessment_versions(self, aid):
         return copy.deepcopy(self.versions)
 
+    def activate_assessment(self, aid, expected, patch_doc):
+        if self.assessments[int(aid)]["status"] != getattr(expected, "value", expected):
+            return False
+        return self.update_assessment(aid, patch_doc)
+
+    def push_delivery_event(self, aid, event):
+        self.assessments[int(aid)].setdefault("delivery_history", []).append(dict(event))
+
     def return_assessment_to_draft(self, aid):
         row = self.assessments[int(aid)]
         if row["status"] != "SENT" or row.get("started_at"):
@@ -436,7 +444,7 @@ class LifecycleTests(unittest.TestCase):
         self.stack.close()
 
     def send(self):
-        return service.send_assessment(1, recruiter={"username": "rec"})
+        return service.send_assessment(1, recruiter={"username": "rec"}, confirm=True)
 
     def test_invalid_or_missing_test_cases_prevent_publication(self):
         check = service.publication_check(1)

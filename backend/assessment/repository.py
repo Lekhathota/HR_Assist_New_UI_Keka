@@ -291,6 +291,17 @@ def get_send_requests_for_candidate(candidate_id: int) -> list[dict]:
     return _serialize_docs(list(_database().assessment_send_requests.find({"candidate_id": int(candidate_id)})))
 
 
+def activate_assessment(assessment_id: int, expected_status: str, patch_doc: dict[str, Any]) -> bool:
+    """Apply patch_doc only if the assessment is still in expected_status (prevents duplicate sends)."""
+    status = getattr(expected_status, "value", expected_status)
+    doc = {k: getattr(v, "value", v) for k, v in patch_doc.items()}
+    row = _database().assessments.find_one_and_update(
+        {"id": int(assessment_id), "status": status}, {"$set": {**doc, "updated_at": _now()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return bool(row)
+
+
 def return_assessment_to_draft(assessment_id: int) -> bool:
     """SENT -> DRAFT only while the candidate has not started (atomic against begin_candidate_attempt)."""
     row = _database().assessments.find_one_and_update(

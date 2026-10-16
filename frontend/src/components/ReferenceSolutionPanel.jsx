@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiGet, apiPost, apiPut } from '../api.js';
 import '../styles/reference_solution.css';
 
@@ -69,9 +69,9 @@ function CaseResult({ result, isSql, showLanguage }) {
  * solutions per language, public and hidden test cases with weights, and scoring / qualification rules.
  * Saving always re-verifies, so the status reflects actual execution of the saved version.
  */
-function ReferenceSolutionPanel({ question, onChange }) {
+function ReferenceSolutionPanel({ question, onChange, onDirtyChange, defaultOpen = false }) {
   const isSql = question.question_type === 'sql';
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [config, setConfig] = useState(null);
   const [draft, setDraft] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -117,21 +117,26 @@ function ReferenceSolutionPanel({ question, onChange }) {
     });
   };
 
+  const load = async () => {
+    setBusy('load');
+    setError('');
+    try {
+      applyConfig(await apiGet(`/api/assessment/question/${question.id}/reference`));
+    } catch (err) {
+      setError(err.message || 'Could not load the coding configuration.');
+    } finally {
+      setBusy('');
+    }
+  };
+
   const toggle = async (event) => {
     const nextOpen = event.currentTarget.open;
     setOpen(nextOpen);
-    if (nextOpen && !config) {
-      setBusy('load');
-      setError('');
-      try {
-        applyConfig(await apiGet(`/api/assessment/question/${question.id}/reference`));
-      } catch (err) {
-        setError(err.message || 'Could not load the coding configuration.');
-      } finally {
-        setBusy('');
-      }
-    }
+    if (nextOpen && !config && busy !== 'load') await load();
   };
+
+  useEffect(() => { if (defaultOpen) load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (patch) => { setDraft(prev => ({ ...prev, ...patch })); setDirty(true); };
   const updateConfig = (patch) => update({ config: { ...draft.config, ...patch } });
