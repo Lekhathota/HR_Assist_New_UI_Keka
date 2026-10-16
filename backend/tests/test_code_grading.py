@@ -330,15 +330,15 @@ class LenientGenerationTests(unittest.TestCase):
 
     def test_final_attempt_keeps_questions_whose_tests_are_unusable(self):
         from assessment.generation import normalized_jd, validate_exam
-        from tests.test_assessment_generation import JD, exam
+        from tests.test_assessment_generation import JD, SQL, TOTAL, exam
 
         data = exam()
-        data["questions"][12]["test_cases"] = [{"setup_sql": "INSERT INTO requests VALUES (1, 1, 'x', 'y');"}]
+        data["questions"][SQL]["test_cases"] = [{"setup_sql": "INSERT INTO requests VALUES (1, 1, 'x', 'y');"}]
         with self.assertRaises(ValueError):
-            validate_exam(copy.deepcopy(data), normalized_jd(JD), total=14)
-        rows = validate_exam(data, normalized_jd(JD), total=14, require_tests=False)
-        self.assertNotIn("test_cases", rows[12])
-        self.assertIn("test_cases", rows[13])
+            validate_exam(copy.deepcopy(data), normalized_jd(JD), total=TOTAL)
+        rows = validate_exam(data, normalized_jd(JD), total=TOTAL, require_tests=False)
+        self.assertNotIn("test_cases", rows[SQL])
+        self.assertIn("test_cases", rows[SQL + 1])
 
     def test_non_strict_preparation_drops_only_the_broken_question(self):
         good = {"question_type": "sql", "correct_answer": REFERENCE_SQL, "sql_schema": SCHEMA,
@@ -461,8 +461,10 @@ class ReferenceServiceTests(unittest.TestCase):
         with self.assertRaises(service.AssessmentServiceError):
             service.save_reference_config(7, {"reference_solution": "x", "reference_language": "powershell", "test_cases": self._tests()})
 
-    def test_edits_blocked_after_sending_but_verify_allowed(self):
-        self.assessment["status"] = "SENT"
+    def test_edits_blocked_once_the_candidate_starts_but_verify_allowed(self):
+        self.assessment["status"] = "SENT"  # invited but not started: still editable
+        self.assertTrue(service.get_reference_config(7)["editable"])
+        self.assessment["status"] = "IN_PROGRESS"
         with self.assertRaises(service.AssessmentServiceError) as ctx:
             service.save_reference_config(7, {"reference_solution": "x", "test_cases": self._tests()})
         self.assertEqual(ctx.exception.status_code, 409)

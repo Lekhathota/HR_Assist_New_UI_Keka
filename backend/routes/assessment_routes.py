@@ -53,10 +53,12 @@ from services.assessment_service import (
 from services.auth_service import api_login_required, current_user, role_required
 from services.coding_question_service import (
     add_spec,
+    discard_draft,
     generate_spec_question,
     get_coding_config,
     remove_spec,
     save_client_prompt,
+    save_spec_question,
     update_spec,
 )
 from services.candidate_assessment_service import (
@@ -230,6 +232,21 @@ def api_assessment_coding_spec_remove(assessment_id: int, spec_id: str):
 @api_login_required
 def api_assessment_coding_spec_generate(assessment_id: int, spec_id: str):
     return _coding_call(lambda: generate_spec_question(assessment_id, spec_id, request.get_json(silent=True) or {}))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs/<spec_id>/save", methods=["POST"],
+                     endpoint="api_assessment_coding_spec_save")
+@api_login_required
+def api_assessment_coding_spec_save(assessment_id: int, spec_id: str):
+    """Validate the reviewed draft question and add it to the assessment."""
+    return _coding_call(lambda: save_spec_question(assessment_id, spec_id, request.get_json(silent=True) or {}))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs/<spec_id>/draft", methods=["DELETE"],
+                     endpoint="api_assessment_coding_spec_discard_draft")
+@api_login_required
+def api_assessment_coding_spec_discard_draft(assessment_id: int, spec_id: str):
+    return _coding_call(lambda: discard_draft(assessment_id, spec_id))
 
 
 @assessment_bp.route("/api/assessment/exam/generate", methods=["POST"])

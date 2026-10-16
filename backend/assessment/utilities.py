@@ -13,7 +13,7 @@ from flask import has_request_context, request
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from assessment.models import DEFAULT_PASSING_SCORE, AssessmentStatus, QuestionType
+from assessment.models import CUSTOM_CODING_FIELDS, DEFAULT_PASSING_SCORE, AssessmentStatus, QuestionType
 
 _CANDIDATE_TEST_PATH = "/assessment"
 _TOKEN_RE = re.compile(
@@ -199,7 +199,7 @@ def recruiter_question_payload(question: dict[str, Any]) -> dict[str, Any]:
         "starter_code": question.get("starter_code") or "",
         "points": int(question.get("points") or 0),
         **{key: question.get(key) for key in ("question_id", "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement",
-                                               "source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot") if question.get(key) is not None},
+                                               *CUSTOM_CODING_FIELDS) if question.get(key) is not None},
         **{key: question.get(key) for key in ("test_cases", "sql_schema", "order_matters", "input_format", "output_format",
                                                "allowed_languages", "default_language", "tests_verified") if question.get(key) is not None},
         **_reference_fields(question),
@@ -221,7 +221,9 @@ def _reference_fields(question: dict[str, Any]) -> dict[str, Any]:
 def candidate_question_payload(question: dict[str, Any]) -> dict[str, Any]:
     payload = recruiter_question_payload(question)
     for key in ("correct_answer", "explanation", "evaluation_focus", "jd_requirement", "test_cases", "tests_verified",
-                "verification", "reference_language", "config_fingerprint"):
+                "verification", "reference_language", "config_fingerprint",
+                # The recruiter's generation prompts can describe the expected approach.
+                "source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot"):
         payload.pop(key, None)
     # Disabled tests are not used for grading, so candidates do not see them either.
     cases = [c for c in question.get("test_cases") or [] if isinstance(c, dict) and c.get("enabled", True) is not False]

@@ -34,7 +34,8 @@ class AssessmentStatus(str, Enum):
 
     @classmethod
     def editable_states(cls) -> frozenset[str]:
-        return frozenset({cls.DRAFT})
+        """Questions may change until the candidate opens the test (SENT means invited, not started)."""
+        return frozenset({cls.DRAFT, cls.SENT})
 
     @classmethod
     def candidate_accessible_states(cls) -> frozenset[str]:
@@ -61,23 +62,28 @@ class QuestionType(str, Enum):
 
 
 DEFAULT_PASSING_SCORE = 70
-DEFAULT_QUESTION_COUNT = 14
+DEFAULT_QUESTION_COUNT = 34
 DEFAULT_TOKEN_TTL_DAYS = 7
 
 # Fixed question mix required for every generated assessment
-MCQ_COUNT = 10
+MCQ_COUNT = 30
 CODING_COUNT = 2
 SQL_COUNT = 2
 TOTAL_GENERATED_QUESTIONS = MCQ_COUNT + CODING_COUNT + SQL_COUNT
-MCQ_MEDIUM_COUNT = 4
-MCQ_HARD_COUNT = 6
+MCQ_MEDIUM_COUNT = 12
+MCQ_HARD_COUNT = 18
+# MCQs are generated in parallel batches of this size (one LLM call each) to stay within request time limits.
+MCQ_BATCH_SIZE = 10
 
 # Recruiter-defined coding questions (Coding Questions panel) come on top of the fixed mix above.
 CODING_DIFFICULTIES = ("Easy", "Medium", "Hard")
 MAX_CODING_PROMPT_CHARS = 4000
 MAX_CLIENT_CODING_PROMPT_CHARS = 4000
+MAX_CODING_TOPIC_CHARS = 200
+MAX_CODING_TIME_LIMIT_MINUTES = 240
 # Question fields that record how a recruiter-defined coding question was generated.
-CUSTOM_CODING_FIELDS = ("source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot")
+CUSTOM_CODING_FIELDS = ("source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot",
+                        "constraints", "time_limit_minutes")
 
 
 def _env_limit(name: str, default: int, *, low: int, high: int) -> int:

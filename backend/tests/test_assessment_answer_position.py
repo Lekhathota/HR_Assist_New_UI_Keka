@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from assessment.evaluation_service import evaluate_assessment
 from assessment.evaluators.coding_evaluator import StubCodingEvaluator
 from assessment.generation import normalized_jd, shuffle_mcq_options, validate_exam
-from tests.test_assessment_generation import JD, exam
+from tests.test_assessment_generation import CODING, JD, TOTAL, exam
 
 OPTIONS = ["Correct decision", "Distractor one", "Distractor two", "Distractor three"]
 
@@ -18,7 +18,7 @@ OPTIONS = ["Correct decision", "Distractor one", "Distractor two", "Distractor t
 def model_exam_with_answer_first():
     """What the model tends to return: the correct option always listed first."""
     data = exam()
-    for question in data["questions"][:10]:
+    for question in data["questions"][:CODING]:
         question["options"] = list(OPTIONS)
         question["correct_answer"] = OPTIONS[0]
     return data
@@ -28,9 +28,9 @@ class AnswerPositionTests(unittest.TestCase):
     def test_correct_option_moves_off_a_and_stays_mapped(self):
         positions = Counter()
         for _ in range(30):
-            rows = validate_exam(model_exam_with_answer_first(), normalized_jd(JD), total=14)
+            rows = validate_exam(model_exam_with_answer_first(), normalized_jd(JD), total=TOTAL)
             mcqs = [r for r in rows if r["question_type"] == "mcq"]
-            self.assertEqual(len(mcqs), 10)
+            self.assertEqual(len(mcqs), 30)
             slots = []
             for row in mcqs:
                 self.assertEqual(sorted(row["options"]), sorted(OPTIONS))
@@ -38,15 +38,15 @@ class AnswerPositionTests(unittest.TestCase):
                 self.assertEqual(row["correct_answer"], "Correct decision")
                 slots.append(row["options"].index(row["correct_answer"]))
             positions.update(slots)
-            # Every exam spreads answers across A-D (3/3/2/2), never all A.
-            self.assertEqual(sorted(Counter(slots).values()), [2, 2, 3, 3])
+            # Every exam spreads its 30 answers across A-D (8/8/7/7), never all A.
+            self.assertEqual(sorted(Counter(slots).values()), [7, 7, 8, 8])
         self.assertEqual(set(positions), {0, 1, 2, 3})
 
     def test_letter_answer_resolves_before_shuffle(self):
         data = exam()
         data["questions"][0]["options"] = ["Validate input", "Handle absent optional field", "Drop the request", "Disable parsing"]
         data["questions"][0]["correct_answer"] = "C"
-        row = validate_exam(data, normalized_jd(JD), total=14)[0]
+        row = validate_exam(data, normalized_jd(JD), total=TOTAL)[0]
         self.assertEqual(row["correct_answer"], "Drop the request")
         self.assertIn("Drop the request", row["options"])
 

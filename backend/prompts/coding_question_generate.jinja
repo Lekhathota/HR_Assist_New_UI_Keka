@@ -22,8 +22,10 @@ Fixed settings chosen by the recruiter (these override anything in the prompts):
 - Difficulty: {{ difficulty }}
 - Language: {% if language %}{{ language_label }} (candidates answer in this language){% else %}candidate's choice of Python, Java, JavaScript, C or C++{% endif %}
 - Points: {{ points }}
-
-Answers are graded automatically by running them, so the task must be a program that reads standard input and prints to standard output. Describe the exact stdin layout in input_format and the exact stdout layout in output_format. Include constraints and the edge cases the recruiter asked for, plus sample input/output inside the question text.
+{% if topic %}- Topic / skill assessed: {{ topic | tojson }} (the question must test this)
+{% endif %}{% if time_limit_minutes %}- Time limit: {{ time_limit_minutes }} minutes (size the problem so a competent candidate at this difficulty can read, solve and test it within this time)
+{% endif %}
+Answers are graded automatically by running them, so the task must be a program that reads standard input and prints to standard output. Describe the exact stdin layout in input_format and the exact stdout layout in output_format. List the input bounds in constraints (and in the question text), cover the edge cases the recruiter asked for, and include sample input/output inside the question text.
 Provide test_cases: at least 3 visible examples (hidden=false) and at least 5 hidden tests (hidden=true) covering edge cases (empty/minimal input, duplicates, large values, ties, and any edge cases the prompts name). Each test is {"input": exact stdin text, "expected_output": exact stdout text, "hidden": bool}.
 correct_answer must be a complete Python 3 reference program that reads stdin and prints exactly expected_output for every test (it is used to verify the tests, whatever the candidate language). Leave starter_code empty; per-language templates are supplied.
 evaluation_focus lists what the grader should reward (correctness, edge cases, complexity, code quality, or criteria from the prompts).
@@ -43,6 +45,7 @@ Return ONLY JSON:
  "explanation": "Expected solution approach and why it works",
  "evaluation_focus": ["Correctness"],
  "input_format": "...",
+ "constraints": "Bounds on input sizes and values, e.g. 1 <= n <= 10^5",
  "output_format": "...",
  "default_language": "{{ language or 'python' }}",
  "test_cases": [{"input": "3\n1 2 3\n", "expected_output": "6\n", "hidden": false}],

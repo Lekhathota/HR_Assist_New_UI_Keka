@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -22,7 +24,7 @@ from assessment.models import (
     max_assessment_questions,
 )
 from assessment.schemas import SchemaValidationError
-from assessment.generation import normalized_jd, requirement_catalog, validate_exam
+from assessment.generation import FULL_MIX, find_duplicate, generation_sections, normalized_jd, requirement_catalog, validate_exam
 from assessment.code_execution.preparation import prepare_executable_questions
 from assessment.evaluation_service import evaluate_assessment
 from assessment.utilities import (
@@ -278,47 +280,112 @@ def _load_context(candidate_id: int, jd_id: int, *, require_selected: bool = Tru
     return {"candidate": candidate, "jd": jd}
 
 
+GENERATION_ROUNDS = 3
+
+
+def _resolve_requirement_ids(exam: Any, catalog: dict[str, str]) -> None:
+    for question in (exam.get("questions") or []) if isinstance(exam, dict) else []:
+        if isinstance(question, dict) and question.get("jd_requirement_id"):
+            ref = question["jd_requirement_id"]
+            if not isinstance(ref, str) or ref not in catalog:
+                raise ValueError("Each jd_requirement_id must reference the supplied JD catalog.")
+            question["jd_requirement"] = catalog[ref]
+
+
+def _generate_section(llm, prompt_service, context, catalog, section, feedback, previous_questions, strict):
+    """One LLM call for one section of the exam; returns (metadata, validated rows) or raises ValueError."""
+    prompt = prompt_service.render(
+        "assessment_generate.jinja", jd_data=context, requirement_catalog=catalog,
+        section=section, exam_mix=FULL_MIX, total_questions=TOTAL_GENERATED_QUESTIONS,
+        generation_nonce=uuid.uuid4().hex, validation_feedback=feedback,
+    )
+    exam = parse_json_response(llm.invoke(prompt, temperature=0.6))
+    _resolve_requirement_ids(exam, catalog)
+    rows = validate_exam(exam, context, previous_questions=previous_questions, require_tests=strict, mix=section)
+    if section["coding"] or section["sql"]:
+        rows = prepare_executable_questions(rows, strict=strict)
+    return {key: exam[key] for key in ("exam_title", "job_title", "experience_required")}, rows
+
+
+def _review_payload(metadata: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
+    exam = _exam_payload(metadata["exam_title"], metadata["job_title"], metadata["experience_required"], rows)
+    for item, row in zip(exam["questions"], rows):
+        item.update({key: row[key] for key in ("input_format", "output_format", "sql_schema") if row.get(key)})
+    return exam
+
+
 def _generate_questions_with_ai(jd: dict, *, previous_questions=None):
-    """Generate for a posted job only; candidate details are assignment metadata."""
+    """Generate for a posted job only; candidate details are assignment metadata.
+
+    The exam is split into sections (coding+SQL and batches of MCQs) generated in parallel so a
+    large exam fits the request time limit. Each round regenerates only the sections that failed
+    validation, then the merged exam is checked for cross-section duplicates and reviewed against the JD.
+    """
     context = normalized_jd(jd)
     if not (context["posted_jd_text"] or context["skills"] or context["responsibilities"] or context["structured_requirements"]):
         raise AssessmentServiceError("The posted JD has no requirements to assess. Add the complete JD first.")
     prompt_service = PromptService()
-    feedback = ""
     catalog = requirement_catalog(context)
     try:
         llm = LLMService(model=os.getenv("ASSESSMENT_MODEL") or "gpt-4.1", temperature=0.6)
     except Exception as exc:
         raise AssessmentServiceError("AI assessment generation is unavailable. Check the configured AI service; no generic exam was created.") from exc
-    for attempt in range(3):
+    sections = generation_sections()
+    done: dict[str, tuple[dict, list[dict]]] = {}
+    feedback: dict[str, str] = {}
+    previous = list(previous_questions or ())
+    for attempt in range(GENERATION_ROUNDS):
+        strict_tests = attempt < GENERATION_ROUNDS - 1  # final round keeps questions whose tests are unusable
+        pending = [section for section in sections if section["key"] not in done]
+        with ThreadPoolExecutor(max_workers=len(pending)) as pool:
+            futures = {section["key"]: pool.submit(_generate_section, llm, prompt_service, context, catalog, section,
+                                                   feedback.get(section["key"], ""), previous, strict_tests)
+                       for section in pending}
+        for key, future in futures.items():
+            try:
+                done[key] = future.result()
+                feedback.pop(key, None)
+            except (ValueError, TypeError, KeyError) as exc:
+                feedback[key] = str(exc)[:2000]
+            except Exception as exc:
+                raise AssessmentServiceError("AI assessment generation failed. Please retry; the existing draft was preserved.") from exc
+        if len(done) < len(sections):
+            continue
+
+        owners = [section["key"] for section in sections for _ in done[section["key"]][1]]
+        rows = [row for section in sections for row in done[section["key"]][1]]
+        duplicate = find_duplicate(rows)
+        if duplicate:
+            later = owners[duplicate[1]]
+            feedback[later] = (f"Your question {rows[duplicate[1]]['question_text'][:160]!r} repeats another section's "
+                               f"question {rows[duplicate[0]]['question_text'][:160]!r}. Write different situations.")
+            done.pop(later)
+            continue
+        order = {"mcq": 0, "coding": 1, "sql": 2}
+        ranked = sorted(zip(rows, owners), key=lambda pair: order[pair[0]["question_type"]])
+        rows, owners = [row for row, _ in ranked], [owner for _, owner in ranked]
+        for index, row in enumerate(rows):
+            row["sort_order"] = index
+            row["question_id"] = f"Q{index + 1:03d}"
+        metadata = done[sections[0]["key"]][0]
         try:
-            prompt = prompt_service.render(
-                "assessment_generate.jinja", jd_data=context,
-                total_questions=TOTAL_GENERATED_QUESTIONS, requirement_catalog=catalog,
-                generation_nonce=uuid.uuid4().hex, validation_feedback=feedback,
-            )
-            exam = parse_json_response(llm.invoke(prompt, temperature=0.6))
-            for question in exam.get("questions", []):
-                if isinstance(question, dict) and question.get("jd_requirement_id"):
-                    ref = question["jd_requirement_id"]
-                    if not isinstance(ref, str) or ref not in catalog:
-                        raise ValueError("Each jd_requirement_id must reference the supplied JD catalog.")
-                    question["jd_requirement"] = catalog[ref]
-            strict_tests = attempt < 2  # final attempt keeps questions whose tests are unusable
-            rows = validate_exam(exam, context, TOTAL_GENERATED_QUESTIONS, previous_questions or (),
-                                 require_tests=strict_tests)
-            rows = prepare_executable_questions(rows, strict=strict_tests)
             review = parse_json_response(llm.invoke(prompt_service.render(
-                "assessment_validate.jinja", jd_data=context, requirement_catalog=catalog, exam=exam,
+                "assessment_validate.jinja", jd_data=context, requirement_catalog=catalog,
+                exam=_review_payload(metadata, rows), exam_mix=FULL_MIX,
             ), temperature=0.0))
-            if not isinstance(review, dict) or review.get("valid") is not True or review.get("issues") != []:
-                raise ValueError("JD review rejected the exam: " + str(review.get("issues", "invalid review") if isinstance(review, dict) else "invalid review"))
-            return {key: exam[key] for key in ("exam_title", "job_title", "experience_required")}, rows
-        except (ValueError, TypeError, KeyError) as exc:
-            feedback = str(exc)[:2000]
+        except (ValueError, TypeError) as exc:
+            review = {"valid": False, "issues": [f"invalid review: {exc}"]}
         except Exception as exc:
             raise AssessmentServiceError("AI assessment generation failed. Please retry; the existing draft was preserved.") from exc
-    raise AssessmentServiceError("The AI could not produce a complete, validated JD-based exam after three attempts. Please retry. " + feedback)
+        if isinstance(review, dict) and review.get("valid") is True and review.get("issues") == []:
+            return metadata, rows
+        issues = review.get("issues", "invalid review") if isinstance(review, dict) else "invalid review"
+        flagged = {owners[int(n) - 1] for n in re.findall(r"\bQ0*(\d{1,3})\b", str(issues)) if 0 < int(n) <= len(owners)}
+        for key in flagged or [section["key"] for section in sections]:
+            feedback[key] = ("JD review rejected the exam: " + str(issues))[:2000]
+            done.pop(key, None)
+    raise AssessmentServiceError("The AI could not produce a complete, validated JD-based exam after three attempts. Please retry. "
+                                 + " ".join(feedback.values())[:2000])
 
 
 def _exam_payload(title, job_title, experience, questions):
@@ -490,6 +557,23 @@ def preview_assessment(assessment_id: int) -> dict[str, Any]:
     }
 
 
+def validate_mcq(question: dict[str, Any]) -> None:
+    """A recruiter-edited MCQ needs four distinct options, exactly one correct option and an explanation."""
+    if str(question.get("question_type") or "") != QuestionType.MCQ.value:
+        return
+    if not str(question.get("question_text") or "").strip():
+        raise AssessmentServiceError("Enter the question text.")
+    options = question.get("options")
+    if not isinstance(options, list) or len(options) != 4 or not all(isinstance(o, str) and o.strip() for o in options):
+        raise AssessmentServiceError("An MCQ needs exactly four non-empty options.")
+    if len({" ".join(o.lower().split()) for o in options}) != 4:
+        raise AssessmentServiceError("The four MCQ options must be different from each other.")
+    if sum(1 for option in options if option == question.get("correct_answer")) != 1:
+        raise AssessmentServiceError("Select exactly one of the four options as the correct answer.")
+    if not str(question.get("explanation") or "").strip():
+        raise AssessmentServiceError("Add an explanation of why the correct answer is right.")
+
+
 def add_question(payload: dict[str, Any]) -> dict[str, Any]:
     assessment = assessment_repo.get_assessment_by_id(int(payload["assessment_id"]))
     if not assessment:
@@ -499,8 +583,10 @@ def add_question(payload: dict[str, Any]) -> dict[str, Any]:
     if assessment_repo.count_questions_for_assessment(int(assessment["id"])) >= max_assessment_questions():
         raise AssessmentServiceError(f"An assessment can have at most {max_assessment_questions()} questions.")
 
+    validate_mcq(payload)
     if not payload.get("sort_order"):
-        payload["sort_order"] = assessment_repo.count_questions_for_assessment(int(assessment["id"]))
+        existing = assessment_repo.get_questions_for_assessment(int(assessment["id"]))
+        payload["sort_order"] = max((int(q.get("sort_order") or 0) for q in existing), default=-1) + 1
 
     question_id = assessment_repo.create_question(payload)
     question = assessment_repo.get_question_by_id(question_id) or {}
@@ -518,6 +604,7 @@ def update_question(question_id: int, patch: dict[str, Any]) -> dict[str, Any]:
         raise AssessmentServiceError("Questions can only be edited while the assessment is in DRAFT status.")
 
     merged = {**question, **patch}
+    validate_mcq(merged)
     if merged.get("test_cases") and merged.get("question_type") in {"sql", "coding"} and (
             {"correct_answer", "sql_schema", "test_cases"} & set(patch)):
         # Expected results must follow the edited reference solution.

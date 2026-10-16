@@ -3,30 +3,33 @@ Recruiter-defined coding questions for a draft assessment (Assessment Builder â†
 
 The base "Generate from JD" exam keeps its fixed format. On top of it a recruiter can add any
 number of coding entries ("specs", up to ASSESSMENT_MAX_CODING_QUESTIONS), each with its own
-prompt, language, difficulty and points, and generate one question per entry from:
+prompt, language, difficulty, topic, time limit and points, and generate one question per entry from:
     the selected JD + the client-level coding prompt + the entry's own prompt.
 
-Specs live on the assessment document (`coding_specs`); a generated question is an ordinary
-question row tagged with `source="custom_coding"`, `coding_spec_id` and the prompts used, so
-grading, candidate links and the existing question editor work unchanged.
+Generation produces a draft (`draft_question` on the spec) that the recruiter reviews and edits;
+saving validates it and only then writes it to the assessment. Specs live on the assessment
+document (`coding_specs`); a saved question is an ordinary question row tagged with
+`source="custom_coding"`, `coding_spec_id` and the prompts used, so grading, candidate links and
+the existing question editor work unchanged.
 """
 
 from __future__ import annotations
 
 import os
 import uuid
-from difflib import SequenceMatcher
 from typing import Any
 
 import database as db
 from assessment import repository as assessment_repo
 from assessment.code_execution.languages import LANGUAGES, normalize_language
-from assessment.code_execution.preparation import prepare_executable_questions, validate_test_fields
-from assessment.generation import normalized_jd, requirement_catalog
+from assessment.code_execution.preparation import MIN_HIDDEN, MIN_VISIBLE, prepare_executable_questions, validate_test_fields
+from assessment.generation import is_duplicate, normalized_jd, requirement_catalog
 from assessment.models import (
     CODING_DIFFICULTIES,
     MAX_CLIENT_CODING_PROMPT_CHARS,
     MAX_CODING_PROMPT_CHARS,
+    MAX_CODING_TIME_LIMIT_MINUTES,
+    MAX_CODING_TOPIC_CHARS,
     AssessmentStatus,
     max_assessment_questions,
     max_coding_questions,
@@ -40,6 +43,15 @@ from services.prompt_service import PromptService
 SOURCE = "custom_coding"
 GENERATION_ATTEMPTS = 3
 DEFAULT_POINTS = 15
+SPEC_KEYS = ("prompt", "language", "difficulty", "points", "topic", "time_limit_minutes")
+# Generated-question fields the recruiter can change while reviewing a draft.
+DRAFT_EDIT_KEYS = ("question_text", "input_format", "output_format", "constraints", "explanation", "correct_answer", "test_cases")
+DRAFT_VIEW_KEYS = (*DRAFT_EDIT_KEYS, "skill_tag", "difficulty", "points", "time_limit_minutes", "evaluation_focus",
+                   "jd_requirement", "allowed_languages", "default_language", "tests_verified", "generation_prompt")
+# Question fields cleared when a saved question is replaced, so stale tests never survive.
+EXECUTABLE_RESET = ("test_cases", "input_format", "output_format", "allowed_languages", "default_language",
+                    "tests_verified", "reference_language", "verification", "config_fingerprint", "jd_requirement",
+                    "constraints", "time_limit_minutes")
 
 
 def _now() -> str:
@@ -88,7 +100,29 @@ def _clean_spec_fields(data: dict[str, Any], *, partial: bool) -> dict[str, Any]
         if not 1 <= points <= 100:
             raise AssessmentServiceError("Points must be a whole number between 1 and 100.")
         out["points"] = points
+    if "topic" in data or not partial:
+        topic = data.get("topic") or ""
+        if not isinstance(topic, str):
+            raise AssessmentServiceError("The topic must be text.")
+        if len(topic.strip()) > MAX_CODING_TOPIC_CHARS:
+            raise AssessmentServiceError(f"The topic is too long (max {MAX_CODING_TOPIC_CHARS} characters).")
+        out["topic"] = topic.strip()
+    if "time_limit_minutes" in data or not partial:
+        out["time_limit_minutes"] = _time_limit(data.get("time_limit_minutes"))
     return out
+
+
+def _time_limit(value: Any) -> int | None:
+    """Optional suggested solving time in whole minutes; empty means no limit."""
+    if value in (None, ""):
+        return None
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        raise AssessmentServiceError(f"Time limit must be a whole number of minutes between 1 and {MAX_CODING_TIME_LIMIT_MINUTES}.") from None
+    if isinstance(value, float) and value != minutes or not 1 <= minutes <= MAX_CODING_TIME_LIMIT_MINUTES:
+        raise AssessmentServiceError(f"Time limit must be a whole number of minutes between 1 and {MAX_CODING_TIME_LIMIT_MINUTES}.")
+    return minutes
 
 
 def validate_generated_coding_question(
@@ -123,11 +157,8 @@ def validate_generated_coding_question(
     ref = item.get("jd_requirement_id")
     if ref not in (None, "", "null") and ref not in catalog:
         raise ValueError("jd_requirement_id must be one of the numbered JD requirements, or null.")
-    canonical = _text(text)
-    for other in previous_questions:
-        other = _text(other)
-        if other and (canonical == other or SequenceMatcher(None, canonical, other).ratio() >= .88):
-            raise ValueError("The question repeats an existing question in this assessment.")
+    if any(is_duplicate(text, other) for other in previous_questions):
+        raise ValueError("The question repeats an existing question in this assessment.")
 
     executable: dict[str, Any] = {}
     try:
@@ -150,6 +181,7 @@ def validate_generated_coding_question(
         "scenario_type": str(item.get("scenario_type") or "Implementation").strip() or "Implementation",
         "explanation": explanation,
         "evaluation_focus": [v.strip() for v in focus],
+        "constraints": str(item.get("constraints") or "").strip(),
         **({"jd_requirement": catalog[ref]} if ref in catalog else {}),
         **executable,
     }
@@ -194,16 +226,27 @@ def _linked_questions(assessment_id: int) -> dict[str, dict]:
     }
 
 
+def _draft_view(draft: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not draft:
+        return None
+    return {key: draft.get(key) for key in DRAFT_VIEW_KEYS if draft.get(key) is not None}
+
+
 def _spec_view(spec: dict[str, Any], question: dict[str, Any] | None) -> dict[str, Any]:
     status = spec.get("status") or "pending"
     if status == "generated" and not question:
         status = "pending"  # the generated question was deleted from the question list
+    if spec.get("draft_question"):
+        status = "review"  # generated, waiting for the recruiter to review and save it
     return {
         "id": spec["id"],
         "prompt": spec.get("prompt") or "",
         "language": spec.get("language") or "",
         "difficulty": spec.get("difficulty") or "Medium",
         "points": int(spec.get("points") or DEFAULT_POINTS),
+        "topic": spec.get("topic") or "",
+        "time_limit_minutes": spec.get("time_limit_minutes"),
+        "draft": _draft_view(spec.get("draft_question")),
         "status": status,
         "last_error": spec.get("last_error") or "",
         "generated_at": spec.get("generated_at"),
@@ -221,6 +264,7 @@ def get_coding_config(assessment_id: int) -> dict[str, Any]:
     questions = assessment_repo.get_questions_for_assessment(assessment_id)
     return {
         "editable": assessment.get("status") in AssessmentStatus.editable_states(),
+        "status": assessment.get("status"),
         "jd": {"id": jd.get("id"), "title": jd.get("title") or ""},
         "client": {"id": client.get("id"), "name": client.get("name") or ""} if client else None,
         "client_prompt": _client_prompt(assessment, client),
@@ -233,6 +277,8 @@ def get_coding_config(assessment_id: int) -> dict[str, Any]:
             "max_questions": max_assessment_questions(),
             "max_prompt_chars": MAX_CODING_PROMPT_CHARS,
             "max_client_prompt_chars": MAX_CLIENT_CODING_PROMPT_CHARS,
+            "max_topic_chars": MAX_CODING_TOPIC_CHARS,
+            "max_time_limit_minutes": MAX_CODING_TIME_LIMIT_MINUTES,
         },
         "languages": [{"key": key, "label": spec["label"]} for key, spec in LANGUAGES.items()],
         "difficulties": list(CODING_DIFFICULTIES),
@@ -297,7 +343,11 @@ def remove_spec(assessment_id: int, spec_id: str) -> dict[str, Any]:
 
 
 def generate_spec_question(assessment_id: int, spec_id: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Generate (or regenerate) the coding question for one entry; replaces only that entry's question."""
+    """Generate (or regenerate) a draft question for one entry for the recruiter to review.
+
+    Nothing is added to the assessment until save_spec_question(); an entry's saved question stays
+    unchanged until its new draft is saved.
+    """
     assessment = _editable(assessment_id)
     specs = list(assessment.get("coding_specs") or [])
     spec = _find_spec(specs, spec_id)
@@ -305,43 +355,148 @@ def generate_spec_question(assessment_id: int, spec_id: str, overrides: dict[str
         spec.update(_clean_spec_fields(overrides, partial=True), updated_at=_now())
     if not spec.get("prompt"):
         raise AssessmentServiceError("Enter the client's requirements for this question before generating it.")
-    linked = _linked_questions(assessment_id)
-    existing = linked.get(spec_id)
-    if not existing and assessment_repo.count_questions_for_assessment(assessment_id) + 1 > max_assessment_questions():
-        raise AssessmentServiceError(f"An assessment can have at most {max_assessment_questions()} questions.", status_code=409)
+    existing = _linked_questions(assessment_id).get(spec_id)
+    _check_room(assessment_id, existing)
 
     jd, client = _client_for(assessment)
     if not jd:
         raise AssessmentServiceError("The assessment's job description no longer exists.", status_code=409)
     client_prompt = _client_prompt(assessment, client)
-    previous = [q.get("question_text") or "" for q in assessment_repo.get_questions_for_assessment(assessment_id)
-                if not existing or q.get("id") != existing.get("id")]
     try:
-        row = _generate_with_ai(jd, client_prompt, spec, previous)
+        row = _generate_with_ai(jd, client_prompt, spec, _other_question_texts(assessment_id, existing))
     except AssessmentServiceError as exc:
         spec.update(status="failed", last_error=str(exc), updated_at=_now())
         assessment_repo.update_assessment(assessment_id, {"coding_specs": specs})
         raise
 
-    row.update(source=SOURCE, coding_spec_id=spec_id, generation_prompt=spec["prompt"], client_prompt_snapshot=client_prompt)
+    row.update(generation_prompt=spec["prompt"], client_prompt_snapshot=client_prompt,
+               time_limit_minutes=spec.get("time_limit_minutes"))
+    if spec.get("topic"):
+        row["skill_tag"] = spec["topic"]
+    spec.update(draft_question=row, status="generated" if existing else "pending", last_error="", updated_at=_now())
+    assessment_repo.update_assessment(assessment_id, {"coding_specs": specs})
+    return {"spec": _spec_view(spec, existing), "draft": _draft_view(row), "config": get_coding_config(assessment_id)}
+
+
+def save_spec_question(assessment_id: int, spec_id: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Validate the reviewed (and possibly edited) draft and add it to the assessment.
+
+    A first save appends the question after all existing ones; saving a regenerated draft replaces
+    the entry's own question in place (same id and position). Other questions are never touched.
+    """
+    assessment = _editable(assessment_id)
+    specs = list(assessment.get("coding_specs") or [])
+    spec = _find_spec(specs, spec_id)
+    draft = spec.get("draft_question")
+    if not draft:
+        raise AssessmentServiceError("Generate the question and review it before saving.", status_code=409)
+    data = data or {}
+    if not isinstance(data, dict) or not isinstance(data.get("question") or {}, dict):
+        raise AssessmentServiceError("Request body must be a JSON object.")
+    spec_fields = _clean_spec_fields({key: data[key] for key in SPEC_KEYS if key in data}, partial=True)
+    edits = {key: value for key, value in (data.get("question") or {}).items() if key in DRAFT_EDIT_KEYS}
+    existing = _linked_questions(assessment_id).get(spec_id)
+    _check_room(assessment_id, existing)
+    spec.update(spec_fields)
+    row = _validated_draft({**draft, **edits}, spec, edits, _other_question_texts(assessment_id, existing))
+
+    row.update(source=SOURCE, coding_spec_id=spec_id)
     if existing:
-        # Regenerate in place: same question id and position; clear stale executable fields.
-        stale = {key: None for key in ("test_cases", "input_format", "output_format", "allowed_languages",
-                                        "default_language", "tests_verified", "reference_language",
-                                        "verification", "config_fingerprint", "jd_requirement")}
-        assessment_repo.update_question(int(existing["id"]), {**stale, **row})
+        assessment_repo.update_question(int(existing["id"]), {**{key: None for key in EXECUTABLE_RESET}, **row})
         question_id = int(existing["id"])
     else:
-        row["sort_order"] = assessment_repo.count_questions_for_assessment(assessment_id)
+        others = assessment_repo.get_questions_for_assessment(assessment_id)
+        row["sort_order"] = max((int(q.get("sort_order") or 0) for q in others), default=-1) + 1
         question_id = assessment_repo.create_question({"assessment_id": assessment_id, **row})
+    spec.pop("draft_question", None)
     spec.update(status="generated", question_id=question_id, last_error="", generated_at=_now(), updated_at=_now())
     assessment_repo.update_assessment(assessment_id, {"coding_specs": specs})
-    db.log_audit("Coding Question Generated", "",
-                 f"Generated coding question #{question_id} for assessment #{assessment_id} from a recruiter prompt.",
+    db.log_audit("Coding Question Saved", "",
+                 f"Saved coding question #{question_id} for assessment #{assessment_id} from a recruiter prompt.",
                  int(assessment.get("jd_id") or 0) or None)
     question = assessment_repo.get_question_by_id(question_id) or {}
     return {"spec": _spec_view(spec, question), "question": recruiter_question_payload(question),
             "config": get_coding_config(assessment_id)}
+
+
+def discard_draft(assessment_id: int, spec_id: str) -> dict[str, Any]:
+    """Drop an unsaved generated draft; a saved question of the entry is kept."""
+    assessment = _editable(assessment_id)
+    specs = list(assessment.get("coding_specs") or [])
+    spec = _find_spec(specs, spec_id)
+    spec.pop("draft_question", None)
+    spec["updated_at"] = _now()
+    assessment_repo.update_assessment(assessment_id, {"coding_specs": specs})
+    return get_coding_config(assessment_id)
+
+
+def _check_room(assessment_id: int, existing: dict[str, Any] | None) -> None:
+    if not existing and assessment_repo.count_questions_for_assessment(assessment_id) + 1 > max_assessment_questions():
+        raise AssessmentServiceError(f"An assessment can have at most {max_assessment_questions()} questions.", status_code=409)
+
+
+def _other_question_texts(assessment_id: int, existing: dict[str, Any] | None) -> list[str]:
+    return [q.get("question_text") or "" for q in assessment_repo.get_questions_for_assessment(assessment_id)
+            if not existing or q.get("id") != existing.get("id")]
+
+
+_TEXT_KEYS = ("question_text", "input_format", "output_format", "constraints", "explanation", "correct_answer")
+
+
+def _validated_draft(row: dict[str, Any], spec: dict[str, Any], edits: dict[str, Any], others: list[str]) -> dict[str, Any]:
+    """Check a reviewed draft before it is written to the assessment; raises AssessmentServiceError."""
+    for key in _TEXT_KEYS:
+        if row.get(key) is not None and not isinstance(row[key], str):
+            raise AssessmentServiceError(f"{key.replace('_', ' ').capitalize()} must be text.")
+    row = {**row, **{key: row[key].strip() for key in _TEXT_KEYS[:-1] if isinstance(row.get(key), str)}}
+    if len((row.get("question_text") or "").split()) < 12:
+        raise AssessmentServiceError("The problem statement must describe the task, behaviour, constraints and samples (at least 12 words).")
+    if not (row.get("correct_answer") or "").strip():
+        raise AssessmentServiceError("Add a reference solution (a complete Python 3 program).")
+    if not row.get("explanation"):
+        raise AssessmentServiceError("Add an explanation of the expected solution approach.")
+    if any(is_duplicate(row["question_text"], other) for other in others):
+        raise AssessmentServiceError("This question repeats another question in the assessment. Edit it or regenerate.")
+
+    row.update(points=int(spec.get("points") or DEFAULT_POINTS), difficulty=spec.get("difficulty") or "Medium",
+               time_limit_minutes=spec.get("time_limit_minutes"))
+    if spec.get("topic"):
+        row["skill_tag"] = spec["topic"]
+    if not row.get("test_cases"):
+        row["test_cases"] = None  # no automatic tests: graded by AI against the reference solution
+        return row
+    if "test_cases" in edits:
+        _check_recruiter_tests(row["test_cases"])
+    try:
+        row.update(validate_test_fields(row, "coding", "Question"))
+    except ValueError as exc:
+        raise AssessmentServiceError(str(exc).replace("Question: ", "")) from exc
+    if spec.get("language"):
+        row.update(allowed_languages=[spec["language"]], default_language=spec["language"])
+    if {"test_cases", "correct_answer"} & set(edits) or "tests_verified" not in row:
+        try:
+            row = prepare_executable_questions([row], strict=True)[0]
+        except ValueError as exc:
+            raise AssessmentServiceError(f"The reference solution does not pass the test cases: {str(exc).replace('Q1: ', '')}") from exc
+    return row
+
+
+def _check_recruiter_tests(cases: Any) -> None:
+    """Recruiter-edited tests are checked strictly instead of being silently repaired."""
+    if not isinstance(cases, list):
+        raise AssessmentServiceError("Test cases must be a list.")
+    for number, case in enumerate(cases, start=1):
+        if not isinstance(case, dict) or not isinstance(case.get("input"), str) or not isinstance(case.get("expected_output"), str):
+            raise AssessmentServiceError(f"Test {number} needs an input and an expected output.")
+        if not case["expected_output"].strip():
+            raise AssessmentServiceError(f"Test {number} needs an expected output.")
+    inputs = [case["input"] for case in cases]
+    if len(set(inputs)) != len(inputs):
+        raise AssessmentServiceError("Two test cases have the same input. Make each test different.")
+    visible = sum(1 for case in cases if not case.get("hidden"))
+    if visible < MIN_VISIBLE["coding"] or len(cases) - visible < MIN_HIDDEN["coding"]:
+        raise AssessmentServiceError(f"Keep at least {MIN_VISIBLE['coding']} visible sample tests and "
+                                     f"{MIN_HIDDEN['coding']} hidden tests.")
 
 
 def _generate_with_ai(jd: dict[str, Any], client_prompt: str, spec: dict[str, Any], previous: list[str]) -> dict[str, Any]:
@@ -363,6 +518,7 @@ def _generate_with_ai(jd: dict[str, Any], client_prompt: str, spec: dict[str, An
                 requirement_catalog=catalog, difficulty=spec.get("difficulty") or "Medium",
                 language=language, language_label=LANGUAGES[language]["label"] if language else "",
                 points=int(spec.get("points") or DEFAULT_POINTS), previous_questions=previous[-40:],
+                topic=spec.get("topic") or "", time_limit_minutes=spec.get("time_limit_minutes"),
                 generation_nonce=uuid.uuid4().hex, validation_feedback=feedback,
             )
             item = parse_json_response(llm.invoke(prompt, temperature=0.6))

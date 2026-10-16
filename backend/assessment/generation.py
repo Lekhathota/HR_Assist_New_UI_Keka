@@ -5,9 +5,21 @@ import random
 from difflib import SequenceMatcher
 from collections import Counter
 from assessment.code_execution.preparation import validate_test_fields
-from assessment.models import TOTAL_GENERATED_QUESTIONS, MCQ_COUNT, CODING_COUNT, SQL_COUNT, MCQ_MEDIUM_COUNT, MCQ_HARD_COUNT
+from assessment.models import CODING_COUNT, MCQ_BATCH_SIZE, MCQ_COUNT, MCQ_HARD_COUNT, MCQ_MEDIUM_COUNT, SQL_COUNT
 
 _rng = random.SystemRandom()
+
+# The complete exam: question counts per type and the MCQ difficulty split.
+FULL_MIX = {"mcq": MCQ_COUNT, "coding": CODING_COUNT, "sql": SQL_COUNT,
+            "mcq_medium": MCQ_MEDIUM_COUNT, "mcq_hard": MCQ_HARD_COUNT}
+
+# Each parallel MCQ batch takes a different angle on the JD so batches do not overlap.
+MCQ_BATCH_FOCUS = (
+    "troubleshooting, debugging and root-cause analysis of failures in the JD's systems and responsibilities",
+    "design, architecture, scalability, performance and trade-off decisions within the JD's scope",
+    "implementation practice, testing, security, data quality, deployment and day-to-day operations from the JD",
+)
+DUPLICATE_RATIO = .88
 
 METADATA = ("difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement")
 
@@ -78,7 +90,48 @@ def shuffle_mcq_options(rows, rng=None):
     return rows
 
 
-def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=(), require_tests=True):
+def mix_total(mix):
+    return mix["mcq"] + mix["coding"] + mix["sql"]
+
+
+def _split(total, parts):
+    return [total // parts + (1 if i < total % parts else 0) for i in range(parts)]
+
+
+def generation_sections(mix=FULL_MIX, batch_size=MCQ_BATCH_SIZE):
+    """Split the exam into independently generated sections: coding+SQL, then MCQ batches."""
+    sections = []
+    if mix["coding"] or mix["sql"]:
+        sections.append({"key": "coding_sql", "mcq": 0, "coding": mix["coding"], "sql": mix["sql"],
+                         "mcq_medium": 0, "mcq_hard": 0, "focus": ""})
+    batches = -(-mix["mcq"] // batch_size) if mix["mcq"] else 0
+    for i, (size, medium) in enumerate(zip(_split(mix["mcq"], batches), _split(mix["mcq_medium"], batches))):
+        sections.append({"key": f"mcq_{i + 1}", "mcq": size, "coding": 0, "sql": 0, "mcq_medium": medium,
+                         "mcq_hard": size - medium, "focus": MCQ_BATCH_FOCUS[i % len(MCQ_BATCH_FOCUS)]})
+    for section in sections:
+        section["total"] = mix_total(section)
+        section["optional_max"] = max(1, -(-section["total"] // 7))
+    return sections
+
+
+def is_duplicate(text, other):
+    text, other = _text(text), _text(other)
+    return bool(other) and (text == other or SequenceMatcher(None, text, other).ratio() >= DUPLICATE_RATIO)
+
+
+def find_duplicate(rows):
+    """Index pair (earlier, later) of the first two questions that repeat each other, or None."""
+    for later in range(1, len(rows)):
+        for earlier in range(later):
+            if is_duplicate(rows[later]["question_text"], rows[earlier]["question_text"]):
+                return earlier, later
+    return None
+
+
+def validate_exam(exam, jd, total=None, previous_questions=(), require_tests=True, mix=None):
+    """Validate one generated exam (or one section of it, given its own mix) and return question rows."""
+    mix = mix or FULL_MIX
+    total = mix_total(mix) if total is None else total
     if not isinstance(exam, dict):
         raise ValueError("Exam must be a JSON object.")
     items = exam.get("questions")
@@ -120,10 +173,9 @@ def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=
         evidence = str(item["jd_requirement"]).strip()
         if not skill or _text(skill) not in source or len(evidence) < 4 or _text(evidence) not in source:
             raise ValueError(f"Q{index+1}: skill {skill!r} or JD excerpt {evidence!r} is not verbatim in the JD. Use a numbered requirement and copy its exact skill wording.")
-        canonical = _text(text)
-        if any(canonical == other or SequenceMatcher(None, canonical, other).ratio() >= .88 for other in seen):
+        if any(is_duplicate(text, other) for other in seen):
             raise ValueError(f"Q{index+1} repeats an existing question.")
-        seen.append(canonical)
+        seen.append(_text(text))
         answer = str(item.get("correct_answer") or "").strip()
         options = item.get("options") or []
         if not answer or not isinstance(options, list):
@@ -155,11 +207,13 @@ def validate_exam(exam, jd, total=TOTAL_GENERATED_QUESTIONS, previous_questions=
                      "points": points, "skill_tag": skill, "sort_order": index,
                      "question_id": f"Q{index+1:03d}", **{k: item[k] for k in METADATA}, **executable})
     counts = Counter(q["question_type"] for q in rows)
-    if counts != {"mcq": MCQ_COUNT, "coding": CODING_COUNT, "sql": SQL_COUNT}:
-        raise ValueError("Every exam must contain exactly 10 MCQs, 2 coding questions and 2 SQL questions.")
+    if counts != Counter({key: mix[key] for key in ("mcq", "coding", "sql") if mix[key]}):
+        raise ValueError(f"The exam must contain exactly {mix['mcq']} MCQs, {mix['coding']} coding questions "
+                         f"and {mix['sql']} SQL questions.")
     mcq_levels = Counter(q["difficulty"] for q in rows if q["question_type"] == "mcq")
-    if mcq_levels != {"Medium": MCQ_MEDIUM_COUNT, "Hard": MCQ_HARD_COUNT}:
-        raise ValueError("The 10 MCQs must contain 4 moderate (Medium) and 6 Hard scenarios; no Easy questions.")
+    if mcq_levels != Counter({k: v for k, v in (("Medium", mix["mcq_medium"]), ("Hard", mix["mcq_hard"])) if v}):
+        raise ValueError(f"The {mix['mcq']} MCQs must contain {mix['mcq_medium']} moderate (Medium) and "
+                         f"{mix['mcq_hard']} Hard scenarios; no Easy questions.")
     if any(q["difficulty"] != "Medium" for q in rows if q["question_type"] in {"coding", "sql"}):
         raise ValueError("Both coding and both SQL questions must be moderate (Medium).")
     order = {"mcq": 0, "coding": 1, "sql": 2}
