@@ -22,7 +22,9 @@ from typing import Optional
 from assessment.code_execution.languages import judge0_language_id
 
 BATCH_SIZE = 20
-_OUTPUT_LIMIT = 4000
+_OUTPUT_LIMIT = 4000  # characters kept per stream for display; the sandbox limit is ExecutionLimits.max_output_kb
+# Statuses caused by the sandbox itself, not by the submitted program: never a candidate failure.
+INFRASTRUCTURE_STATUSES = frozenset({"error"})
 
 
 class ExecutionUnavailable(Exception):
@@ -32,11 +34,30 @@ class ExecutionUnavailable(Exception):
 @dataclass
 class ExecutionResult:
     case_id: str
-    status: str  # ok | compile_error | runtime_error | time_limit | memory_limit | error
+    # ok | compile_error | runtime_error | time_limit | memory_limit | output_limit | error (sandbox failure)
+    status: str
     stdout: str = ""
     stderr: str = ""
     time: Optional[float] = None
     memory: Optional[int] = None
+
+
+@dataclass
+class ExecutionLimits:
+    """Per-run sandbox limits. Judge0 enforces them inside isolate; network is always disabled."""
+    cpu_time_limit: float = 2.0      # seconds of CPU per test
+    wall_time_limit: float = 5.0     # seconds of wall-clock per test
+    memory_limit_kb: int = 128_000
+    max_output_kb: int = 64          # stdout/stderr file size limit
+
+    @classmethod
+    def for_question(cls, question: dict, default: "ExecutionLimits | None" = None) -> "ExecutionLimits":
+        base = default or cls()
+        cpu = float(question.get("time_limit_seconds") or base.cpu_time_limit)
+        memory_mb = question.get("memory_limit_mb")
+        return cls(cpu_time_limit=cpu, wall_time_limit=max(base.wall_time_limit, cpu * 2.5),
+                   memory_limit_kb=int(memory_mb) * 1024 if memory_mb else base.memory_limit_kb,
+                   max_output_kb=int(question.get("max_output_kb") or base.max_output_kb))
 
 
 def _b64(text: str) -> str:
@@ -52,16 +73,23 @@ def _unb64(value: Optional[str]) -> str:
         return ""
 
 
-def _status(status_id: int) -> str:
+def _status(status_id: int, memory: Optional[int] = None, memory_limit_kb: int = 0) -> str:
+    """Judge0 status ids: 3 accepted, 4 wrong answer, 5 TLE, 6 compile error, 7-12 runtime errors
+    (8 = SIGXFSZ, output file too large), 13 internal error, 14 exec format error."""
     if status_id in (3, 4):  # accepted / wrong answer: we compare output ourselves
         return "ok"
     if status_id == 5:
         return "time_limit"
     if status_id == 6:
         return "compile_error"
+    if status_id == 8:
+        return "output_limit"
     if 7 <= status_id <= 12:
+        # isolate kills a process at its memory cap; Judge0 reports a signal with memory at the limit.
+        if memory and memory_limit_kb and memory >= memory_limit_kb * 0.95:
+            return "memory_limit"
         return "runtime_error"
-    return "error"
+    return "error"  # 13 internal error, 14 exec format error, unknown: the sandbox failed, not the program
 
 
 class Judge0Runner:
@@ -111,8 +139,12 @@ class Judge0Runner:
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
             raise ExecutionUnavailable(f"Judge0 is unreachable: {exc}") from exc
 
-    def run(self, language: str, source: str, cases: list[dict]) -> list[ExecutionResult]:
+    def default_limits(self) -> ExecutionLimits:
+        return ExecutionLimits(cpu_time_limit=self.cpu_time_limit, memory_limit_kb=self.memory_limit_kb)
+
+    def run(self, language: str, source: str, cases: list[dict], limits: Optional[ExecutionLimits] = None) -> list[ExecutionResult]:
         """Run source once per case (stdin = case['input']). Returns results in case order."""
+        limits = limits or self.default_limits()
         results: list[ExecutionResult] = []
         for start in range(0, len(cases), BATCH_SIZE):
             chunk = cases[start:start + BATCH_SIZE]
@@ -120,17 +152,21 @@ class Judge0Runner:
                 "language_id": judge0_language_id(language),
                 "source_code": _b64(source),
                 "stdin": _b64(str(case.get("input") or "")),
-                "cpu_time_limit": self.cpu_time_limit,
-                "memory_limit": self.memory_limit_kb,
+                "cpu_time_limit": limits.cpu_time_limit,
+                "wall_time_limit": limits.wall_time_limit,
+                "memory_limit": limits.memory_limit_kb,
+                "max_file_size": limits.max_output_kb,
+                "enable_network": False,
             } for case in chunk]}
             created = self._request("POST", "/submissions/batch?base64_encoded=true", payload)
             tokens = [row.get("token") for row in created or [] if isinstance(row, dict)]
             if len(tokens) != len(chunk) or not all(tokens):
                 raise ExecutionUnavailable("Judge0 did not accept the submissions.")
-            results.extend(self._collect(tokens, chunk))
+            results.extend(self._collect(tokens, chunk, limits))
         return results
 
-    def _collect(self, tokens: list[str], cases: list[dict]) -> list[ExecutionResult]:
+    def _collect(self, tokens: list[str], cases: list[dict], limits: Optional[ExecutionLimits] = None) -> list[ExecutionResult]:
+        limits = limits or self.default_limits()
         deadline = time.monotonic() + self.wait_seconds
         fields = "token,status,stdout,stderr,compile_output,time,memory"
         query = f"/submissions/batch?tokens={','.join(tokens)}&base64_encoded=true&fields={fields}"
@@ -147,20 +183,36 @@ class Judge0Runner:
         out = []
         for token, case in zip(tokens, cases):
             row = by_token.get(token) or {}
-            status = _status(int((row.get("status") or {}).get("id") or 0))
+            memory = int(row["memory"]) if row.get("memory") not in (None, "") else None
+            status = _status(int((row.get("status") or {}).get("id") or 0), memory, limits.memory_limit_kb)
             stderr = _unb64(row.get("compile_output")) if status == "compile_error" else _unb64(row.get("stderr"))
+            if status == "error":
+                stderr = stderr or str((row.get("status") or {}).get("description") or "Judge0 internal error")
             out.append(ExecutionResult(
                 case_id=str(case.get("id")), status=status, stdout=_unb64(row.get("stdout")), stderr=stderr,
-                time=float(row["time"]) if row.get("time") not in (None, "") else None,
-                memory=int(row["memory"]) if row.get("memory") not in (None, "") else None,
+                time=float(row["time"]) if row.get("time") not in (None, "") else None, memory=memory,
             ))
         return out
 
 
-def outputs_match(actual: str, expected: str) -> bool:
-    """Compare program output ignoring trailing whitespace and line-ending style."""
+COMPARISON_MODES = {
+    "trim_trailing": "Ignore trailing spaces on each line and trailing blank lines (default)",
+    "exact": "Exact match (only line-ending style is normalised)",
+    "tokens": "Compare whitespace-separated tokens (ignore all spacing and line breaks)",
+}
+
+
+def outputs_match(actual: str, expected: str, mode: str = "trim_trailing") -> bool:
+    """Compare program output with the expected output under the question's comparison rule."""
+    actual = str(actual or "").replace("\r\n", "\n")
+    expected = str(expected or "").replace("\r\n", "\n")
+    if mode == "exact":
+        return actual == expected
+    if mode == "tokens":
+        return actual.split() == expected.split()
+
     def norm(text: str) -> list[str]:
-        lines = [line.rstrip() for line in str(text or "").replace("\r\n", "\n").split("\n")]
+        lines = [line.rstrip() for line in text.split("\n")]
         while lines and not lines[-1]:
             lines.pop()
         return lines

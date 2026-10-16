@@ -9,6 +9,9 @@ import os
 LANGUAGES: dict[str, dict] = {
     "python": {
         "label": "Python 3",
+        "runtime": "Python 3.8 (Judge0 CE)",
+        "entry_point": "Top-level script or main(); read sys.stdin, print to stdout.",
+        "run": "Interpreted: python3 script.py",
         "judge0_id": 71,
         "template": (
             "import sys\n\n\n"
@@ -21,6 +24,9 @@ LANGUAGES: dict[str, dict] = {
     },
     "javascript": {
         "label": "JavaScript (Node.js)",
+        "runtime": "Node.js 12 (Judge0 CE)",
+        "entry_point": "Script; read require('fs').readFileSync(0, 'utf8'), print with console.log.",
+        "run": "Interpreted: node script.js",
         "judge0_id": 63,
         "template": (
             "const data = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/);\n"
@@ -29,6 +35,9 @@ LANGUAGES: dict[str, dict] = {
     },
     "java": {
         "label": "Java",
+        "runtime": "OpenJDK 13 (Judge0 CE)",
+        "entry_point": "public class Main with public static void main(String[] args); read System.in.",
+        "run": "Compiled: javac Main.java, then java Main",
         "judge0_id": 62,
         "template": (
             "import java.io.*;\n"
@@ -43,6 +52,9 @@ LANGUAGES: dict[str, dict] = {
     },
     "c": {
         "label": "C",
+        "runtime": "GCC 9.2 (Judge0 CE)",
+        "entry_point": "int main(void); read stdin with scanf/fgets, print with printf.",
+        "run": "Compiled: gcc -O2 main.c, then ./a.out",
         "judge0_id": 50,
         "template": (
             "#include <stdio.h>\n\n"
@@ -54,6 +66,9 @@ LANGUAGES: dict[str, dict] = {
     },
     "cpp": {
         "label": "C++",
+        "runtime": "G++ 9.2 (Judge0 CE)",
+        "entry_point": "int main(); read std::cin, print with std::cout.",
+        "run": "Compiled: g++ -O2 main.cpp, then ./a.out",
         "judge0_id": 54,
         "template": (
             "#include <bits/stdc++.h>\n"
@@ -94,6 +109,12 @@ def judge0_language_id(language: str) -> int:
         except (ValueError, TypeError):
             pass
     return int(LANGUAGES[language]["judge0_id"])
+
+
+def runtime_info() -> list[dict]:
+    """Compiler/interpreter, entry-point and run conventions shown to recruiters (read-only)."""
+    return [{"key": k, "label": v["label"], "runtime": v["runtime"], "entry_point": v["entry_point"], "run": v["run"],
+             "judge0_id": judge0_language_id(k)} for k, v in LANGUAGES.items()]
 
 
 def language_options(allowed: list[str] | None = None) -> list[dict]:

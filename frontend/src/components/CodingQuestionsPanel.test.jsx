@@ -38,8 +38,13 @@ function generatedDraft(spec) {
 // In-memory stand-in for /api/assessment/1 and /api/assessment/1/coding/* (mirrors coding_question_service).
 function makeServer({ max = 20, status = 'DRAFT' } = {}) {
   const state = { specs: [], clientPrompt: 'Acme default rules', clientDefault: 'Acme default rules', baseCoding: 2, nextId: 1,
-    nextQ: 500, failNext: null, failSave: null, saved: [], status };
-  const editable = () => ['DRAFT', 'SENT'].includes(state.status);
+    nextQ: 500, failNext: null, failSave: null, saved: [], status, ready: true, approved: false, result: null, attempts: [] };
+  const check = () => ({
+    ready: state.ready, problems: state.ready ? [] : ['1 generated coding question(s) are still awaiting review: save or cancel them.'],
+    questions: state.ready ? [] : [{ question_id: 14, number: 2, question_type: 'sql', problems: ['Add at least one hidden test case.'] }],
+    mcq_questions: 1, coding_questions: state.saved.length, approval: { current: state.approved, by: state.approved ? 'rec' : undefined },
+  });
+  const editable = () => state.status === 'DRAFT';
   const view = s => ({ ...s, status: s.draft ? 'review' : s.status });
   const config = () => ({
     editable: editable(), status: state.status, jd: { id: 20, title: 'Backend Engineer' }, client: { id: 5, name: 'Acme' },
@@ -56,9 +61,12 @@ function makeServer({ max = 20, status = 'DRAFT' } = {}) {
   apiGet.mockImplementation(path => {
     if (path === '/api/assessment/1/coding') return Promise.resolve(config());
     if (path === '/api/assessment/1') return Promise.resolve({
-      assessment: { id: 1, status: state.status, title: 'Exam', candidate_id: 9, jd_id: 20 },
+      assessment: { id: 1, status: state.status, title: 'Exam', candidate_id: 9, jd_id: 20, scoring_policy: state.policy || null },
       questions: [...BASE_QUESTIONS, ...state.saved], answers: [],
     });
+    if (path === '/api/assessment/1/publish-check') return Promise.resolve(check());
+    if (path === '/api/assessment/result/1') return Promise.resolve({ result: state.result });
+    if (path === '/api/assessment/1/code-attempts') return Promise.resolve({ attempts: state.attempts });
     return Promise.resolve({});
   });
   apiPost.mockImplementation((path, body) => {
@@ -98,9 +106,23 @@ function makeServer({ max = 20, status = 'DRAFT' } = {}) {
       return ok({ spec: view(target), question, config: config() });
     }
     if (path === '/api/assessment/question') return ok({ question: { ...body, id: 900, sort_order: 99 } });
+    if (path === '/api/assessment/1/approve') {
+      if (!state.ready) return fail(409, 'The assessment is not ready to approve.');
+      state.approved = true;
+      return ok(check());
+    }
+    if (path === '/api/assessment/1/return-to-draft') {
+      state.status = 'DRAFT';
+      return ok({});
+    }
+    if (path === '/api/assessment/1/generate-email') return ok({ to_email: 'c@example.com', subject: 'Test', body: 'Link', candidate_test_link: 'https://x/assessment/t' });
     return ok({});
   });
   apiPut.mockImplementation((path, body) => {
+    if (path === '/api/assessment/1') {
+      state.policy = body.scoring_policy;
+      return ok({ assessment: { id: 1, status: state.status, scoring_policy: body.scoring_policy } });
+    }
     if (path === '/api/assessment/1/coding/client-prompt') {
       state.clientPrompt = body.prompt;
       if (body.save_as_client_default) state.clientDefault = body.prompt;
@@ -522,20 +544,96 @@ describe('Assessment Builder integration', () => {
     expect($('.ab-notice').textContent).toContain('saved as Q5');
   });
 
-  test('an invited (SENT) assessment can still get coding questions; questions lock once started', async () => {
+  test('a sent assessment is locked until it is returned to draft', async () => {
     await mountBuilder({ status: 'SENT' });
+    expect(button('+ Add Coding Question').disabled).toBe(true);
+    expect($('.ab-coding-locked').textContent).toContain('return to draft');
+    expect($('.ab-add-bar')).toBeNull();
+    expect(questionCards()[0].querySelector('[title="Edit"]')).toBeNull();
+    window.confirm.mockReturnValueOnce(true);
+    await click(button('Edit questions (return to draft)'));
+    expect(apiPost).toHaveBeenCalledWith('/api/assessment/1/return-to-draft', {});
     expect(button('+ Add Coding Question').disabled).toBe(false);
     expect($('.ab-add-bar')).toBeTruthy();
-    expect(questionCards()[0].querySelector('[title="Edit"]')).toBeTruthy();
     act(() => root.unmount()); container.remove();
     await mountBuilder({ status: 'IN_PROGRESS' });
     expect(button('+ Add Coding Question').disabled).toBe(true);
-    expect($('.ab-add-bar')).toBeNull();
-    expect(questionCards()[0].querySelector('[title="Edit"]')).toBeNull();
+    expect(button('Edit questions (return to draft)')).toBeUndefined();
+  });
+
+  test('sending requires validation and approval; problems block approval', async () => {
+    await mountBuilder();
+    server.ready = false;
+    await click(button('Send Assessment'));
+    expect(calls(apiPost, '/generate-email')).toHaveLength(0);
+    const publish = $('.ab-publish');
+    expect(publish.textContent).toContain('Add at least one hidden test case.');
+    expect(publish.textContent).toContain('still awaiting review');
+    expect(button('Approve for sending', publish).disabled).toBe(true);
+    server.ready = true;
+    await click(button('Validate', publish));
+    await click(button('Approve for sending', publish));
+    expect(apiPost).toHaveBeenCalledWith('/api/assessment/1/approve', {});
+    expect(publish.textContent).toContain('Approved by rec');
+    await click(button('Send Assessment'));
+    expect(calls(apiPost, '/generate-email')).toHaveLength(1);
+  });
+
+  test('the scoring policy is saved with the draft', async () => {
+    await mountBuilder();
+    await click($('.ab-policy input[type="checkbox"]'));
+    type($('#ab-weight-mcq'), 30);
+    expect($('#ab-weight-coding').value).toBe('70');
+    type($('#ab-min-coding'), 40);
+    await click([...$$('.ab-policy input[type="checkbox"]')][1]);
+    await click(button('Save Draft'));
+    const [, body] = apiPut.mock.calls.find(([path]) => path === '/api/assessment/1');
+    expect(body.scoring_policy).toEqual(expect.objectContaining({
+      section_weights: { mcq: 30, coding: 70 }, min_coding_score: 40, coding_section_mandatory: true,
+    }));
+  });
+
+  test('results show separate MCQ and coding scores, qualification and attempt history', async () => {
+    server = null;
+    await mountBuilder({ status: 'PASSED' });
+    act(() => root.unmount()); container.remove();
+    const state = makeServer({ status: 'PASSED' });
+    state.result = {
+      status: 'PASSED', percentage: 56, score: 28, total_points: 40, pass_basis: 'weighted', assessment_version: 2,
+      applied_section_weights: { mcq: 40, coding: 60 },
+      evaluation_breakdown: { sections: { mcq: { count: 30, percentage: 80, earned: 24, possible: 30 }, coding: { count: 1, percentage: 40, earned: 4, possible: 10 } } },
+      qualification_checks: [{ rule: 'overall', label: 'Overall score at least 50%', met: true, actual: 56 },
+        { rule: 'min_coding_score', label: 'Coding score at least 40%', met: true, actual: 40 }],
+      question_results: [{ question_id: 14, question_type: 'sql', points_earned: 4, points_possible: 10, evaluation_method: 'executed', answer: 'print(1)',
+        metadata: { language: 'python', tests_passed: 2, tests_total: 5, hidden_passed: 0, hidden_total: 3, result_status: 'partially_passed',
+          qualification: 'qualified', compile_status: 'compiled', qualification_checks: [{ rule: 'min_tests_passed', label: 'At least 2 test case(s) passed', met: true }], tests: [] } }],
+    };
+    state.attempts = [{ question_id: 14, kind: 'run', language: 'python', passed: 2, total: 2, code: 'print(1)' },
+      { question_id: 14, kind: 'submit', language: 'python', passed: 2, total: 5, marks: 4, max_marks: 10, code: 'print(1)' }];
+    container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
+    await act(async () => root.render(
+      <MemoryRouter initialEntries={['/hiring-pipeline/assessment/1']}>
+        <Routes><Route path="/hiring-pipeline/assessment/:assessmentId" element={<AssessmentBuilder />} /></Routes>
+      </MemoryRouter>,
+    ));
+    const tiles = $$('.ab-score-tile').map(t => t.textContent);
+    expect(tiles[0]).toContain('MCQ80%');
+    expect(tiles[1]).toContain('40%');
+    expect(tiles[1]).toContain('weight 60%');
+    expect(tiles[2]).toContain('56%');
+    expect($('.ab-result-banner').textContent).toContain('assessment version 2');
+    const result = $('.ab-coding-result');
+    expect(result.textContent).toContain('4/10 marks');
+    expect(result.textContent).toContain('Partially passed');
+    expect(result.textContent).toContain('Qualified');
+    expect(result.textContent).toContain('At least 2 test case(s) passed');
+    expect(result.textContent).toContain('Attempt history (2)');
+    expect(result.textContent).toContain('Final submission');
   });
 
   test('sending warns about entries that were not saved to the assessment', async () => {
     await mountBuilder();
+    server.approved = true;
     await addGenerateAndSave('Saved one');
     await addAndGenerate('Generated but not saved');
     window.confirm.mockReturnValueOnce(false);

@@ -362,7 +362,7 @@ class RecruiterMcqValidationTests(unittest.TestCase):
                 service.validate_mcq({**self.GOOD, **patch_data})
 
     def test_add_and_update_enforce_mcq_rules_and_append_after_existing_questions(self):
-        sent = {"id": 1, "status": "SENT"}
+        sent = {"id": 1, "status": "DRAFT"}
         existing = [{"id": 5, "sort_order": 0}, {"id": 6, "sort_order": 33}]
         with patch.object(service.assessment_repo, "get_assessment_by_id", return_value=sent), \
              patch.object(service.assessment_repo, "count_questions_for_assessment", return_value=2), \
@@ -381,8 +381,8 @@ class RecruiterMcqValidationTests(unittest.TestCase):
                 service.update_question(7, {"options": ["W", "X", "Y", "Z"]})  # the old answer is no longer an option
             update.assert_not_called()
 
-    def test_questions_lock_once_the_candidate_starts(self):
-        for status in ("IN_PROGRESS", "COMPLETED", "PASSED"):
+    def test_questions_lock_once_published(self):
+        for status in ("SENT", "IN_PROGRESS", "COMPLETED", "PASSED"):
             with self.subTest(status=status), \
                  patch.object(service.assessment_repo, "get_assessment_by_id", return_value={"id": 1, "status": status}):
                 with self.assertRaisesRegex(service.AssessmentServiceError, "only be added"):

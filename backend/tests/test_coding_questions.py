@@ -285,12 +285,14 @@ class ValidationTests(CodingTestBase):
         self.assertTrue(saved["last_error"])
         self.assertEqual(self.store.custom(), [])
 
-    def test_sent_but_not_started_assessments_can_still_change(self):
-        self.store.assessments[1]["status"] = AssessmentStatus.SENT.value
+    def test_a_sent_assessment_is_a_published_version_and_cannot_change(self):
         spec = self.add()
-        self.generate_and_save(spec["id"])
-        self.assertEqual(len(self.store.custom()), 1)
-        self.assertTrue(svc.get_coding_config(1)["editable"])
+        self.store.assessments[1]["status"] = AssessmentStatus.SENT.value
+        for call in (lambda: self.add(), lambda: svc.generate_spec_question(1, spec["id"])):
+            with self.assertRaises(AssessmentServiceError) as ctx:
+                call()
+            self.assertEqual(ctx.exception.status_code, 409)
+        self.assertFalse(svc.get_coding_config(1)["editable"])
 
     def test_questions_lock_once_the_candidate_starts(self):
         spec = self.add()
@@ -336,7 +338,7 @@ class FakeRunner:
         self.stdout = stdout
         self.calls = []
 
-    def run(self, language, code, cases):
+    def run(self, language, code, cases, limits=None):
         from types import SimpleNamespace
         self.calls.append(code)
         return [SimpleNamespace(status="ok", stdout=case["expected_output"] if self.stdout is None else self.stdout) for case in cases]

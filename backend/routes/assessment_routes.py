@@ -35,6 +35,11 @@ from services.assessment_service import (
     lookup_assessment,
     preview_assessment,
     regrade_assessment,
+    approve_assessment,
+    get_assessment_versions,
+    get_code_attempts,
+    publication_check,
+    return_to_draft,
     remove_question,
     get_reference_config,
     save_reference_config,
@@ -498,6 +503,49 @@ def api_assessment_reference_verify(question_id: int):
         return _json_error(str(exc), exc.status_code)
     except Exception:
         return _json_error("Could not verify the reference solution.", 500)
+
+
+def _recruiter_call(action, failure: str):
+    """Shared error mapping for recruiter assessment-lifecycle endpoints."""
+    user = current_user() or {}
+    try:
+        return jsonify(action(user.get("username") or ""))
+    except AssessmentServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception:
+        return _json_error(failure, 500)
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/publish-check", methods=["GET"], endpoint="api_assessment_publish_check")
+@api_login_required
+def api_assessment_publish_check(assessment_id: int):
+    """Recruiter: what must be fixed before the assessment can be approved and sent."""
+    return _recruiter_call(lambda actor: publication_check(assessment_id), "Could not check the assessment.")
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/approve", methods=["POST"], endpoint="api_assessment_approve")
+@api_login_required
+def api_assessment_approve(assessment_id: int):
+    return _recruiter_call(lambda actor: approve_assessment(assessment_id, actor=actor), "Could not approve the assessment.")
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/return-to-draft", methods=["POST"], endpoint="api_assessment_return_to_draft")
+@api_login_required
+def api_assessment_return_to_draft(assessment_id: int):
+    return _recruiter_call(lambda actor: return_to_draft(assessment_id, actor=actor), "Could not return the assessment to draft.")
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/versions", methods=["GET"], endpoint="api_assessment_versions")
+@api_login_required
+def api_assessment_versions(assessment_id: int):
+    return _recruiter_call(lambda actor: get_assessment_versions(assessment_id), "Could not load published versions.")
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/code-attempts", methods=["GET"], endpoint="api_assessment_code_attempts")
+@api_login_required
+def api_assessment_code_attempts(assessment_id: int):
+    """Recruiter: the candidate's code runs and submissions (code is visible to signed-in recruiters only)."""
+    return _recruiter_call(lambda actor: get_code_attempts(assessment_id), "Could not load the attempt history.")
 
 
 @assessment_bp.route("/api/assessment/<int:assessment_id>/regrade", methods=["POST"], endpoint="api_assessment_regrade")

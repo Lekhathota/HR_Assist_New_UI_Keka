@@ -96,11 +96,19 @@ function SampleTests({ question }) {
       </div>
     );
   }
-  if (!samples.length && !question.input_format && !question.output_format) return null;
+  if (!samples.length && !question.input_format && !question.output_format && !question.constraints) return null;
   return (
     <div className="ca-samples">
       {question.input_format && <p><strong>Input:</strong> {question.input_format}</p>}
       {question.output_format && <p><strong>Output:</strong> {question.output_format}</p>}
+      {question.constraints && <p><strong>Constraints:</strong> {question.constraints}</p>}
+      {question.edge_cases && <p><strong>Edge cases to handle:</strong> {question.edge_cases}</p>}
+      {(question.time_limit_seconds || question.memory_limit_mb) && (
+        <p className="ca-muted">
+          Limits per test: {question.time_limit_seconds || 2}s CPU time, {question.memory_limit_mb || 128} MB memory.
+          {' '}Hidden tests are also used for scoring, so passing the examples alone does not guarantee full marks.
+        </p>
+      )}
       {samples.map((sample, index) => (
         <div className="ca-sample ca-sample-io" key={sample.id}>
           <h3>Example {index + 1}</h3>
@@ -113,6 +121,11 @@ function SampleTests({ question }) {
   );
 }
 
+const RUN_STATUS = {
+  failed: 'Wrong answer', compile_error: 'Compilation error', runtime_error: 'Runtime error',
+  time_limit: 'Time limit exceeded', memory_limit: 'Memory limit exceeded', output_limit: 'Output limit exceeded',
+};
+
 function RunResults({ result, sql }) {
   if (result.error) return <div className="ca-run-results ca-run-error" role="alert">{result.error}</div>;
   const allPassed = result.total > 0 && result.passed === result.total;
@@ -123,10 +136,9 @@ function RunResults({ result, sql }) {
         {' '}Passed {result.passed} of {result.total} example test{result.total === 1 ? '' : 's'}
         {result.hidden_test_count > 0 && ` · ${result.hidden_test_count} hidden tests run on submit`}
       </p>
-      {result.method === 'ai_estimated' && <p className="ca-muted">Code execution is not available right now, so this result is an AI estimate.</p>}
       {(result.tests || []).map((test, index) => (
         <details key={test.id} className={`ca-test ${test.passed ? 'ok' : 'bad'}`} open={!test.passed}>
-          <summary>Example {index + 1}: {test.passed ? 'Passed' : test.status === 'failed' ? 'Wrong answer' : test.status.replace(/_/g, ' ')}</summary>
+          <summary>Example {index + 1}: {test.passed ? 'Passed' : RUN_STATUS[test.status] || test.status.replace(/_/g, ' ')}</summary>
           {test.error && <pre className="ca-test-error">{test.error}</pre>}
           {!sql && test.actual != null && (<><span className="ca-sample-label">Your output</span><pre>{test.actual || '(no output)'}</pre></>)}
           {!sql && !test.passed && test.expected != null && (<><span className="ca-sample-label">Expected output</span><pre>{test.expected}</pre></>)}

@@ -34,8 +34,9 @@ class AssessmentStatus(str, Enum):
 
     @classmethod
     def editable_states(cls) -> frozenset[str]:
-        """Questions may change until the candidate opens the test (SENT means invited, not started)."""
-        return frozenset({cls.DRAFT, cls.SENT})
+        """Questions change only in DRAFT; a sent assessment is a published version.
+        A SENT assessment the candidate has not started can be returned to DRAFT to edit."""
+        return frozenset({cls.DRAFT})
 
     @classmethod
     def candidate_accessible_states(cls) -> frozenset[str]:

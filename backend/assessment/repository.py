@@ -74,6 +74,8 @@ def ensure_assessment_indexes() -> None:
 
     mongo.assessment_results.create_index([("id", ASCENDING)], unique=True)
     mongo.assessment_results.create_index([("assessment_id", ASCENDING)], unique=True)
+    mongo.assessment_versions.create_index([("assessment_id", ASCENDING), ("version", ASCENDING)], unique=True)
+    mongo.assessment_code_attempts.create_index([("assessment_id", ASCENDING), ("question_id", ASCENDING), ("created_at", ASCENDING)])
     # One in-flight "generate & send" per candidate and JD (see claim_send_request).
     mongo.assessment_send_requests.create_index([("candidate_id", ASCENDING), ("jd_id", ASCENDING)], unique=True)
 
@@ -289,6 +291,16 @@ def get_send_requests_for_candidate(candidate_id: int) -> list[dict]:
     return _serialize_docs(list(_database().assessment_send_requests.find({"candidate_id": int(candidate_id)})))
 
 
+def return_assessment_to_draft(assessment_id: int) -> bool:
+    """SENT -> DRAFT only while the candidate has not started (atomic against begin_candidate_attempt)."""
+    row = _database().assessments.find_one_and_update(
+        {"id": int(assessment_id), "status": AssessmentStatus.SENT, "started_at": {"$in": [None]}},
+        {"$set": {"status": AssessmentStatus.DRAFT, "approval": None, "updated_at": _now()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return bool(row)
+
+
 def begin_candidate_attempt(assessment_id: int) -> Optional[dict]:
     """Only the first start sets the clock; concurrent starts cannot reset it."""
     row = _database().assessments.find_one_and_update(
@@ -350,6 +362,8 @@ def delete_assessment_cascade(assessment_id: int) -> None:
     mongo.questions.delete_many({"assessment_id": aid})
     mongo.candidate_answers.delete_many({"assessment_id": aid})
     mongo.assessment_results.delete_many({"assessment_id": aid})
+    mongo.assessment_versions.delete_many({"assessment_id": aid})
+    mongo.assessment_code_attempts.delete_many({"assessment_id": aid})
     mongo.assessments.delete_one({"id": aid})
     from assessment.proctoring_media import delete_assessment_media
     delete_assessment_media(aid)
@@ -362,6 +376,8 @@ EXECUTABLE_QUESTION_FIELDS = (
     "test_cases", "sql_schema", "order_matters", "input_format", "output_format",
     "allowed_languages", "default_language", "tests_verified",
     "reference_language", "verification", "config_fingerprint",
+    # Coding configuration (assessment/code_execution/coding_config.py)
+    "title", "edge_cases", "time_limit_seconds", "memory_limit_mb", "comparison", "scoring", "reference_solutions",
 )
 
 
@@ -514,6 +530,32 @@ def consume_code_run(assessment_id: int, question_id: int, limit: int) -> bool:
     return bool(row)
 
 
+def record_code_attempt(data: dict[str, Any]) -> None:
+    """Append a candidate code run or final submission to the attempt history (recruiter view only)."""
+    _database().assessment_code_attempts.insert_one({**data, "assessment_id": int(data["assessment_id"]),
+                                                     "question_id": int(data["question_id"]), "created_at": _now()})
+
+
+def get_code_attempts(assessment_id: int) -> list[dict]:
+    rows = _database().assessment_code_attempts.find({"assessment_id": int(assessment_id)}).sort([("created_at", ASCENDING)])
+    return _serialize_docs(list(rows))
+
+
+# Published versions: an immutable snapshot of the questions and scoring rules each time an assessment is sent.
+
+
+def create_assessment_version(data: dict[str, Any]) -> int:
+    version = int(data["version"])
+    _database().assessment_versions.insert_one({**data, "assessment_id": int(data["assessment_id"]), "version": version,
+                                                "created_at": _now()})
+    return version
+
+
+def get_assessment_versions(assessment_id: int) -> list[dict]:
+    rows = _database().assessment_versions.find({"assessment_id": int(assessment_id)}).sort([("version", ASCENDING)])
+    return _serialize_docs(list(rows))
+
+
 def get_answers_for_assessment(assessment_id: int) -> list[dict]:
     rows = list(_database().candidate_answers.find({"assessment_id": int(assessment_id)}))
     return _serialize_docs(rows)
@@ -534,9 +576,10 @@ def _result_document(data: dict[str, Any]) -> dict[str, Any]:
         "assessment_id": int(data["assessment_id"]),
         "candidate_id": int(data["candidate_id"]),
         "jd_id": int(data["jd_id"]),
-        "total_points": int(data.get("total_points") or 0),
-        "earned_points": int(data.get("earned_points") or 0),
-        "score": int(data.get("score") if data.get("score") is not None else data.get("earned_points") or 0),
+        # Coding marks can be fractional (weighted test cases), so points are stored as floats.
+        "total_points": float(data.get("total_points") or 0),
+        "earned_points": float(data.get("earned_points") or 0),
+        "score": float(data.get("score") if data.get("score") is not None else data.get("earned_points") or 0),
         "score_percentage": float(data.get("score_percentage") or data.get("percentage") or 0.0),
         "percentage": float(data.get("percentage") if data.get("percentage") is not None else data.get("score_percentage") or 0.0),
         "mcq_percentage": float(data.get("mcq_percentage") or 0.0),
@@ -548,6 +591,13 @@ def _result_document(data: dict[str, Any]) -> dict[str, Any]:
         "pass_basis": data.get("pass_basis") or "overall",
         "summary": data.get("summary") or "",
         "scored_at": data.get("scored_at") or _now(),
+        "coding_percentage": data.get("coding_percentage"),
+        "execution_error_count": int(data.get("execution_error_count") or 0),
+        "needs_retry": bool(data.get("needs_retry")),
+        "qualification_checks": list(data.get("qualification_checks") or []),
+        "scoring_policy": data.get("scoring_policy") or {},
+        "applied_section_weights": data.get("applied_section_weights"),
+        "assessment_version": data.get("assessment_version"),
     }
 
 

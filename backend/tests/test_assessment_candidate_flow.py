@@ -21,12 +21,17 @@ class CandidateFlowTests(unittest.TestCase):
             update = stack.enter_context(patch.object(service.assessment_repo, 'update_assessment', return_value=True))
             stack.enter_context(patch.object(service.assessment_repo, 'get_assessment_by_id', return_value={'status': 'SENT'}))
             stack.enter_context(patch.object(service.db, 'log_audit'))
+            stack.enter_context(patch.object(service.assessment_repo, 'get_questions_for_assessment', return_value=[]))
+            stack.enter_context(patch.object(service, 'publication_check', return_value={
+                'ready': True, 'problems': [], 'questions': [], 'approval': {'current': True}}))
+            version = stack.enter_context(patch.object(service.assessment_repo, 'create_assessment_version', return_value=1))
             def deliver(*args, **kwargs):
                 self.assertEqual(update.call_args.args[1]['access_token'], token)
                 self.assertEqual(update.call_args.args[1]['status'], 'SENT')
             send = stack.enter_context(patch.object(service, 'send_email', side_effect=deliver))
             result = service.send_assessment(1, recruiter={'username': 'hr'})
         send.assert_called_once()
+        version.assert_called_once()
         self.assertEqual(result['assessment_link'], link)
 
     def test_public_candidate_loads_generated_questions_without_answer_key(self):

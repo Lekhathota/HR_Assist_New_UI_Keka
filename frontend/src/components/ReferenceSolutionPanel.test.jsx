@@ -104,3 +104,79 @@ test('read-only after the assessment is sent, but verification can still run', a
   expect(button('Save & verify')).toBeUndefined();
   expect(button('Verify solution').disabled).toBe(false);
 });
+
+const runtimes = [
+  { key: 'python', label: 'Python 3', runtime: 'Python 3.8 (Judge0 CE)', entry_point: 'stdin/stdout', run: 'python3 script.py' },
+  { key: 'java', label: 'Java', runtime: 'OpenJDK 13 (Judge0 CE)', entry_point: 'public class Main', run: 'javac Main.java' },
+];
+const codingConfig = (overrides = {}) => config({
+  runtimes,
+  comparison_modes: [{ key: 'trim_trailing', label: 'Ignore trailing spaces' }, { key: 'tokens', label: 'Compare tokens' }],
+  jd: { id: 20, title: 'Backend Engineer' }, client: { id: 5, name: 'Acme' },
+  problems: [],
+  config: {
+    title: 'Double it', question_text: 'Read n and print twice n for every input line.', skill_tag: 'Arithmetic', difficulty: 'Medium',
+    points: 10, allowed_languages: ['python', 'java'], input_format: 'n', output_format: '2n', constraints: '|n| <= 10^9',
+    edge_cases: 'negative n', time_limit_seconds: 2, memory_limit_mb: 128, comparison: 'trim_trailing',
+    scoring: { partial_credit: true, min_tests_passed: 1, min_score_percent: 50, require_mandatory: true },
+    reference_solutions: {}, generation_prompt: 'Simple arithmetic warm-up',
+  },
+  ...overrides,
+});
+
+test('shows the full coding configuration with JD/client, limits, runtimes and a marks table', async () => {
+  await render(codingConfig());
+  expect($('summary').textContent).toContain('Coding Configuration');
+  expect($('summary').textContent).toContain('Ready to publish');
+  expect(container.textContent).toContain('For Backend Engineer · client Acme');
+  expect(container.textContent).toContain('Recruiter prompt: Simple arithmetic warm-up');
+  expect(container.textContent).toContain('OpenJDK 13 (Judge0 CE)');
+  const rows = [...container.querySelectorAll('.rs-marks tbody tr')].map(r => r.textContent);
+  expect(rows).toEqual(['0 of 2' + '0/10' + 'No', '1 of 2' + '5/10' + 'Yes', '2 of 2' + '10/10' + 'Yes']);
+});
+
+test('configuration, weights, mandatory tests and an extra reference language are saved together', async () => {
+  apiPut.mockResolvedValue({ ok: true, data: codingConfig() });
+  const onChange = await render(codingConfig());
+  const inputByLabel = text => [...container.querySelectorAll('.rs-field')].find(f => f.textContent.startsWith(text)).querySelector('input, textarea, select');
+  await setValue(inputByLabel('Maximum marks'), '20');
+  await setValue(inputByLabel('Time limit per test'), '1.5');
+  await setValue(inputByLabel('Memory limit'), '64');
+  await setValue(inputByLabel('Minimum tests passed'), '2');
+  await setValue(inputByLabel('Constraints'), '1 <= n <= 100');
+  await act(async () => [...container.querySelectorAll('.rs-languages input')][1].click()); // drop Java
+  await setValue(container.querySelectorAll('[aria-label="Test case weight"]')[1], '3');
+  await act(async () => container.querySelectorAll('[aria-label="Mandatory test"]')[1].click());
+  await setValue($('[aria-label="Add a reference solution in"]'), 'java');
+  await act(async () => button('Add').click());
+  await setValue($('#rs-ref-11-java'), 'public class Main {}');
+  await act(async () => button('Save & verify').click());
+  const [, body] = apiPut.mock.calls[0];
+  expect(body.config).toEqual(expect.objectContaining({
+    points: 20, time_limit_seconds: 1.5, memory_limit_mb: 64, constraints: '1 <= n <= 100', allowed_languages: ['python'],
+    scoring: expect.objectContaining({ min_tests_passed: 2 }), reference_solutions: { java: 'public class Main {}' },
+  }));
+  expect(body.test_cases[1]).toEqual(expect.objectContaining({ weight: 3, mandatory: true }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Double it', points: 10 }));
+});
+
+test('unequal weights replace the marks table with the weighted formula', async () => {
+  await render(codingConfig({ test_cases: config().test_cases.map((c, i) => ({ ...c, weight: i + 1 })) }));
+  expect($('.rs-marks')).toBeNull();
+  expect(container.textContent).toContain('weight of passed tests ÷ total weight');
+});
+
+test('an invalid question lists what blocks publication and shows failing tests per language', async () => {
+  await render(codingConfig({
+    problems: ['Add at least one hidden test case.', 'The reference solution fails one or more test cases.'],
+    verification: { status: 'failed', message: 'The reference solution fails 1 test run(s).', results: [
+      { id: 't2', language: 'python', passed: true, status: 'passed', actual: '10\n' },
+      { id: 't2', language: 'java', passed: false, status: 'compile_error', error: 'Main.java:1: error' },
+    ] },
+  }));
+  expect($('summary').textContent).toContain('Invalid · 2 issues');
+  expect(container.textContent).toContain('Add at least one hidden test case.');
+  const results = container.querySelectorAll('.rs-case')[1].querySelectorAll('.rs-case-result');
+  expect([...results].map(r => r.textContent)).toEqual([expect.stringContaining('python'), expect.stringContaining('compile error')]);
+  expect(results[1].textContent).toContain('Main.java:1: error');
+});

@@ -166,9 +166,13 @@ function CodingQuestionsPanel({ assessmentId, onQuestionsChanged, onConfigChange
         <div className="ab-coding-head">
           <div>
             <h2 id="ab-coding-title"><i className="fas fa-code" aria-hidden="true" /> Coding Questions ({config.coding_question_count})</h2>
-            <p className="ab-muted">Questions are locked because the candidate has started this assessment.</p>
+            <p className="ab-muted">
+              {config.status === 'SENT'
+                ? 'Questions are locked because this assessment has been sent. Use “Edit questions (return to draft)” at the top to change them; it is re-published as a new version.'
+                : 'Questions are locked because the candidate has started this assessment.'}
+            </p>
           </div>
-          <button type="button" className="btn btn-primary" disabled title="Questions are locked once the candidate starts">
+          <button type="button" className="btn btn-primary" disabled title="Questions can only be added to a draft assessment">
             + Add Coding Question
           </button>
         </div>

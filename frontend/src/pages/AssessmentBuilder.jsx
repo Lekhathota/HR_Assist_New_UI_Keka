@@ -27,8 +27,11 @@ const EMPTY_QUESTION = {
   skill_tag: '',
 };
 
-// Questions can change until the candidate opens the test (SENT = invited, not started).
-const QUESTION_EDIT_STATES = ['DRAFT', 'SENT'];
+// Questions change only in DRAFT; a sent assessment is a published version (return it to draft to edit).
+const QUESTION_EDIT_STATES = ['DRAFT'];
+const DEFAULT_POLICY = {
+  section_weights: null, min_mcq_score: 0, min_coding_score: 0, coding_section_mandatory: false, require_coding_qualification: false,
+};
 
 // Same rules as the server's validate_mcq: four distinct options, exactly one correct, an explanation.
 export function mcqProblem(form) {
@@ -48,9 +51,38 @@ const METHOD_LABELS = {
   ai_estimated: 'AI-estimated (not executed)',
   pending_ai: 'Not graded',
 };
+const RESULT_LABELS = {
+  passed: 'Passed', partially_passed: 'Partially passed', not_passed: 'Not passed',
+  execution_error: 'Execution error', not_answered: 'Not answered',
+};
+const QUALIFICATION_LABELS = { qualified: 'Qualified', not_qualified: 'Not qualified', pending: 'Pending re-grade' };
+
+// Section scores and the pass/qualification rules that were applied.
+function ScoreSummary({ result }) {
+  const sections = result?.evaluation_breakdown?.sections || {};
+  const checks = result?.qualification_checks || [];
+  const weights = result?.applied_section_weights;
+  return (
+    <div className="ab-score-summary">
+      <div className="ab-score-tiles">
+        {sections.mcq?.count > 0 && <div className="ab-score-tile"><span>MCQ</span><strong>{sections.mcq.percentage}%</strong><small>{sections.mcq.earned}/{sections.mcq.possible} pts{weights?.mcq != null ? ` · weight ${Math.round(weights.mcq)}%` : ''}</small></div>}
+        {sections.coding?.count > 0 && <div className="ab-score-tile"><span>Coding &amp; SQL</span><strong>{sections.coding.percentage}%</strong><small>{sections.coding.earned}/{sections.coding.possible} pts{weights?.coding != null ? ` · weight ${Math.round(weights.coding)}%` : ''}</small></div>}
+        <div className="ab-score-tile"><span>Overall</span><strong>{result.percentage ?? result.score_percentage}%</strong><small>{result.pass_basis === 'weighted' ? 'weighted by section' : 'by points'}</small></div>
+      </div>
+      {result.needs_retry && (
+        <p className="ab-error" role="status">Some coding answers could not be executed because of an infrastructure problem. No pass/fail decision was made: use Re-grade once code execution is available.</p>
+      )}
+      {checks.length > 0 && (
+        <ul className="ab-criteria" aria-label="Qualification criteria">
+          {checks.map(c => <li key={c.rule} className={c.met ? 'ok' : 'bad'}><i className={`fas fa-${c.met ? 'check' : 'times'}`} aria-hidden="true" /> {c.label} <span className="ab-muted">(actual {typeof c.actual === 'number' ? c.actual : String(c.actual)})</span></li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 // Per-question coding / SQL grading from the stored assessment result.
-function CodingResultBreakdown({ result, questions }) {
+function CodingResultBreakdown({ result, questions, attempts }) {
   const rows = (result?.question_results || []).filter(r => r.question_type === 'coding' || r.question_type === 'sql');
   if (!rows.length) return null;
   const position = new Map(questions.map((q, i) => [q.id, i + 1]));
@@ -59,16 +91,29 @@ function CodingResultBreakdown({ result, questions }) {
       <h3>Coding &amp; SQL grading</h3>
       {rows.map(r => {
         const meta = r.metadata || {};
+        const history = (attempts || []).filter(a => a.question_id === r.question_id);
         return (
           <details key={r.question_id} className="ab-coding-result">
             <summary>
               <span>Q{position.get(r.question_id) || '?'} · {r.question_type === 'sql' ? 'SQL' : 'Coding'}{meta.language && r.question_type === 'coding' ? ` (${meta.language})` : ''}</span>
-              <span>{r.points_earned}/{r.points_possible} pts</span>
+              <span>{r.points_earned}/{r.points_possible} marks</span>
               {meta.tests_total > 0 && <span>{meta.tests_passed}/{meta.tests_total} tests · hidden {meta.hidden_passed}/{meta.hidden_total}</span>}
+              {meta.result_status && <span className={`ab-result-chip ab-result-chip-${meta.result_status}`}>{RESULT_LABELS[meta.result_status] || meta.result_status}</span>}
+              {meta.qualification && <span className={`ab-result-chip ab-qual-${meta.qualification}`}>{QUALIFICATION_LABELS[meta.qualification] || meta.qualification}</span>}
               <span className={`ab-method ab-method-${r.evaluation_method}`}>{METHOD_LABELS[r.evaluation_method] || r.evaluation_method}</span>
             </summary>
             {r.feedback && <p>{r.feedback}</p>}
             {r.review_notes && <p className="ab-muted">{r.review_notes}</p>}
+            <p className="ab-muted">
+              {meta.compile_status === 'compile_error' ? 'Compilation failed' : meta.compile_status === 'compiled' ? 'Compiled and ran' : ''}
+              {meta.max_time != null && ` · slowest test ${meta.max_time}s`}
+              {meta.max_memory_kb != null && ` · peak memory ${Math.round(meta.max_memory_kb / 1024)} MB`}
+            </p>
+            {(meta.qualification_checks || []).length > 0 && (
+              <ul className="ab-criteria">
+                {meta.qualification_checks.map(c => <li key={c.rule} className={c.met ? 'ok' : 'bad'}><i className={`fas fa-${c.met ? 'check' : 'times'}`} aria-hidden="true" /> {c.label}</li>)}
+              </ul>
+            )}
             {r.answer ? <pre className="ab-code-preview">{r.answer}</pre> : <p className="ab-muted">No answer submitted.</p>}
             {(meta.tests || []).length > 0 && (
               <ul className="ab-test-outcomes">
@@ -80,10 +125,61 @@ function CodingResultBreakdown({ result, questions }) {
                 ))}
               </ul>
             )}
+            {history.length > 0 && (
+              <details className="ab-attempts">
+                <summary>Attempt history ({history.length})</summary>
+                <ol>
+                  {history.map((a, i) => (
+                    <li key={i}>
+                      <span>{a.kind === 'submit' ? 'Final submission' : 'Sample run'}</span>
+                      <span>{a.language}</span>
+                      <span>{a.passed ?? 0}/{a.total ?? 0} tests</span>
+                      {a.marks != null && <span>{a.marks}/{a.max_marks} marks</span>}
+                      <span className="ab-muted">{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</span>
+                      {a.code && <details><summary>Code</summary><pre className="ab-code-preview">{a.code}</pre></details>}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
           </details>
         );
       })}
     </div>
+  );
+}
+
+// Validate → Approve → Send: what still blocks publishing, and the approval state.
+function PublishChecklist({ check, busy, onValidate, onApprove }) {
+  return (
+    <section className="white-card ab-publish" aria-labelledby="ab-publish-title">
+      <div className="ab-publish-head">
+        <h2 id="ab-publish-title"><i className="fas fa-clipboard-check" aria-hidden="true" /> Review &amp; approve</h2>
+        <div className="ab-publish-actions">
+          <button type="button" className="btn btn-secondary" onClick={onValidate} disabled={busy}>Validate</button>
+          <button type="button" className="btn btn-primary" onClick={onApprove} disabled={busy || !check?.ready || check?.approval?.current}>
+            {check?.approval?.current ? 'Approved' : 'Approve for sending'}
+          </button>
+        </div>
+      </div>
+      {!check && <p className="ab-muted">Validate the assessment before approving it. Sending requires a current approval.</p>}
+      {check && check.ready && (
+        <p className={check.approval?.current ? 'ab-success-text' : 'ab-muted'}>
+          {check.approval?.current
+            ? `Approved${check.approval.by ? ` by ${check.approval.by}` : ''}. Any change to questions, tests or scoring needs a new approval.`
+            : `All ${check.mcq_questions} MCQs and ${check.coding_questions} coding questions are valid. Approve to enable sending.`}
+        </p>
+      )}
+      {check && !check.ready && (
+        <div className="ab-error" role="alert">
+          <strong>Fix these before the assessment can be approved:</strong>
+          <ul>
+            {check.problems.map(p => <li key={p}>{p}</li>)}
+            {check.questions.map(q => <li key={q.question_id}><a href={`#ab-q-${q.question_id}`}>Q{q.number}</a> ({q.question_type}): {q.problems.join(' ')}</li>)}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -131,7 +227,7 @@ function AssessmentBuilder() {
   const [notice, setNotice] = useState('');
   const [assessment, setAssessment] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [draft, setDraft] = useState({ title: '', passing_score: 70, time_limit_minutes: 90 });
+  const [draft, setDraft] = useState({ title: '', passing_score: 70, time_limit_minutes: 90, scoring_policy: { ...DEFAULT_POLICY } });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [addType, setAddType] = useState(null);
@@ -149,6 +245,8 @@ function AssessmentBuilder() {
   const [pdfProgress, setPdfProgress] = useState('');
   const [codingConfig, setCodingConfig] = useState(null);
   const [formError, setFormError] = useState('');
+  const [publishCheck, setPublishCheck] = useState(null);
+  const [attempts, setAttempts] = useState([]);
 
   const isDraft = assessment?.status === 'DRAFT';
   const canEditQuestions = QUESTION_EDIT_STATES.includes(assessment?.status);
@@ -172,7 +270,12 @@ function AssessmentBuilder() {
         title: data.assessment?.title || '',
         passing_score: data.assessment?.passing_score ?? 70,
         time_limit_minutes: data.assessment?.time_limit_minutes ?? 90,
+        scoring_policy: { ...DEFAULT_POLICY, ...(data.assessment?.scoring_policy || {}) },
       });
+      setPublishCheck(null);
+      if (['IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(data.assessment?.status)) {
+        apiGet(`/api/assessment/${assessmentId}/code-attempts`).then(res => setAttempts(res.attempts || [])).catch(() => setAttempts([]));
+      }
       const status = data.assessment?.status;
       if (['PASSED', 'FAILED', 'COMPLETED'].includes(status)) {
         try {
@@ -408,7 +511,61 @@ function AssessmentBuilder() {
     }
   };
 
+  const handleValidate = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await apiGet(`/api/assessment/${assessmentId}/publish-check`);
+      setPublishCheck(data);
+      return data;
+    } catch (err) {
+      setError(err.message || 'Could not validate the assessment.');
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/approve`, {});
+      if (!ok) throw new Error(data.error || 'Could not approve the assessment.');
+      setPublishCheck(data);
+      showNotice('Assessment approved. You can now send it.');
+    } catch (err) {
+      setError(err.message || 'Could not approve the assessment.');
+      handleValidate();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReturnToDraft = async () => {
+    if (!window.confirm('Return this assessment to draft to edit it? The candidate link stops working until you approve and send it again (as a new version).')) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { ok, data } = await apiPost(`/api/assessment/${assessmentId}/return-to-draft`, {});
+      if (!ok) throw new Error(data.error || 'Could not return the assessment to draft.');
+      await loadAssessment();
+      showNotice('Assessment returned to draft.');
+    } catch (err) {
+      setError(err.message || 'Could not return the assessment to draft.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openSendModal = async () => {
+    const check = await handleValidate();
+    if (!check) return;
+    if (!check.ready || !check.approval?.current) {
+      setError(check.ready ? 'Approve the assessment before sending it.' : 'Fix the problems listed under Review & approve before sending.');
+      document.getElementById('ab-publish-title')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     const unsaved = (codingConfig?.specs || []).filter(spec => !spec.question || spec.draft).length;
     if (unsaved && !window.confirm(`${unsaved} coding question ${unsaved === 1 ? 'entry has' : 'entries have'} an unsaved or ungenerated question that will not be in the assessment. Send anyway?`)) return;
     setSendForm({
@@ -580,6 +737,55 @@ function AssessmentBuilder() {
     </div>
   );
 
+  const policy = draft.scoring_policy || DEFAULT_POLICY;
+  const setPolicy = patch => setDraft({ ...draft, scoring_policy: { ...policy, ...patch } });
+  const renderScoringPolicy = () => (
+    <fieldset className="ab-policy" disabled={!isDraft}>
+      <legend>Scoring &amp; qualification</legend>
+      <label className="ab-checkbox">
+        <input type="checkbox" checked={Boolean(policy.section_weights)}
+          onChange={e => setPolicy({ section_weights: e.target.checked ? { mcq: 40, coding: 60 } : null })} />
+        Weight sections (otherwise the overall score is points earned ÷ points possible)
+      </label>
+      {policy.section_weights && (
+        <div className="ab-settings-grid">
+          <div>
+            <label className="ab-label" htmlFor="ab-weight-mcq">MCQ weight (%)</label>
+            <input id="ab-weight-mcq" type="number" min={0} max={100} value={policy.section_weights.mcq}
+              onChange={e => { const mcq = Number(e.target.value); setPolicy({ section_weights: { mcq, coding: Math.max(0, 100 - mcq) } }); }} />
+          </div>
+          <div>
+            <label className="ab-label" htmlFor="ab-weight-coding">Coding &amp; SQL weight (%)</label>
+            <input id="ab-weight-coding" type="number" min={0} max={100} value={policy.section_weights.coding}
+              onChange={e => { const coding = Number(e.target.value); setPolicy({ section_weights: { coding, mcq: Math.max(0, 100 - coding) } }); }} />
+          </div>
+        </div>
+      )}
+      <div className="ab-settings-grid">
+        <div>
+          <label className="ab-label" htmlFor="ab-min-mcq">Minimum MCQ score (%)</label>
+          <input id="ab-min-mcq" type="number" min={0} max={100} value={policy.min_mcq_score}
+            onChange={e => setPolicy({ min_mcq_score: Number(e.target.value) })} />
+        </div>
+        <div>
+          <label className="ab-label" htmlFor="ab-min-coding">Minimum coding score (%)</label>
+          <input id="ab-min-coding" type="number" min={0} max={100} value={policy.min_coding_score}
+            onChange={e => setPolicy({ min_coding_score: Number(e.target.value) })} />
+        </div>
+      </div>
+      <label className="ab-checkbox">
+        <input type="checkbox" checked={Boolean(policy.coding_section_mandatory)}
+          onChange={e => setPolicy({ coding_section_mandatory: e.target.checked })} />
+        Coding qualification is independent of MCQs: the coding requirements must be met whatever the MCQ score
+      </label>
+      <label className="ab-checkbox">
+        <input type="checkbox" checked={Boolean(policy.require_coding_qualification)} disabled={!policy.coding_section_mandatory}
+          onChange={e => setPolicy({ require_coding_qualification: e.target.checked })} />
+        Every coding question must meet its own qualification criteria (set in each question's Coding Configuration)
+      </label>
+    </fieldset>
+  );
+
   if (loading) {
     return <Layout><div className="ab-loading">Loading assessment builder…</div></Layout>;
   }
@@ -624,6 +830,12 @@ function AssessmentBuilder() {
             <button type="button" className="btn btn-secondary" onClick={handlePreview} disabled={busy}>
               <i className="fas fa-eye" /> Preview
             </button>
+            {assessment?.status === 'SENT' && !assessment?.started_at && (
+              <button type="button" className="btn btn-secondary" onClick={handleReturnToDraft} disabled={busy}
+                title="The candidate has not started: re-open the assessment to edit its questions">
+                <i className="fas fa-edit" /> Edit questions (return to draft)
+              </button>
+            )}
             {isDraft && (
               <>
                 <button type="button" className="btn btn-secondary" onClick={handleRegenerate} disabled={busy}>
@@ -632,7 +844,8 @@ function AssessmentBuilder() {
                 <button type="button" className="btn btn-secondary" onClick={handleSaveDraft} disabled={busy}>
                   <i className="fas fa-save" /> Save Draft
                 </button>
-                <button type="button" className="btn btn-success" onClick={openSendModal} disabled={busy || !questions.length}>
+                <button type="button" className="btn btn-success" onClick={openSendModal} disabled={busy || !questions.length}
+                  title={publishCheck?.approval?.current ? undefined : 'Validate and approve the assessment first'}>
                   <i className="fas fa-paper-plane" /> Send Assessment
                 </button>
               </>
@@ -657,10 +870,12 @@ function AssessmentBuilder() {
             <p>
               <strong>Score:</strong> {assessmentResult.percentage ?? assessmentResult.score_percentage}%
               {' '}({assessmentResult.score ?? assessmentResult.earned_points}/{assessmentResult.total_points} points)
+              {assessmentResult.assessment_version && <span className="ab-muted"> · assessment version {assessmentResult.assessment_version}</span>}
             </p>
-            <p><strong>Status:</strong> {assessmentResult.status}</p>
+            <p><strong>Status:</strong> {assessmentResult.needs_retry ? 'Pending re-grade (execution error)' : assessmentResult.status}</p>
             {assessmentResult.summary && <p>{assessmentResult.summary}</p>}
-            <CodingResultBreakdown result={assessmentResult} questions={questions} />
+            <ScoreSummary result={assessmentResult} />
+            <CodingResultBreakdown result={assessmentResult} questions={questions} attempts={attempts} />
           </div>
         )}
 
@@ -703,7 +918,10 @@ function AssessmentBuilder() {
               />
             </div>
           </div>
+          {renderScoringPolicy()}
         </div>
+
+        {isDraft && <PublishChecklist check={publishCheck} busy={busy} onValidate={handleValidate} onApprove={handleApprove} />}
 
         {canEditQuestions && (
           <div className="ab-add-bar">
@@ -805,7 +1023,8 @@ function AssessmentBuilder() {
 
         {/* Below the last question card, so it stays reachable however many questions there are. */}
         {assessment && (
-          <CodingQuestionsPanel assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} onConfigChange={setCodingConfig} />
+          // Keyed by status: the panel reloads its editable state when the assessment is sent or returned to draft.
+          <CodingQuestionsPanel key={assessment.status} assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} onConfigChange={setCodingConfig} />
         )}
 
         {previewOpen && previewData && (

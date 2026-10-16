@@ -17,7 +17,9 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from assessment.code_execution import sql_runner
-from assessment.code_execution.judge0 import ExecutionUnavailable, Judge0Runner, outputs_match
+from assessment.code_execution.judge0 import (
+    INFRASTRUCTURE_STATUSES, ExecutionLimits, ExecutionUnavailable, Judge0Runner, outputs_match,
+)
 from assessment.code_execution.languages import DEFAULT_LANGUAGE, LANGUAGES, normalize_language
 
 NOT_VERIFIED, VERIFIED, FAILED, UNAVAILABLE = "not_verified", "verified", "failed", "unavailable"
@@ -51,6 +53,10 @@ def fingerprint(question: dict) -> str:
         "schema": question.get("sql_schema") or "",
         "order_matters": bool(question.get("order_matters")),
         "tests": [[c.get("id")] + [c.get(k) or "" for k in keys] for c in enabled_cases(question)],
+        # Extra per-language references, limits and the comparison rule all change what "passes".
+        "extra_references": {k: v for k, v in sorted((question.get("reference_solutions") or {}).items()) if v},
+        "limits": [question.get("time_limit_seconds"), question.get("memory_limit_mb")],
+        "comparison": question.get("comparison") or "trim_trailing",
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -160,18 +166,35 @@ def verify_question(question: dict, *, runner: Any = _UNSET) -> tuple[dict, list
     if runner is None:
         return {**base, "status": UNAVAILABLE, "results": [],
                 "message": "Code execution is not configured. Set JUDGE0_URL (and JUDGE0_AUTH_TOKEN or JUDGE0_RAPIDAPI_KEY)."}, tests
-    try:
-        runs = runner.run(reference_language(question), reference, enabled)
-    except ExecutionUnavailable as exc:
-        return {**base, "status": UNAVAILABLE, "results": [], "message": f"Code execution is unavailable: {exc}"}, tests
-    results = []
-    for case, run in zip(enabled, runs):
-        if run.status == "ok":
-            passed = outputs_match(run.stdout, case.get("expected_output") or "")
-            results.append(_result(case, passed, "passed" if passed else "wrong_answer", run.stdout, run.stderr, run.time))
-        else:
-            results.append(_result(case, False, run.status, run.stdout, run.stderr, run.time))
-    ok = all(r["passed"] for r in results)
-    passed = sum(r["passed"] for r in results)
-    return {**base, "status": VERIFIED if ok else FAILED, "results": results,
-            "message": f"{passed}/{len(results)} enabled test cases passed."}, tests
+    from assessment.code_execution.coding_config import reference_solutions
+
+    mode = question.get("comparison") or "trim_trailing"
+    default = runner.default_limits() if hasattr(runner, "default_limits") else None
+    limits = ExecutionLimits.for_question(question, default)
+    results, languages = [], []
+    for language, code in reference_solutions(question).items():
+        try:
+            runs = runner.run(language, code, enabled, limits=limits)
+        except ExecutionUnavailable as exc:
+            return {**base, "status": UNAVAILABLE, "results": [], "message": f"Code execution is unavailable: {exc}"}, tests
+        if any(run.status in INFRASTRUCTURE_STATUSES for run in runs) or len(runs) != len(enabled):
+            return {**base, "status": UNAVAILABLE, "results": [], "message": "The sandbox failed internally while verifying. Retry."}, tests
+        rows = []
+        for case, run in zip(enabled, runs):
+            if run.status == "ok":
+                passed = outputs_match(run.stdout, case.get("expected_output") or "", mode)
+                rows.append(_result(case, passed, "passed" if passed else "wrong_answer", run.stdout, run.stderr, run.time))
+            else:
+                rows.append(_result(case, False, run.status, run.stdout, run.stderr, run.time))
+            rows[-1]["language"] = language
+            rows[-1]["memory"] = run.memory
+        results.extend(rows)
+        languages.append({"language": language, "label": LANGUAGES[language]["label"],
+                          "passed": sum(r["passed"] for r in rows), "total": len(rows),
+                          "status": VERIFIED if all(r["passed"] for r in rows) else FAILED})
+    ok = all(entry["status"] == VERIFIED for entry in languages)
+    summary = "; ".join(f"{e['label']}: {e['passed']}/{e['total']}" for e in languages)
+    failing = [r for r in results if not r["passed"]]
+    message = (f"Every reference solution passed all {len(enabled)} enabled test cases ({summary})." if ok
+               else f"The reference solution fails {len(failing)} test run(s) ({summary}). Fix the solution or the expected output.")
+    return {**base, "status": VERIFIED if ok else FAILED, "results": results, "languages": languages, "message": message}, tests

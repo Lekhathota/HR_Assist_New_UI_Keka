@@ -540,3 +540,32 @@
 @media (max-width: 640px) {
   .ab-draft-test { grid-template-columns: 1fr; }
 }
+
+/* Scoring policy, review & approve, results */
+.ab-policy { margin: 1rem 0 0; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; }
+.ab-policy legend { font-weight: 700; color: #1e293b; padding: 0 0.35rem; }
+.ab-policy .ab-checkbox { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.5rem 0; }
+.ab-publish { margin-bottom: 1.25rem; }
+.ab-publish-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.ab-publish-head h2 { margin: 0; font-size: 1.1rem; }
+.ab-publish-head h2 i { color: var(--accent-color, #f97316); }
+.ab-publish-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.ab-publish ul { margin: 0.35rem 0 0; padding-left: 1.2rem; }
+.ab-score-summary { margin: 0.75rem 0; }
+.ab-score-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; }
+.ab-score-tile { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.6rem 0.8rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
+.ab-score-tile span { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+.ab-score-tile strong { font-size: 1.3rem; color: #1e293b; }
+.ab-score-tile small { color: #64748b; }
+.ab-criteria { list-style: none; margin: 0.6rem 0; padding: 0; display: grid; gap: 0.25rem; }
+.ab-criteria li.ok i { color: #16a34a; }
+.ab-criteria li.bad i { color: #dc2626; }
+.ab-result-chip { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: #f1f5f9; color: #475569; }
+.ab-result-chip-passed, .ab-qual-qualified { background: #dcfce7; color: #15803d; }
+.ab-result-chip-partially_passed { background: #fef9c3; color: #a16207; }
+.ab-result-chip-not_passed, .ab-qual-not_qualified { background: #fee2e2; color: #b91c1c; }
+.ab-result-chip-execution_error, .ab-qual-pending { background: #ffedd5; color: #c2410c; }
+.ab-attempts { margin-top: 0.6rem; }
+.ab-attempts summary { cursor: pointer; font-weight: 600; }
+.ab-attempts ol { margin: 0.4rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.35rem; }
+.ab-attempts li > span { margin-right: 0.75rem; }

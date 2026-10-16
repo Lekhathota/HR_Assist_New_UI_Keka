@@ -84,6 +84,13 @@ def _result_payload(result: dict[str, Any] | None) -> dict[str, Any] | None:
         "summary": result.get("summary") or "",
         "scored_at": result.get("scored_at"),
         "created_at": result.get("created_at"),
+        "coding_percentage": result.get("coding_percentage"),
+        "execution_error_count": result.get("execution_error_count") or 0,
+        "needs_retry": bool(result.get("needs_retry")),
+        "qualification_checks": result.get("qualification_checks") or [],
+        "scoring_policy": result.get("scoring_policy") or {},
+        "applied_section_weights": result.get("applied_section_weights"),
+        "assessment_version": result.get("assessment_version"),
     }
 
 
@@ -637,8 +644,16 @@ def _reference_question(question_id: int) -> tuple[dict[str, Any], dict[str, Any
 
 
 def _reference_payload(question: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
+    from assessment.code_execution.coding_config import config_problems, config_view
+    from assessment.code_execution.judge0 import COMPARISON_MODES
+    from assessment.code_execution.languages import runtime_info
     from assessment.code_execution.verification import execution_status, reference_language, verification_view
 
+    try:  # display-only association; the configuration must still load if the JD lookup fails
+        jd = db.get_jd_by_id(int(assessment.get("jd_id") or 0)) or {} if assessment.get("jd_id") else {}
+        client = db.get_client_by_id(int(jd["client_id"])) or {} if jd.get("client_id") else {}
+    except Exception:
+        jd, client = {}, {}
     return {
         "question_id": question.get("id"),
         "question_type": question.get("question_type"),
@@ -650,6 +665,12 @@ def _reference_payload(question: dict[str, Any], assessment: dict[str, Any]) -> 
         "verification": verification_view(question),
         "editable": assessment.get("status") in AssessmentStatus.editable_states(),
         "execution": execution_status(),
+        "config": config_view(question),
+        "problems": config_problems(question),
+        "runtimes": runtime_info(),
+        "comparison_modes": [{"key": k, "label": v} for k, v in COMPARISON_MODES.items()],
+        "jd": {"id": jd.get("id"), "title": jd.get("title") or ""} if jd else None,
+        "client": {"id": client.get("id"), "name": client.get("name") or ""} if client else None,
     }
 
 
@@ -674,11 +695,19 @@ def save_reference_config(question_id: int, data: dict[str, Any], *, actor: str 
         raise AssessmentServiceError("reference_solution is required.")
     if len(reference) > 50_000:
         raise AssessmentServiceError("reference_solution is too long (50,000 characters maximum).")
+    from assessment.code_execution.coding_config import normalize_case_scoring, normalize_config
+
+    raw_cases = data.get("test_cases", question.get("test_cases") or [])
     try:
-        cases = normalize_test_cases(qtype, data.get("test_cases", question.get("test_cases") or []))
+        cases = normalize_case_scoring(normalize_test_cases(qtype, raw_cases), raw_cases)
+        config_patch = normalize_config(qtype, data.get("config") or {}, question)
     except ValueError as exc:
         raise AssessmentServiceError(str(exc)) from exc
-    patch: dict[str, Any] = {"correct_answer": reference, "test_cases": cases, "verification": None, "tests_verified": False}
+    rules = config_patch.get("scoring") or {}
+    if rules.get("min_tests_passed", 0) > len([c for c in cases if c.get("enabled", True)]):
+        raise AssessmentServiceError(f"Minimum tests passed ({rules['min_tests_passed']}) cannot exceed the number of enabled test cases.")
+    patch: dict[str, Any] = {"correct_answer": reference, "test_cases": cases, "verification": None, "tests_verified": False,
+                             **config_patch}
     if qtype == "coding":
         language = normalize_language(data.get("reference_language") or question.get("reference_language") or "python")
         if not language:
@@ -730,6 +759,131 @@ def remove_question(question_id: int) -> dict[str, Any]:
     if not assessment_repo.delete_question(question_id):
         raise AssessmentServiceError("Question could not be deleted.")
     return {"success": True, "question_id": question_id}
+
+
+def _content_fingerprint(assessment: dict[str, Any], questions: list[dict[str, Any]]) -> str:
+    """Hash of everything a candidate is assessed on: questions, tests, scoring rules and settings."""
+    import hashlib
+
+    volatile = {"_id", "created_at", "updated_at", "verification", "config_fingerprint"}
+    content = {
+        "questions": [{k: v for k, v in sorted(q.items()) if k not in volatile} for q in questions],
+        "verification": [(q.get("id"), (q.get("verification") or {}).get("fingerprint")) for q in questions],
+        "settings": {k: assessment.get(k) for k in ("passing_score", "time_limit_minutes", "scoring_policy", "title")},
+    }
+    return hashlib.sha256(json.dumps(content, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def publication_check(assessment_id: int) -> dict[str, Any]:
+    """Everything that must be true before an assessment can be approved and sent."""
+    from assessment.code_execution.coding_config import config_problems
+    from assessment.evaluation_service import normalize_scoring_policy
+
+    assessment = assessment_repo.get_assessment_by_id(int(assessment_id))
+    if not assessment:
+        raise AssessmentServiceError("Assessment not found.", status_code=404)
+    questions = sorted(assessment_repo.get_questions_for_assessment(int(assessment_id)),
+                       key=lambda q: (int(q.get("sort_order") or 0), int(q.get("id") or 0)))
+    general: list[str] = []
+    if not questions:
+        general.append("The assessment has no questions.")
+    try:
+        normalize_scoring_policy(assessment.get("scoring_policy"))
+    except ValueError as exc:
+        general.append(f"Scoring policy: {exc}")
+    pending = [spec for spec in assessment.get("coding_specs") or [] if spec.get("draft_question")]
+    if pending:
+        general.append(f"{len(pending)} generated coding question(s) are still awaiting review: save or cancel them.")
+    issues = []
+    for number, question in enumerate(questions, start=1):
+        kind = str(question.get("question_type") or "")
+        problems: list[str] = []
+        if kind in {"coding", "sql"}:
+            problems = config_problems(question)
+        elif kind == "mcq":
+            try:
+                validate_mcq(question)
+            except AssessmentServiceError as exc:
+                problems = [str(exc)]
+        if problems:
+            issues.append({"question_id": question.get("id"), "number": number, "question_type": kind,
+                           "title": question.get("title") or str(question.get("question_text") or "")[:80], "problems": problems})
+    approval = assessment.get("approval") or {}
+    fingerprint = _content_fingerprint(assessment, questions)
+    return {
+        "ready": not general and not issues,
+        "problems": general,
+        "questions": issues,
+        "coding_questions": sum(1 for q in questions if q.get("question_type") == "coding"),
+        "mcq_questions": sum(1 for q in questions if q.get("question_type") == "mcq"),
+        "approval": {**approval, "current": bool(approval) and approval.get("fingerprint") == fingerprint},
+        "fingerprint": fingerprint,
+    }
+
+
+def approve_assessment(assessment_id: int, *, actor: str = "") -> dict[str, Any]:
+    """Recruiter approval of the reviewed draft. Any later change to the content invalidates it."""
+    assessment = assessment_repo.get_assessment_by_id(int(assessment_id))
+    if not assessment:
+        raise AssessmentServiceError("Assessment not found.", status_code=404)
+    if assessment.get("status") != AssessmentStatus.DRAFT:
+        raise AssessmentServiceError("Only a draft assessment can be approved.", status_code=409)
+    check = publication_check(assessment_id)
+    if not check["ready"]:
+        raise AssessmentServiceError("The assessment is not ready to approve. Fix the listed problems first.", status_code=409)
+    approval = {"fingerprint": check["fingerprint"], "by": actor, "at": utc_now().isoformat()}
+    assessment_repo.update_assessment(int(assessment_id), {"approval": approval})
+    db.log_audit("Assessment Approved", actor, f"Approved assessment #{assessment_id} for sending.",
+                 int(assessment.get("jd_id") or 0) or None)
+    return publication_check(assessment_id)
+
+
+def return_to_draft(assessment_id: int, *, actor: str = "") -> dict[str, Any]:
+    """Re-open a sent assessment the candidate has not started, so its questions can be edited.
+
+    The candidate link stops working until the assessment is approved and sent again, which
+    publishes a new version; the earlier published version is kept unchanged.
+    """
+    assessment = assessment_repo.get_assessment_by_id(int(assessment_id))
+    if not assessment:
+        raise AssessmentServiceError("Assessment not found.", status_code=404)
+    if assessment.get("status") != AssessmentStatus.SENT or assessment.get("started_at"):
+        raise AssessmentServiceError("Only a sent assessment that the candidate has not started can return to draft.", status_code=409)
+    assert_status_transition(AssessmentStatus.SENT, AssessmentStatus.DRAFT)
+    if not assessment_repo.return_assessment_to_draft(int(assessment_id)):
+        raise AssessmentServiceError("The candidate has just started this assessment, so it can no longer be edited.", status_code=409)
+    db.log_audit("Assessment Returned to Draft", actor, f"Assessment #{assessment_id} returned to draft for editing.",
+                 int(assessment.get("jd_id") or 0) or None)
+    return _build_assessment_response(int(assessment_id))
+
+
+def get_assessment_versions(assessment_id: int) -> dict[str, Any]:
+    rows = assessment_repo.get_assessment_versions(int(assessment_id))
+    return {"versions": [{k: row.get(k) for k in ("version", "published_at", "published_by", "fingerprint",
+                                                  "passing_score", "time_limit_minutes", "scoring_policy")}
+                         | {"question_count": len(row.get("questions") or [])} for row in rows]}
+
+
+def _publish_version(assessment: dict[str, Any], questions: list[dict[str, Any]], actor: str) -> int:
+    version = int(assessment.get("published_version") or 0) + 1
+    import copy
+
+    assessment_repo.create_assessment_version({
+        "assessment_id": int(assessment["id"]), "version": version, "published_by": actor,
+        "published_at": utc_now().isoformat(), "fingerprint": _content_fingerprint(assessment, questions),
+        "questions": copy.deepcopy([{k: v for k, v in q.items() if k != "_id"} for q in questions]),
+        "scoring_policy": assessment.get("scoring_policy"), "passing_score": assessment.get("passing_score"),
+        "time_limit_minutes": assessment.get("time_limit_minutes"),
+    })
+    return version
+
+
+def get_code_attempts(assessment_id: int) -> dict[str, Any]:
+    """Candidate code runs and final submissions, oldest first (recruiter only)."""
+    rows = assessment_repo.get_code_attempts(int(assessment_id))
+    keep = ("question_id", "kind", "language", "code", "passed", "total", "statuses", "created_at",
+            "marks", "max_marks", "result_status", "qualification")
+    return {"attempts": [{k: row.get(k) for k in keep} for row in rows]}
 
 
 def _company_name() -> str:
@@ -880,8 +1034,17 @@ def send_assessment(
     if not is_candidate_test_url(link) or link not in body:
         raise AssessmentServiceError("Candidate test link could not be included in the email.")
 
-    if current_status == AssessmentStatus.DRAFT:
+    publish = current_status == AssessmentStatus.DRAFT
+    questions = assessment_repo.get_questions_for_assessment(assessment_id)
+    if publish:
         assert_status_transition(current_status, AssessmentStatus.SENT)
+        check = publication_check(assessment_id)
+        if not check["ready"]:
+            details = check["problems"] + [f"Q{q['number']}: {' '.join(q['problems'])}" for q in check["questions"]]
+            raise AssessmentServiceError("The assessment cannot be sent yet. " + " ".join(details)[:1500], status_code=409)
+        if not check["approval"].get("current"):
+            raise AssessmentServiceError("Review and approve the assessment before sending it "
+                                         "(it was changed after approval, or never approved).", status_code=409)
 
     saved = assessment_repo.update_assessment(
         assessment_id,
@@ -904,6 +1067,10 @@ def send_assessment(
             ("status", "access_token", "token_expires_at", "sent_at", "candidate_email")
         })
         raise
+
+    if publish:
+        version = _publish_version(assessment, questions, recruiter.get("username") or "")
+        assessment_repo.update_assessment(assessment_id, {"published_version": version})
 
     db.log_audit(
         "Assessment Sent",
@@ -1188,8 +1355,13 @@ def run_candidate_code(token: str, question_id: int, code: str, language: str = 
     except ValueError as exc:
         raise AssessmentServiceError(str(exc)) from exc
     except ExecutionUnavailable as exc:
-        raise AssessmentServiceError(f"Code could not be run right now: {exc}", status_code=503) from exc
+        raise AssessmentServiceError(f"Code could not be run right now: {exc} Your answer is saved; try again.", status_code=503) from exc
     summary = graded.summary()
+    assessment_repo.record_code_attempt({
+        "assessment_id": int(assessment["id"]), "question_id": int(question_id), "kind": "run",
+        "language": graded.language, "code": code, "passed": graded.passed, "total": graded.total,
+        "statuses": [o.status for o in graded.outcomes],
+    })
     return {
         "method": graded.method, "language": graded.language, "note": graded.note,
         "passed": graded.passed, "total": graded.total, "tests": outcome_dicts(graded),
@@ -1199,21 +1371,49 @@ def run_candidate_code(token: str, question_id: int, code: str, language: str = 
 
 
 def _scoring_summary(scoring: dict[str, Any], passing_score: int) -> str:
-    pending_note = ""
+    notes = ""
+    sections = (scoring.get("evaluation_breakdown") or {}).get("sections") or {}
+    for key, label in (("mcq", "MCQ"), ("coding", "Coding/SQL")):
+        section = sections.get(key) or {}
+        if section.get("count"):
+            notes += f" {label}: {section.get('percentage')}% ({section.get('earned')}/{section.get('possible')})."
     coding_results = [r for r in scoring["question_results"] if r.get("question_type") in {"coding", "sql"}]
-    if coding_results:
-        passed_tests = sum(int((r.get("metadata") or {}).get("tests_passed") or 0) for r in coding_results)
-        total_tests = sum(int((r.get("metadata") or {}).get("tests_total") or 0) for r in coding_results)
-        if total_tests:
-            pending_note += f" Coding/SQL tests passed: {passed_tests}/{total_tests} (including hidden tests)."
-        if any(r.get("evaluation_method") == "ai_estimated" for r in coding_results):
-            pending_note += " Some coding answers were AI-estimated because code execution is not configured."
+    passed_tests = sum(int((r.get("metadata") or {}).get("tests_passed") or 0) for r in coding_results)
+    total_tests = sum(int((r.get("metadata") or {}).get("tests_total") or 0) for r in coding_results)
+    if total_tests:
+        notes += f" Tests passed: {passed_tests}/{total_tests} (including hidden tests)."
+    failed = [c["label"] for c in scoring.get("qualification_checks") or [] if not c["met"]]
+    if failed and not scoring.get("needs_retry"):
+        notes += " Not met: " + "; ".join(failed) + "."
+    if scoring.get("needs_retry"):
+        notes += (f" {scoring['execution_error_count']} coding answer(s) could not be executed because of an infrastructure "
+                  "problem; the result is pending until it is re-graded.")
     if int(scoring.get("pending_review_count") or 0) > 0:
-        pending_note += f" {scoring['pending_review_count']} coding/SQL answer(s) could not be graded automatically (counted as 0)."
-    return (
-        f"Score: {scoring['score_percentage']}% ({scoring['earned_points']}/{scoring['total_points']} points). "
-        f"Passing score: {passing_score}%.{pending_note}"
-    )
+        notes += f" {scoring['pending_review_count']} answer(s) need manual review (counted as 0)."
+    return (f"Score: {scoring['score_percentage']}% ({scoring['earned_points']}/{scoring['total_points']} points). "
+            f"Passing score: {passing_score}%.{notes}")
+
+
+def _final_status(scoring: dict[str, Any]) -> str:
+    """An infrastructure failure leaves the attempt COMPLETED (awaiting re-grade), never FAILED."""
+    if scoring.get("needs_retry"):
+        return AssessmentStatus.COMPLETED
+    return AssessmentStatus.PASSED if scoring["passed"] else AssessmentStatus.FAILED
+
+
+def _record_submissions(assessment_id: int, scoring: dict[str, Any], languages: dict[int, str]) -> None:
+    for row in scoring["question_results"]:
+        if row.get("question_type") not in {"coding", "sql"} or not str(row.get("answer") or "").strip():
+            continue
+        meta = row.get("metadata") or {}
+        assessment_repo.record_code_attempt({
+            "assessment_id": assessment_id, "question_id": int(row.get("question_id") or 0), "kind": "submit",
+            "language": meta.get("language") or languages.get(int(row.get("question_id") or 0)) or "",
+            "code": row.get("answer"), "passed": meta.get("tests_passed"), "total": meta.get("tests_total"),
+            "statuses": [t.get("status") for t in meta.get("tests") or []], "marks": row.get("points_earned"),
+            "max_marks": row.get("points_possible"), "result_status": meta.get("result_status"),
+            "qualification": meta.get("qualification"),
+        })
 
 
 def _result_document(assessment: dict[str, Any], scoring: dict[str, Any], final_status: str, summary: str) -> dict[str, Any]:
@@ -1235,6 +1435,13 @@ def _result_document(assessment: dict[str, Any], scoring: dict[str, Any], final_
         "pass_basis": scoring.get("pass_basis"),
         "summary": summary,
         "scored_at": utc_now(),
+        "coding_percentage": scoring.get("coding_percentage"),
+        "execution_error_count": scoring.get("execution_error_count"),
+        "needs_retry": scoring.get("needs_retry"),
+        "qualification_checks": scoring.get("qualification_checks"),
+        "scoring_policy": scoring.get("scoring_policy"),
+        "applied_section_weights": scoring.get("applied_section_weights"),
+        "assessment_version": assessment.get("published_version"),
     }
 
 
@@ -1255,15 +1462,16 @@ def regrade_assessment(assessment_id: int, *, actor: str = "") -> dict[str, Any]
     answers = {int(r.get("question_id") or 0): str(r.get("answer") or "") for r in rows}
     languages = {int(r.get("question_id") or 0): str(r.get("language") or "") for r in rows}
     passing_score = int(assessment.get("passing_score") or DEFAULT_PASSING_SCORE)
-    scoring = evaluate_assessment(questions, answers, passing_score=passing_score, languages_by_question=languages)
-    passed = bool(scoring["passed"])
-    final_status = AssessmentStatus.PASSED if passed else AssessmentStatus.FAILED
+    scoring = evaluate_assessment(questions, answers, passing_score=passing_score, languages_by_question=languages,
+                                  scoring_policy=assessment.get("scoring_policy"))
+    final_status = _final_status(scoring)
     summary = _scoring_summary(scoring, passing_score) + " (Re-graded.)"
     result_id = assessment_repo.upsert_assessment_result(_result_document(assessment, scoring, final_status, summary))
 
     if final_status != previous_status:
         assessment_repo.update_assessment(int(assessment_id), {"status": final_status})
-        record_candidate_outcome(assessment, final_status)
+        if final_status != AssessmentStatus.COMPLETED:
+            record_candidate_outcome(assessment, final_status)
     db.log_audit(
         "Assessment Re-graded",
         actor,
@@ -1308,9 +1516,9 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
 
     passing_score = int(assessment.get("passing_score") or DEFAULT_PASSING_SCORE)
     scoring = evaluate_assessment(questions, answers_by_question, passing_score=passing_score,
-                                  languages_by_question=languages_by_question)
-    passed = bool(scoring["passed"])
-    final_status = AssessmentStatus.PASSED if passed else AssessmentStatus.FAILED
+                                  languages_by_question=languages_by_question,
+                                  scoring_policy=assessment.get("scoring_policy"))
+    final_status = _final_status(scoring)
     summary = _scoring_summary(scoring, passing_score)
 
     current_status = str(assessment.get("status") or AssessmentStatus.IN_PROGRESS)
@@ -1322,8 +1530,10 @@ def submit_assessment(token: str, answers: list[dict[str, Any]] | None = None) -
     assessment_repo.mark_answers_final(assessment_id)
 
     result_id = assessment_repo.upsert_assessment_result(_result_document(assessment, scoring, final_status, summary))
+    _record_submissions(assessment_id, scoring, languages_by_question)
 
-    record_candidate_outcome(assessment, final_status)
+    if final_status != AssessmentStatus.COMPLETED:  # pending re-grade: the hiring stage waits for a real result
+        record_candidate_outcome(assessment, final_status)
 
     db.log_audit(
         "Assessment Completed",
@@ -1381,6 +1591,11 @@ __all__ = [
     "save_answer",
     "submit_assessment",
     "get_assessment_result",
+    "publication_check",
+    "approve_assessment",
+    "return_to_draft",
+    "get_assessment_versions",
+    "get_code_attempts",
     "is_eligible_for_interview",
     "is_assessment_passed_for_candidate_jd",
     "enrich_candidates_with_assessments",

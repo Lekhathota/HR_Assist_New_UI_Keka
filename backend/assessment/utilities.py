@@ -91,7 +91,8 @@ def assessment_link(token: str) -> str:
 def assert_status_transition(current: str, target: str) -> None:
     allowed: dict[str, set[str]] = {
         AssessmentStatus.DRAFT: {AssessmentStatus.SENT},
-        AssessmentStatus.SENT: {AssessmentStatus.IN_PROGRESS, AssessmentStatus.COMPLETED},
+        # SENT -> DRAFT: recruiter returns an unstarted assessment to draft to edit it (it is re-published on send).
+        AssessmentStatus.SENT: {AssessmentStatus.IN_PROGRESS, AssessmentStatus.COMPLETED, AssessmentStatus.DRAFT},
         AssessmentStatus.IN_PROGRESS: {AssessmentStatus.COMPLETED, AssessmentStatus.PASSED, AssessmentStatus.FAILED, AssessmentStatus.TERMINATED},
         AssessmentStatus.COMPLETED: {AssessmentStatus.PASSED, AssessmentStatus.FAILED},
     }
@@ -201,7 +202,9 @@ def recruiter_question_payload(question: dict[str, Any]) -> dict[str, Any]:
         **{key: question.get(key) for key in ("question_id", "difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement",
                                                *CUSTOM_CODING_FIELDS) if question.get(key) is not None},
         **{key: question.get(key) for key in ("test_cases", "sql_schema", "order_matters", "input_format", "output_format",
-                                               "allowed_languages", "default_language", "tests_verified") if question.get(key) is not None},
+                                               "allowed_languages", "default_language", "tests_verified",
+                                               "title", "edge_cases", "time_limit_seconds", "memory_limit_mb", "comparison",
+                                               "scoring", "reference_solutions") if question.get(key) is not None},
         **_reference_fields(question),
         "skill_tag": question.get("skill_tag") or "",
         "sort_order": int(question.get("sort_order") or 0),
@@ -223,7 +226,9 @@ def candidate_question_payload(question: dict[str, Any]) -> dict[str, Any]:
     for key in ("correct_answer", "explanation", "evaluation_focus", "jd_requirement", "test_cases", "tests_verified",
                 "verification", "reference_language", "config_fingerprint",
                 # The recruiter's generation prompts can describe the expected approach.
-                "source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot"):
+                "source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot",
+                # Server-side scoring configuration and extra reference programs.
+                "scoring", "reference_solutions", "comparison"):
         payload.pop(key, None)
     # Disabled tests are not used for grading, so candidates do not see them either.
     cases = [c for c in question.get("test_cases") or [] if isinstance(c, dict) and c.get("enabled", True) is not False]
@@ -335,6 +340,9 @@ def assessment_summary_payload(
         "termination_reason": assessment.get("termination_reason") or "",
         "terms_accepted_at": assessment.get("terms_accepted_at"),
         "terms_version": assessment.get("terms_version") or "",
+        "scoring_policy": assessment.get("scoring_policy") or None,
+        "published_version": assessment.get("published_version"),
+        "approval": assessment.get("approval") or None,
     }
     if include_token:
         token = normalize_access_token(str(assessment.get("access_token") or ""))

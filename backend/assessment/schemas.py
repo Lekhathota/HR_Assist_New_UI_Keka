@@ -87,6 +87,13 @@ def validate_save_draft_payload(data: dict[str, Any]) -> dict[str, Any]:
         patch["passing_score"] = _optional_int(data.get("passing_score"), DEFAULT_PASSING_SCORE, minimum=1, maximum=100)
     if "time_limit_minutes" in data:
         patch["time_limit_minutes"] = _optional_int(data.get("time_limit_minutes"), 90, minimum=5, maximum=480)
+    if "scoring_policy" in data:
+        from assessment.evaluation_service import normalize_scoring_policy
+
+        try:
+            patch["scoring_policy"] = normalize_scoring_policy(data.get("scoring_policy"))
+        except ValueError as exc:
+            raise SchemaValidationError(str(exc)) from exc
     if not patch:
         raise SchemaValidationError("At least one field is required to save the draft.")
     return patch

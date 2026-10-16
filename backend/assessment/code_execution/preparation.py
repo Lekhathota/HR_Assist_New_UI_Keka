@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from assessment.code_execution import sql_runner
-from assessment.code_execution.judge0 import ExecutionUnavailable, Judge0Runner, outputs_match
+from assessment.code_execution.judge0 import ExecutionLimits, ExecutionUnavailable, Judge0Runner, outputs_match
 from assessment.code_execution.languages import DEFAULT_LANGUAGE, LANGUAGES, normalize_language
 
 MIN_VISIBLE = {"coding": 2, "sql": 1}
@@ -170,11 +170,14 @@ def _prepare_row(index: int, row: dict, runner: Any) -> None:
         try:
             language = normalize_language(row.get("reference_language")) or DEFAULT_LANGUAGE
             enabled = [c for c in row["test_cases"] if c.get("enabled", True) is not False]
-            results = runner.run(language, row["correct_answer"], enabled)
+            default = runner.default_limits() if hasattr(runner, "default_limits") else None
+            results = runner.run(language, row["correct_answer"], enabled, limits=ExecutionLimits.for_question(row, default))
         except ExecutionUnavailable:
             return  # keep the generated tests; they are marked unverified
+        if any(run.status == "error" for run in results):
+            return  # the sandbox failed, not the reference: keep the tests unverified
         bad = [case["id"] for case, run in zip(enabled, results)
-               if run.status != "ok" or not outputs_match(run.stdout, case["expected_output"])]
+               if run.status != "ok" or not outputs_match(run.stdout, case["expected_output"], row.get("comparison") or "trim_trailing")]
         if bad:
             raise ValueError(f"Q{index}: the reference solution does not produce expected_output for tests "
                              f"{', '.join(bad)}. Fix the reference program or the expected outputs.")

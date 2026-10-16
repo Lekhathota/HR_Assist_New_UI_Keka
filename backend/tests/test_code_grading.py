@@ -1,7 +1,7 @@
 """Automatic grading of coding / SQL answers with visible and hidden test cases.
 
-SQL runs for real in the in-memory SQLite sandbox. Judge0 and the AI reviewer
-are replaced with fakes: no network calls are made.
+SQL runs for real in the in-memory SQLite sandbox. Judge0 is replaced with fakes here
+(no network calls); tests/test_coding_engine.py executes real programs.
 """
 import base64
 import copy
@@ -60,7 +60,7 @@ class FakeRunner:
     def __init__(self, fn=None, fail=None):
         self.fn, self.fail, self.calls = fn, fail, []
 
-    def run(self, language, source, cases):
+    def run(self, language, source, cases, limits=None):
         self.calls.append((language, source, [c["id"] for c in cases]))
         if self.fail:
             raise ExecutionUnavailable(self.fail)
@@ -125,12 +125,10 @@ class CodeGradingTests(unittest.TestCase):
         self.assertEqual(result.passed, 0)
         self.assertEqual({o.status for o in result.outcomes}, {"runtime_error"})
 
-    def test_falls_back_to_labelled_ai_estimate_when_execution_unavailable(self):
-        with patch.object(grader.ai_reviewer, "estimate_tests", return_value=({"t1": True, "t2": True, "t3": True, "t4": False}, "ok")):
-            result = grader.grade_answer(coding_question(), "code", "cpp", runner=FakeRunner(fail="Judge0 is unreachable"))
-        self.assertEqual(result.method, "ai_estimated")
-        self.assertIn("AI-estimated", result.note)
-        self.assertEqual(result.passed, 3)
+    def test_unavailable_execution_is_never_estimated(self):
+        for runner in (FakeRunner(fail="Judge0 is unreachable"), None):
+            with self.subTest(runner=runner), self.assertRaises(ExecutionUnavailable):
+                grader.grade_answer(coding_question(), "code", "cpp", runner=runner)
 
     def test_disallowed_language_is_rejected(self):
         with self.assertRaises(ValueError):
@@ -161,18 +159,16 @@ class ScoringTests(unittest.TestCase):
                                          languages_by_question={7: "python"})
         by_id = {r["question_id"]: r for r in result["question_results"]}
         self.assertEqual(result["pending_review_count"], 0)
-        self.assertEqual(by_id[7]["points_earned"], 8)  # 3 of 4 tests x 10 points, rounded
+        self.assertEqual(by_id[7]["points_earned"], 7.5)  # 3 of 4 equally weighted tests x 10 marks
         self.assertEqual(by_id[7]["metadata"]["hidden_total"], 2)
         self.assertEqual(by_id[5]["points_earned"], 20)
-        self.assertEqual(result["score_percentage"], 95.0)
+        self.assertEqual(result["score_percentage"], 93.75)
         self.assertTrue(result["passed"])
 
-    def test_legacy_question_without_tests_uses_ai_against_reference(self):
+    def test_legacy_question_without_tests_waits_for_manual_review(self):
         legacy = {"id": 9, "question_type": "coding", "points": 10, "correct_answer": "def f(): return 1"}
-        with patch.object(grader.ai_reviewer, "estimate_score", return_value=(0.5, "half right")):
-            row = AutoCodingEvaluator().evaluate(legacy, "def f(): return 2").to_dict()
-        self.assertEqual((row["points_earned"], row["evaluation_method"]), (5, "ai_estimated"))
-        self.assertIn("AI-estimated", row["feedback"])
+        row = AutoCodingEvaluator().evaluate(legacy, "def f(): return 2").to_dict()
+        self.assertEqual((row["points_earned"], row["evaluation_status"]), (0, "pending_review"))
 
     def test_nothing_to_grade_against_stays_pending(self):
         bare = {"id": 9, "question_type": "coding", "points": 10}
@@ -205,6 +201,7 @@ class RunEndpointServiceTests(unittest.TestCase):
         self.stack.enter_context(patch.object(service, "_resolve_token_assessment", return_value=self.assessment))
         self.get_q = self.stack.enter_context(patch.object(service.assessment_repo, "get_question_by_id", return_value=coding_question()))
         self.consume = self.stack.enter_context(patch.object(service.assessment_repo, "consume_code_run", return_value=True))
+        self.attempts = self.stack.enter_context(patch.object(service.assessment_repo, "record_code_attempt"))
         self.stack.enter_context(patch.object(grader.Judge0Runner, "from_env", return_value=FakeRunner(lambda s: f"{int(s) * 2}\n")))
 
     def tearDown(self):
@@ -424,6 +421,8 @@ class ReferenceServiceTests(unittest.TestCase):
         self.stack.enter_context(patch.object(service.assessment_repo, "get_question_by_id", side_effect=lambda qid: copy.deepcopy(self.question)))
         self.assessment = {"id": 1, "status": "DRAFT", "jd_id": 3}
         self.stack.enter_context(patch.object(service.assessment_repo, "get_assessment_by_id", side_effect=lambda aid: self.assessment))
+        self.stack.enter_context(patch.object(service.db, "get_jd_by_id", return_value={"id": 3, "title": "Backend", "client_id": 5}))
+        self.stack.enter_context(patch.object(service.db, "get_client_by_id", return_value={"id": 5, "name": "Acme"}))
         self.stack.enter_context(patch.object(service.db, "log_audit"))
         self.stack.enter_context(patch.object(service.assessment_repo, "update_question", side_effect=self._apply))
         self.guarded = self.stack.enter_context(patch.object(service.assessment_repo, "update_question_if_unchanged", side_effect=self._apply_guarded))
@@ -461,10 +460,8 @@ class ReferenceServiceTests(unittest.TestCase):
         with self.assertRaises(service.AssessmentServiceError):
             service.save_reference_config(7, {"reference_solution": "x", "reference_language": "powershell", "test_cases": self._tests()})
 
-    def test_edits_blocked_once_the_candidate_starts_but_verify_allowed(self):
-        self.assessment["status"] = "SENT"  # invited but not started: still editable
-        self.assertTrue(service.get_reference_config(7)["editable"])
-        self.assessment["status"] = "IN_PROGRESS"
+    def test_edits_blocked_after_sending_but_verify_allowed(self):
+        self.assessment["status"] = "SENT"  # published: edit only after returning it to draft
         with self.assertRaises(service.AssessmentServiceError) as ctx:
             service.save_reference_config(7, {"reference_solution": "x", "test_cases": self._tests()})
         self.assertEqual(ctx.exception.status_code, 409)
