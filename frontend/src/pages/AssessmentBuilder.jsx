@@ -22,9 +22,25 @@ const EMPTY_QUESTION = {
   options: ['', '', '', ''],
   correct_answer: '',
   starter_code: '',
+  explanation: '',
   points: 10,
   skill_tag: '',
 };
+
+// Questions can change until the candidate opens the test (SENT = invited, not started).
+const QUESTION_EDIT_STATES = ['DRAFT', 'SENT'];
+
+// Same rules as the server's validate_mcq: four distinct options, exactly one correct, an explanation.
+export function mcqProblem(form) {
+  if (form.question_type !== 'mcq') return '';
+  if (!String(form.question_text || '').trim()) return 'Enter the question text.';
+  const options = form.options || [];
+  if (options.length !== 4 || options.some(o => !String(o).trim())) return 'An MCQ needs exactly four non-empty options.';
+  if (new Set(options.map(o => String(o).trim().toLowerCase().replace(/\s+/g, ' '))).size !== 4) return 'The four MCQ options must be different from each other.';
+  if (options.filter(o => o === form.correct_answer).length !== 1) return 'Select exactly one of the four options as the correct answer.';
+  if (!String(form.explanation || '').trim()) return 'Add an explanation of why the correct answer is right.';
+  return '';
+}
 
 const METHOD_LABELS = {
   executed: 'Executed in sandbox',
@@ -132,14 +148,17 @@ function AssessmentBuilder() {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
   const [codingConfig, setCodingConfig] = useState(null);
+  const [formError, setFormError] = useState('');
 
   const isDraft = assessment?.status === 'DRAFT';
+  const canEditQuestions = QUESTION_EDIT_STATES.includes(assessment?.status);
   const isReviewable = ['PASSED', 'FAILED', 'COMPLETED'].includes(assessment?.status);
   // Answers exist once the candidate starts, including attempts that were terminated.
   const showAnswers = ['IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(assessment?.status);
   const resultByQuestion = new Map((assessmentResult?.question_results || []).map(r => [r.question_id, r]));
   const answeredCount = Object.values(candidateAnswers).filter(a => String(a?.answer ?? '').trim()).length;
-  const sortedQuestions = [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const sortedQuestions = [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+  const typeCounts = sortedQuestions.reduce((acc, q) => ({ ...acc, [q.question_type]: (acc[q.question_type] || 0) + 1 }), {});
 
   const loadAssessment = useCallback(async () => {
     setLoading(true);
@@ -174,11 +193,17 @@ function AssessmentBuilder() {
 
   useEffect(() => { loadAssessment(); }, [loadAssessment]);
 
-  // Refresh just the question list (after a coding question is generated or removed) without a full reload.
-  const refreshQuestions = useCallback(async () => {
+  // Refresh just the question list (after a coding question is saved or removed) without a full reload.
+  const refreshQuestions = useCallback(async (saved) => {
     try {
       const data = await apiGet(`/api/assessment/${assessmentId}`);
-      setQuestions(data.questions || []);
+      const list = data.questions || [];
+      setQuestions(list);
+      if (saved?.id) {
+        const ordered = [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+        const number = ordered.findIndex(q => q.id === saved.id) + 1;
+        if (number) setNotice(`Coding question saved as Q${number}.`);
+      }
     } catch (err) {
       setError(err.message || 'Could not refresh questions.');
     }
@@ -224,7 +249,7 @@ function AssessmentBuilder() {
   };
 
   const handleRegenerate = async () => {
-    if (!window.confirm('Replace the JD-based questions with a fresh set of 14 (10 MCQs, 2 moderate coding and 2 moderate SQL)? '
+    if (!window.confirm('Replace the JD-based questions with a fresh set of 34 (30 MCQs, 2 moderate coding and 2 moderate SQL)? '
       + 'Questions from the Coding Questions panel and the client instructions are kept; questions you added manually are replaced.')) return;
     setBusy(true);
     setError('');
@@ -266,18 +291,23 @@ function AssessmentBuilder() {
       options: [...(q.options?.length ? q.options : ['', '', '', ''])],
       correct_answer: q.correct_answer || '',
       starter_code: q.starter_code || '',
+      explanation: q.explanation || '',
       points: q.points ?? 10,
       skill_tag: q.skill_tag || '',
     });
+    setFormError('');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm(null);
+    setFormError('');
   };
 
   const handleUpdateQuestion = async () => {
     if (!editForm) return;
+    const problem = mcqProblem(editForm);
+    if (problem) { setFormError(problem); return; }
     setBusy(true);
     try {
       const { ok, data } = await apiPut(`/api/assessment/question/${editingId}`, editForm);
@@ -317,16 +347,19 @@ function AssessmentBuilder() {
       starter_code: type === 'coding' ? 'def solution():\n    pass\n' : '',
       points: type === 'coding' ? 20 : type === 'sql' ? 15 : 10,
     });
+    setFormError('');
   };
 
   const handleAddQuestion = async () => {
+    const problem = mcqProblem(addForm);
+    if (problem) { setFormError(problem); return; }
     setBusy(true);
     try {
+      // The server appends the question after the existing ones.
       const payload = {
         assessment_id: Number(assessmentId),
         ...addForm,
-        options: addForm.options.filter(o => String(o).trim()),
-        sort_order: questions.length,
+        options: addForm.question_type === 'mcq' ? addForm.options : addForm.options.filter(o => String(o).trim()),
       };
       const { ok, data } = await apiPost('/api/assessment/question', payload);
       if (!ok) throw new Error(data.error || 'Could not add question.');
@@ -376,8 +409,8 @@ function AssessmentBuilder() {
   };
 
   const openSendModal = async () => {
-    const ungenerated = (codingConfig?.specs || []).filter(spec => spec.status !== 'generated').length;
-    if (ungenerated && !window.confirm(`${ungenerated} coding question ${ungenerated === 1 ? 'entry has' : 'entries have'} no generated question and will not be in the assessment. Send anyway?`)) return;
+    const unsaved = (codingConfig?.specs || []).filter(spec => !spec.question || spec.draft).length;
+    if (unsaved && !window.confirm(`${unsaved} coding question ${unsaved === 1 ? 'entry has' : 'entries have'} an unsaved or ungenerated question that will not be in the assessment. Send anyway?`)) return;
     setSendForm({
       to_email: assessment?.candidate_email || '',
       from_email: '',
@@ -439,49 +472,40 @@ function AssessmentBuilder() {
     }
   };
 
+  // Exactly four options; the radio marks the one correct answer and follows its text when edited.
   const renderOptionEditor = (form, setForm) => (
-    <div className="ab-options-editor">
-      <label className="ab-label">Options</label>
-      {(form.options || []).map((opt, idx) => (
-        <div key={idx} className="ab-option-row">
-          <input
-            type="text"
-            value={opt}
-            onChange={e => {
-              const next = [...form.options];
-              next[idx] = e.target.value;
-              setForm({ ...form, options: next });
-            }}
-            placeholder={`Option ${idx + 1}`}
-          />
-          <button
-            type="button"
-            className="ab-icon-btn"
-            onClick={() => setForm({ ...form, options: form.options.filter((_, i) => i !== idx) })}
-            title="Remove option"
-          >
-            <i className="fas fa-times" />
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        className="ab-link-btn"
-        onClick={() => setForm({ ...form, options: [...(form.options || []), ''] })}
-      >
-        + Add option
-      </button>
-      <label className="ab-label">Correct answer</label>
-      <select
-        value={form.correct_answer}
-        onChange={e => setForm({ ...form, correct_answer: e.target.value })}
-      >
-        <option value="">Select correct option</option>
-        {(form.options || []).filter(Boolean).map(opt => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-    </div>
+    <fieldset className="ab-options-editor">
+      <legend className="ab-label">Options (select the one correct answer)</legend>
+      {[0, 1, 2, 3].map(idx => {
+        const opt = form.options?.[idx] ?? '';
+        const letter = String.fromCharCode(65 + idx);
+        const isCorrect = Boolean(String(opt).trim()) && opt === form.correct_answer;
+        return (
+          <div key={idx} className={`ab-option-row${isCorrect ? ' ab-option-correct' : ''}`}>
+            <input
+              type="radio"
+              name={`ab-correct-${editingId ?? 'new'}`}
+              checked={isCorrect}
+              disabled={!String(opt).trim()}
+              onChange={() => setForm({ ...form, correct_answer: opt })}
+              aria-label={`Option ${letter} is correct`}
+            />
+            <span className="ab-option-letter">{letter}</span>
+            <input
+              type="text"
+              value={opt}
+              onChange={e => {
+                const next = [0, 1, 2, 3].map(i => form.options?.[i] ?? '');
+                next[idx] = e.target.value;
+                setForm({ ...form, options: next, correct_answer: isCorrect ? e.target.value : form.correct_answer });
+              }}
+              placeholder={`Option ${letter}`}
+              aria-label={`Option ${letter}`}
+            />
+          </div>
+        );
+      })}
+    </fieldset>
   );
 
   const renderQuestionForm = (form, setForm, onSave, onCancel) => (
@@ -513,6 +537,12 @@ function AssessmentBuilder() {
         </div>
       </div>
       {form.question_type === 'mcq' && renderOptionEditor(form, setForm)}
+      <label className="ab-label">Explanation{form.question_type === 'mcq' ? ' (why the correct answer is right)' : ''}</label>
+      <textarea
+        rows={3}
+        value={form.explanation || ''}
+        onChange={e => setForm({ ...form, explanation: e.target.value })}
+      />
       {form.question_type === 'coding' && (
         <>
           <label className="ab-label">Starter code</label>
@@ -542,6 +572,7 @@ function AssessmentBuilder() {
           />
         </>
       )}
+      {formError && <div className="ab-error" role="alert">{formError}</div>}
       <div className="ab-form-actions">
         <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={onSave}>Save</button>
@@ -674,7 +705,7 @@ function AssessmentBuilder() {
           </div>
         </div>
 
-        {isDraft && (
+        {canEditQuestions && (
           <div className="ab-add-bar">
             <span>Add question:</span>
             <button type="button" className="btn btn-primary ab-add-btn" onClick={() => openAddForm('mcq')}>
@@ -689,14 +720,15 @@ function AssessmentBuilder() {
           </div>
         )}
 
-        {addType && renderQuestionForm(addForm, setAddForm, handleAddQuestion, () => setAddType(null))}
-
-        {isDraft && (
-          <CodingQuestionsPanel assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} onConfigChange={setCodingConfig} />
-        )}
+        {addType && renderQuestionForm(addForm, setAddForm, handleAddQuestion, () => { setAddType(null); setFormError(''); })}
 
         <div className="ab-questions">
           <h2>Questions ({sortedQuestions.length})</h2>
+          {sortedQuestions.length > 0 && (
+            <p className="ab-type-summary">
+              {Object.entries(TYPE_LABELS).filter(([type]) => typeCounts[type]).map(([type, label]) => `${typeCounts[type]} ${label}`).join(' · ')}
+            </p>
+          )}
           {showAnswers && <p className="ab-answer-summary">
             <i className="fas fa-user-edit" aria-hidden="true" /> Candidate answered <strong>{answeredCount} of {sortedQuestions.length}</strong> questions.
             {assessment?.status === 'IN_PROGRESS' && ' The test is still in progress; reload to see the latest answers.'}
@@ -717,7 +749,8 @@ function AssessmentBuilder() {
                   {q.source === 'custom_coding' && <span className="ab-badge ab-badge-custom" title={q.generation_prompt}>Custom prompt</span>}
                   {q.scenario_type && <span className="ab-skill">{q.scenario_type}</span>}
                   <span className="ab-points">{q.points} pts</span>
-                  {isDraft && (
+                  {q.time_limit_minutes && <span className="ab-skill"><i className="far fa-clock" aria-hidden="true" /> {q.time_limit_minutes} min</span>}
+                  {canEditQuestions && (
                     <div className="ab-question-actions">
                       <button type="button" className="ab-icon-btn" onClick={() => startEdit(q)} title="Edit">
                         <i className="fas fa-edit" />
@@ -737,6 +770,9 @@ function AssessmentBuilder() {
                       {q.source === 'custom_coding' && q.generation_prompt && (
                         <p className="ab-custom-prompt"><strong>Recruiter prompt:</strong> {q.generation_prompt}</p>
                       )}
+                      {q.source === 'custom_coding' && q.input_format && <p><strong>Input:</strong> {q.input_format}</p>}
+                      {q.source === 'custom_coding' && q.output_format && <p><strong>Output:</strong> {q.output_format}</p>}
+                      {q.constraints && <p><strong>Constraints:</strong> {q.constraints}</p>}
                       {q.explanation && <p><strong>Explanation:</strong> {q.explanation}</p>}
                       {q.jd_requirement && <p><strong>JD requirement:</strong> {q.jd_requirement}</p>}
                       {q.evaluation_focus?.length > 0 && <p><strong>Evaluation focus:</strong> {q.evaluation_focus.join(", ")}</p>}
@@ -766,6 +802,11 @@ function AssessmentBuilder() {
             ))
           )}
         </div>
+
+        {/* Below the last question card, so it stays reachable however many questions there are. */}
+        {assessment && (
+          <CodingQuestionsPanel assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} onConfigChange={setCodingConfig} />
+        )}
 
         {previewOpen && previewData && (
           <div className="ab-modal-overlay" onClick={() => setPreviewOpen(false)}>

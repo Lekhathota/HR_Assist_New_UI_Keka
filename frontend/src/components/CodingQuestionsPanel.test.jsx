@@ -1,8 +1,8 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import CodingQuestionsPanel from './CodingQuestionsPanel.jsx';
-import AssessmentBuilder from '../pages/AssessmentBuilder.jsx';
+import CodingQuestionsPanel, { draftProblem } from './CodingQuestionsPanel.jsx';
+import AssessmentBuilder, { mcqProblem } from '../pages/AssessmentBuilder.jsx';
 import { apiDelete, apiGet, apiPost, apiPut } from '../api.js';
 
 jest.mock('../api.js', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn() }));
@@ -12,55 +12,92 @@ jest.mock('./ProctoringEvidence.jsx', () => () => null);
 jest.mock('../utils/assessmentPdf.js', () => ({ downloadAssessmentPdf: jest.fn() }));
 
 const LANGUAGES = [{ key: 'python', label: 'Python 3' }, { key: 'java', label: 'Java' }, { key: 'cpp', label: 'C++' }];
+const SPEC_KEYS = ['prompt', 'language', 'difficulty', 'points', 'topic', 'time_limit_minutes'];
+// Existing questions on the assessment (like Q13/Q14 in the screenshot) that must never change.
+const BASE_QUESTIONS = [
+  { id: 13, question_type: 'mcq', question_text: 'Existing MCQ about REST retries', options: ['A1', 'B1', 'C1', 'D1'], correct_answer: 'B1', explanation: 'B1 is idempotent.', points: 5, sort_order: 0 },
+  { id: 14, question_type: 'sql', question_text: 'Existing SQL on microservice_errors', correct_answer: 'SELECT 1', points: 10, sort_order: 1 },
+];
 
-// In-memory stand-in for /api/assessment/1/coding/* (mirrors coding_question_service responses).
-function makeServer({ max = 20 } = {}) {
-  const state = { specs: [], clientPrompt: 'Acme default rules', clientDefault: 'Acme default rules', baseCoding: 2, nextId: 1, nextQ: 500, failNext: null, generated: [] };
+function generatedDraft(spec) {
+  return {
+    question_text: `Generated for: ${spec.prompt}. Read the input from stdin, handle the edge cases and print the result.`,
+    input_format: 'n then n integers', output_format: 'one integer', constraints: '1 <= n <= 10^5',
+    explanation: 'Single pass.', correct_answer: 'print(1)', skill_tag: spec.topic || 'Coding',
+    time_limit_minutes: spec.time_limit_minutes ?? null, tests_verified: true, generation_prompt: spec.prompt,
+    test_cases: [
+      { id: 't1', input: '1\n', expected_output: '1\n', hidden: false },
+      { id: 't2', input: '2\n', expected_output: '2\n', hidden: false },
+      { id: 't3', input: '3\n', expected_output: '3\n', hidden: true },
+      { id: 't4', input: '4\n', expected_output: '4\n', hidden: true },
+      { id: 't5', input: '5\n', expected_output: '5\n', hidden: true },
+    ],
+  };
+}
+
+// In-memory stand-in for /api/assessment/1 and /api/assessment/1/coding/* (mirrors coding_question_service).
+function makeServer({ max = 20, status = 'DRAFT' } = {}) {
+  const state = { specs: [], clientPrompt: 'Acme default rules', clientDefault: 'Acme default rules', baseCoding: 2, nextId: 1,
+    nextQ: 500, failNext: null, failSave: null, saved: [], status };
+  const editable = () => ['DRAFT', 'SENT'].includes(state.status);
+  const view = s => ({ ...s, status: s.draft ? 'review' : s.status });
   const config = () => ({
-    editable: true, jd: { id: 20, title: 'Backend Engineer' }, client: { id: 5, name: 'Acme' },
+    editable: editable(), status: state.status, jd: { id: 20, title: 'Backend Engineer' }, client: { id: 5, name: 'Acme' },
     client_prompt: state.clientPrompt, client_default_prompt: state.clientDefault,
-    specs: state.specs.map(s => ({ ...s })),
-    coding_question_count: state.baseCoding + state.specs.filter(s => s.status === 'generated').length,
-    limits: { max_coding_questions: max, max_questions: 60, max_prompt_chars: 4000, max_client_prompt_chars: 4000 },
+    specs: state.specs.map(view),
+    coding_question_count: state.baseCoding + state.specs.filter(s => s.question).length,
+    limits: { max_coding_questions: max, max_questions: 60, max_prompt_chars: 4000, max_client_prompt_chars: 4000, max_topic_chars: 200, max_time_limit_minutes: 240 },
     languages: LANGUAGES, difficulties: ['Easy', 'Medium', 'Hard'],
   });
   const ok = data => Promise.resolve({ ok: true, status: 200, data: { success: true, ...data } });
-  const fail = (status, error) => Promise.resolve({ ok: false, status, data: { error } });
+  const fail = (code, error) => Promise.resolve({ ok: false, status: code, data: { error } });
   const spec = id => state.specs.find(s => s.id === id);
+  const specFields = body => Object.fromEntries(Object.entries(body || {}).filter(([key]) => SPEC_KEYS.includes(key)));
   apiGet.mockImplementation(path => {
     if (path === '/api/assessment/1/coding') return Promise.resolve(config());
     if (path === '/api/assessment/1') return Promise.resolve({
-      assessment: { id: 1, status: 'DRAFT', title: 'Exam', candidate_id: 9, jd_id: 20 },
-      questions: state.generated.map((q, i) => ({ ...q, sort_order: i })), answers: [],
+      assessment: { id: 1, status: state.status, title: 'Exam', candidate_id: 9, jd_id: 20 },
+      questions: [...BASE_QUESTIONS, ...state.saved], answers: [],
     });
     return Promise.resolve({});
   });
   apiPost.mockImplementation((path, body) => {
     if (path === '/api/assessment/1/coding/specs') {
       if (state.specs.length >= max) return fail(409, `An assessment can have at most ${max} custom coding questions.`);
-      const created = { id: `s${state.nextId++}`, prompt: body.prompt, language: body.language, difficulty: body.difficulty,
-        points: body.points, status: 'pending', last_error: '', question: null };
+      const created = { id: `s${state.nextId++}`, ...specFields(body), status: 'pending', last_error: '', question: null, draft: null };
       state.specs.push(created);
-      return ok({ spec: created, config: config() });
+      return ok({ spec: view(created), config: config() });
     }
-    const match = path.match(/^\/api\/assessment\/1\/coding\/specs\/(\w+)\/generate$/);
+    let match = path.match(/^\/api\/assessment\/1\/coding\/specs\/(\w+)\/generate$/);
     if (match) {
       const target = spec(match[1]);
-      Object.assign(target, body);
+      Object.assign(target, specFields(body));
       if (state.failNext) {
         const message = state.failNext;
         state.failNext = null;
         Object.assign(target, { status: 'failed', last_error: message });
         return fail(502, message);
       }
-      const question = target.question || { id: state.nextQ++ };
-      Object.assign(question, { question_type: 'coding', source: 'custom_coding', generation_prompt: target.prompt,
-        question_text: `Generated for: ${target.prompt}`, points: target.points, tests_verified: true,
-        test_cases: [{ hidden: false }, { hidden: true }] });
-      Object.assign(target, { status: 'generated', last_error: '', question });
-      state.generated = state.generated.filter(q => q.id !== question.id).concat(question);
-      return ok({ spec: target, question, config: config() });
+      Object.assign(target, { last_error: '', draft: generatedDraft(target) });
+      return ok({ spec: view(target), draft: target.draft, config: config() });
     }
+    match = path.match(/^\/api\/assessment\/1\/coding\/specs\/(\w+)\/save$/);
+    if (match) {
+      const target = spec(match[1]);
+      if (!target.draft) return fail(409, 'Generate the question and review it before saving.');
+      if (state.failSave) {
+        const message = state.failSave;
+        state.failSave = null;
+        return fail(400, message);
+      }
+      Object.assign(target, specFields(body));
+      const question = { ...(target.question || { id: state.nextQ++, sort_order: 2 + state.saved.length }), ...target.draft, ...(body.question || {}),
+        question_type: 'coding', source: 'custom_coding', points: target.points };
+      Object.assign(target, { status: 'generated', draft: null, question });
+      state.saved = state.saved.filter(q => q.id !== question.id).concat(question).sort((a, b) => a.sort_order - b.sort_order);
+      return ok({ spec: view(target), question, config: config() });
+    }
+    if (path === '/api/assessment/question') return ok({ question: { ...body, id: 900, sort_order: 99 } });
     return ok({});
   });
   apiPut.mockImplementation((path, body) => {
@@ -73,15 +110,20 @@ function makeServer({ max = 20 } = {}) {
     if (match) {
       if (body.language === 'cobol') return fail(400, 'Unsupported language');
       Object.assign(spec(match[1]), body);
-      return ok({ spec: spec(match[1]), config: config() });
+      return ok({ spec: view(spec(match[1])), config: config() });
     }
     return ok({});
   });
   apiDelete.mockImplementation(path => {
+    const draft = path.match(/^\/api\/assessment\/1\/coding\/specs\/(\w+)\/draft$/);
+    if (draft) {
+      spec(draft[1]).draft = null;
+      return ok(config());
+    }
     const id = path.split('/').pop();
     const removed = spec(id);
     state.specs = state.specs.filter(s => s.id !== id);
-    if (removed?.question) state.generated = state.generated.filter(q => q.id !== removed.question.id);
+    if (removed?.question) state.saved = state.saved.filter(q => q.id !== removed.question.id);
     return ok(config());
   });
   return state;
@@ -90,8 +132,9 @@ function makeServer({ max = 20 } = {}) {
 let root, container, server, onQuestionsChanged;
 const $ = s => container.querySelector(s);
 const $$ = s => [...container.querySelectorAll(s)];
-const button = text => $$('button').find(b => b.textContent.trim().includes(text));
+const button = (text, scope = container) => [...scope.querySelectorAll('button')].find(b => b.textContent.trim().includes(text));
 const heading = () => $('#ab-coding-title').textContent;
+const calls = (mock, suffix) => mock.mock.calls.filter(([path]) => path.endsWith(suffix));
 
 function type(el, value) {
   const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
@@ -101,11 +144,19 @@ function type(el, value) {
   });
 }
 async function click(el) { await act(async () => el.click()); }
+async function renderPanel() {
+  await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" onQuestionsChanged={onQuestionsChanged} />));
+}
 async function mount(options) {
   server = makeServer(options);
   onQuestionsChanged = jest.fn();
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
-  await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" onQuestionsChanged={onQuestionsChanged} />));
+  await renderPanel();
+}
+async function remount() {
+  act(() => root.unmount());
+  root = createRoot(container);
+  await renderPanel();
 }
 async function addAndGenerate(prompt, extra = {}) {
   await click(button('+ Add Coding Question'));
@@ -113,7 +164,14 @@ async function addAndGenerate(prompt, extra = {}) {
   type(card.querySelector('textarea'), prompt);
   if (extra.language) type(card.querySelector('select[id^="ab-coding-lang"]'), extra.language);
   if (extra.difficulty) type(card.querySelector('select[id^="ab-coding-diff"]'), extra.difficulty);
-  await click([...card.querySelectorAll('button')].find(b => b.textContent.includes('Generate Question')));
+  if (extra.topic) type(card.querySelector('input[id^="ab-coding-topic"]'), extra.topic);
+  if (extra.time) type(card.querySelector('input[id^="ab-coding-time"]'), extra.time);
+  await click(button('Generate Question', card));
+  return card;
+}
+async function addGenerateAndSave(prompt, extra) {
+  const card = await addAndGenerate(prompt, extra);
+  await click(button('Save Question', card));
   return card;
 }
 
@@ -124,16 +182,103 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); jest.restoreAllMocks(); jest.clearAllMocks(); });
 
 describe('Coding Questions panel', () => {
-  test.each([1, 2, 5, 10])('adds and generates %i coding questions, each from its own prompt', async (count) => {
+  test.each([1, 2, 5, 10])('adds, generates, reviews and saves %i coding questions, each from its own prompt', async (count) => {
     await mount();
     expect(heading()).toContain('Coding Questions (2)');
-    for (let i = 0; i < count; i += 1) await addAndGenerate(`Client requirement number ${i}`);
+    for (let i = 0; i < count; i += 1) await addGenerateAndSave(`Client requirement number ${i}`);
     expect($$('.ab-coding-card')).toHaveLength(count);
     expect(heading()).toContain(`Coding Questions (${2 + count})`);
-    const generateCalls = apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'));
-    expect(generateCalls.map(([, body]) => body.prompt)).toEqual(Array.from({ length: count }, (_, i) => `Client requirement number ${i}`));
+    expect(calls(apiPost, '/generate').map(([, body]) => body.prompt)).toEqual(Array.from({ length: count }, (_, i) => `Client requirement number ${i}`));
+    expect(calls(apiPost, '/save')).toHaveLength(count);
     expect(onQuestionsChanged).toHaveBeenCalledTimes(count);
-    expect(container.textContent).toContain(`${count} generated`);
+    expect(server.saved).toHaveLength(count);
+    expect(container.textContent).toContain(`${count} saved`);
+  });
+
+  test('generating shows an editable review and nothing is added until Save Question', async () => {
+    await mount();
+    const card = await addAndGenerate('Merge overlapping intervals');
+    expect(card.querySelector('.ab-coding-status').textContent).toBe('Review & save');
+    expect(server.saved).toHaveLength(0);
+    expect(onQuestionsChanged).not.toHaveBeenCalled();
+    const review = card.querySelector('[aria-label="Review generated question"]');
+    expect(review.querySelector('textarea[id^="ab-draft-question_text"]').value).toContain('Generated for: Merge overlapping intervals');
+    for (const key of ['input_format', 'output_format', 'constraints', 'explanation', 'correct_answer']) {
+      expect(review.querySelector(`textarea[id^="ab-draft-${key}"]`)).toBeTruthy();
+    }
+    expect(review.textContent).toContain('2 visible samples, 3 hidden');
+
+    type(review.querySelector('textarea[id^="ab-draft-question_text"]'), 'Edited statement: merge intervals that overlap and print the merged list sorted by start time.');
+    type(review.querySelector('textarea[id^="ab-draft-constraints"]'), '1 <= n <= 1000');
+    await click(review.querySelector('[aria-label="Remove test 5"]'));
+    await click(button('+ Add test case', review));
+    type(review.querySelector('[aria-label="Test 5 input"]'), '9\n');
+    type(review.querySelector('[aria-label="Test 5 expected output"]'), '9\n');
+    await click(button('Save Question', card));
+
+    const [, body] = calls(apiPost, '/save')[0];
+    expect(body.question.question_text).toContain('Edited statement');
+    expect(body.question.constraints).toBe('1 <= n <= 1000');
+    expect(body.question.test_cases.map(t => t.input)).toEqual(['1\n', '2\n', '3\n', '4\n', '9\n']);
+    expect(body.question.test_cases.at(-1).hidden).toBe(true);
+    expect(server.saved[0].question_text).toContain('Edited statement');
+    expect(onQuestionsChanged).toHaveBeenCalledWith(expect.objectContaining({ id: server.saved[0].id }));
+    expect(card.querySelector('.ab-coding-status').textContent).toBe('Saved');
+    expect(card.textContent).toContain('Saved to the assessment.');
+  });
+
+  test('prompt, topic, language, difficulty and time limit are sent with generation', async () => {
+    await mount();
+    await addAndGenerate('Rate limiter in Java', { language: 'java', difficulty: 'Hard', topic: 'Sliding window', time: 45 });
+    const [, body] = calls(apiPost, '/generate')[0];
+    expect(body).toEqual(expect.objectContaining({ prompt: 'Rate limiter in Java', language: 'java', difficulty: 'Hard', topic: 'Sliding window', time_limit_minutes: 45 }));
+    expect($('.ab-coding-summary').textContent).toContain('Sliding window');
+  });
+
+  test('the review is validated before saving', async () => {
+    await mount();
+    const card = await addAndGenerate('Validate me');
+    const review = card.querySelector('[aria-label="Review generated question"]');
+    type(review.querySelector('textarea[id^="ab-draft-correct_answer"]'), '  ');
+    await click(button('Save Question', card));
+    expect($('[role="alert"]').textContent).toContain('reference solution');
+    type(review.querySelector('textarea[id^="ab-draft-correct_answer"]'), 'print(1)');
+    await click(review.querySelector('[aria-label="Remove test 5"]'));
+    await click(button('Save Question', card));
+    expect($('[role="alert"]').textContent).toContain('3 hidden tests');
+    expect(calls(apiPost, '/save')).toHaveLength(0);
+    expect(draftProblem({ question_text: 'too short', correct_answer: 'x', explanation: 'y' })).toContain('12 words');
+  });
+
+  test('a server validation error on save is shown and the draft is kept', async () => {
+    await mount();
+    const card = await addAndGenerate('Server says no');
+    server.failSave = 'The reference solution does not pass the test cases: t3';
+    await click(button('Save Question', card));
+    expect($('[role="alert"]').textContent).toContain('does not pass the test cases');
+    expect(card.querySelector('[aria-label="Review generated question"]')).toBeTruthy();
+    expect(server.saved).toHaveLength(0);
+    expect(onQuestionsChanged).not.toHaveBeenCalled();
+  });
+
+  test('Cancel on a new entry removes it; Cancel on a regenerated draft keeps the saved question', async () => {
+    await mount();
+    await addAndGenerate('Changed my mind');
+    await click(button('Cancel', $('.ab-coding-card')));
+    expect(apiDelete).toHaveBeenLastCalledWith('/api/assessment/1/coding/specs/s1');
+    expect($$('.ab-coding-card')).toHaveLength(0);
+    expect(server.saved).toHaveLength(0);
+
+    const card = await addGenerateAndSave('Keep this one');
+    const savedText = server.saved[0].question_text;
+    await click(button('Regenerate', card));
+    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('review the new version'));
+    expect(card.querySelector('[aria-label="Review generated question"]')).toBeTruthy();
+    await click(button('Cancel', card));
+    expect(apiDelete).toHaveBeenLastCalledWith('/api/assessment/1/coding/specs/s2/draft');
+    expect($$('.ab-coding-card')).toHaveLength(1);
+    expect(server.saved[0].question_text).toBe(savedText);
+    expect(server.specs[0].draft).toBeNull();
   });
 
   test('bottom add action is present with zero, one, two, three and more entries', async () => {
@@ -152,9 +297,9 @@ describe('Coding Questions panel', () => {
     }
   });
 
-  test('more than two questions can be edited, saved, generated, removed and restored', async () => {
+  test('more than two questions can be edited, saved, regenerated, removed and restored', async () => {
     await mount();
-    for (let i = 0; i < 4; i += 1) await addAndGenerate(`Requirement ${i}`);
+    for (let i = 0; i < 4; i += 1) await addGenerateAndSave(`Requirement ${i}`);
     await click(button('Collapse all'));
     const third = $$('.ab-coding-card')[2];
     await click(third.querySelector('[aria-label="Edit coding question 3"]'));
@@ -162,19 +307,18 @@ describe('Coding Questions panel', () => {
     type(third.querySelector('textarea'), 'Updated third requirement');
     type(third.querySelector('select[id^="ab-coding-lang"]'), 'java');
     type(third.querySelector('select[id^="ab-coding-diff"]'), 'Hard');
-    await click([...third.querySelectorAll('button')].find(b => b.textContent.includes('Save changes')));
+    await click(button('Save changes', third));
     expect(apiPut).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s3', {
       prompt: 'Updated third requirement', language: 'java', difficulty: 'Hard',
     });
-    await click([...third.querySelectorAll('button')].find(b => b.textContent.includes('Regenerate')));
-    expect(third.textContent).toContain('Generated for: Updated third requirement');
+    await click(button('Regenerate', third));
+    await click(button('Save Question', third));
+    expect(server.saved.find(q => q.id === server.specs[2].question.id).question_text).toContain('Updated third requirement');
     const fourth = $$('.ab-coding-card')[3];
     await click(fourth.querySelector('[aria-label="Edit coding question 4"]'));
-    await click([...fourth.querySelectorAll('button')].find(b => b.textContent.includes('Remove')));
+    await click(button('Remove', fourth));
     expect(apiDelete).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s4');
-    act(() => root.unmount());
-    root = createRoot(container);
-    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    await remount();
     expect($$('.ab-coding-card')).toHaveLength(3);
     expect(heading()).toContain('Coding Questions (5)');
     await click($$('.ab-coding-card')[2].querySelector('[aria-label="Edit coding question 3"]'));
@@ -190,14 +334,24 @@ describe('Coding Questions panel', () => {
       await click($('.ab-coding-footer button'));
       const card = $$('.ab-coding-card').at(-1);
       type(card.querySelector('textarea'), `Draft prompt ${i}`);
-      await click([...card.querySelectorAll('button')].find(b => b.textContent.includes('Save changes')));
+      await click(button('Save changes', card));
     }
-    act(() => root.unmount()); root = createRoot(container);
-    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    await remount();
     expect($$('.ab-coding-card')).toHaveLength(4);
     expect(heading()).toContain('Coding Questions (6)');
     for (let i = 0; i < 4; i += 1) expect($$('.ab-coding-card')[i].textContent).toContain(`Draft prompt ${i}`);
     expect(server.specs.every(spec => spec.status === 'pending')).toBe(true);
+  });
+
+  test('a generated draft awaiting review survives a reload', async () => {
+    await mount();
+    await addAndGenerate('Review me after lunch');
+    await remount();
+    const card = $('.ab-coding-card');
+    expect(card.querySelector('.ab-coding-status').textContent).toBe('Review & save');
+    expect(card.querySelector('textarea[id^="ab-draft-question_text"]').value).toContain('Review me after lunch');
+    await click(button('Save Question', card));
+    expect(server.saved).toHaveLength(1);
   });
 
   test('generation saves the current shared instructions before generating each individual question', async () => {
@@ -210,8 +364,7 @@ describe('Coding Questions panel', () => {
     expect(apiPut.mock.invocationCallOrder[0]).toBeLessThan(apiPost.mock.invocationCallOrder[1]);
     expect(server.clientPrompt).toBe('Shared Java performance requirements');
     expect(server.specs.map(spec => spec.prompt)).toEqual(Array.from({ length: 4 }, (_, i) => `Individual prompt ${i}`));
-    act(() => root.unmount()); root = createRoot(container);
-    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    await remount();
     expect($('#ab-client-prompt').value).toBe('Shared Java performance requirements');
   });
 
@@ -222,51 +375,39 @@ describe('Coding Questions panel', () => {
     type($('.ab-coding-card textarea'), 'Unsaved individual prompt');
     apiPut.mockResolvedValueOnce({ ok: false, data: { error: 'Could not save instructions' } });
     await click(button('Generate Question'));
-    expect(apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'))).toHaveLength(0);
+    expect(calls(apiPost, '/generate')).toHaveLength(0);
     expect($('.ab-coding-card textarea').value).toBe('Unsaved individual prompt');
     expect($('#ab-client-prompt').value).toBe('Unsaved shared instructions');
     expect($('[role="alert"]').textContent).toContain('Could not save instructions');
   });
 
-  test('language, difficulty and the prompt are sent with generation and the preview shows the question', async () => {
-    await mount();
-    const card = await addAndGenerate('Rate limiter in Java', { language: 'java', difficulty: 'Hard' });
-    const [, body] = apiPost.mock.calls.find(([path]) => path.endsWith('/generate'));
-    expect(body).toEqual(expect.objectContaining({ prompt: 'Rate limiter in Java', language: 'java', difficulty: 'Hard' }));
-    expect(card.textContent).toContain('Generated for: Rate limiter in Java');
-    expect(card.textContent).toContain('2 test cases (1 hidden)');
-    expect(card.querySelector('.ab-coding-status').textContent).toBe('Generated');
-    expect(card.querySelector('a[href^="#ab-q-"]')).toBeTruthy();
-  });
-
-  test('an empty prompt is rejected before calling the API', async () => {
+  test('an empty prompt is rejected before calling the API and Save is disabled until generated', async () => {
     await mount();
     await click(button('+ Add Coding Question'));
+    expect(button('Save Question').disabled).toBe(true);
     await click(button('Generate Question'));
     expect($('[role="alert"]').textContent).toContain('requirements');
-    expect(apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'))).toHaveLength(0);
+    expect(calls(apiPost, '/generate')).toHaveLength(0);
   });
 
-  test('regenerate asks first and keeps the same entry; edits can be saved without generating', async () => {
+  test('regenerating a draft with edits asks first', async () => {
     await mount();
     const card = await addAndGenerate('First version');
-    type(card.querySelector('textarea'), 'Second version');
-    await click(button('Save changes'));
-    expect(apiPut).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s1', { prompt: 'Second version' });
+    type(card.querySelector('textarea[id^="ab-draft-explanation"]'), 'My edit');
     window.confirm.mockReturnValueOnce(false);
-    await click(button('Regenerate'));
-    expect(apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'))).toHaveLength(1);
-    await click(button('Regenerate'));
-    expect(apiPost.mock.calls.filter(([path]) => path.endsWith('/generate'))).toHaveLength(2);
-    expect($$('.ab-coding-card')).toHaveLength(1);
-    expect(container.textContent).toContain('Generated for: Second version');
+    await click(button('Regenerate', card));
+    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('edits to the generated draft'));
+    expect(calls(apiPost, '/generate')).toHaveLength(1);
+    await click(button('Regenerate', card));
+    expect(calls(apiPost, '/generate')).toHaveLength(2);
+    expect(card.querySelector('textarea[id^="ab-draft-explanation"]').value).toBe('Single pass.');
   });
 
-  test('remove deletes the entry and its question', async () => {
+  test('remove deletes the entry and its saved question', async () => {
     await mount();
-    await addAndGenerate('Entry to delete');
+    await addGenerateAndSave('Entry to delete');
     await click(button('Remove'));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('generated question is removed'));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('saved question is removed'));
     expect(apiDelete).toHaveBeenCalledWith('/api/assessment/1/coding/specs/s1');
     expect($$('.ab-coding-card')).toHaveLength(0);
     expect(heading()).toContain('Coding Questions (2)');
@@ -294,12 +435,11 @@ describe('Coding Questions panel', () => {
     expect($('[role="alert"]').textContent).toContain('Unsupported language');
   });
 
-  test('the limit disables adding more', async () => {
-    await mount({ max: 2 });
-    await click(button('+ Add Coding Question'));
-    await click(button('+ Add Coding Question'));
+  test('the configurable limit disables adding more; there is no fixed limit of two', async () => {
+    await mount({ max: 3 });
+    for (let i = 0; i < 3; i += 1) await addGenerateAndSave(`Question ${i}`);
     expect(button('+ Add Coding Question').disabled).toBe(true);
-    expect(container.textContent).toContain('limit 2');
+    expect(container.textContent).toContain('limit 3');
   });
 
   test('client instructions default from the client and can be saved as the client default', async () => {
@@ -329,18 +469,23 @@ describe('Coding Questions panel', () => {
 
   test('reloading restores saved entries', async () => {
     await mount();
-    await addAndGenerate('Persisted prompt');
-    act(() => root.unmount());
-    root = createRoot(container);
-    await act(async () => root.render(<CodingQuestionsPanel assessmentId="1" />));
+    await addGenerateAndSave('Persisted prompt');
+    await remount();
     expect(container.textContent).toContain('Persisted prompt');
-    expect($('.ab-coding-status').textContent).toBe('Generated');
+    expect($('.ab-coding-status').textContent).toBe('Saved');
+  });
+
+  test('once the candidate starts, the button stays visible but questions are locked', async () => {
+    await mount({ status: 'IN_PROGRESS' });
+    expect(button('+ Add Coding Question').disabled).toBe(true);
+    expect(container.textContent).toContain('locked because the candidate has started');
+    expect($('#ab-client-prompt')).toBeNull();
   });
 });
 
 describe('Assessment Builder integration', () => {
-  async function mountBuilder() {
-    server = makeServer();
+  async function mountBuilder(options) {
+    server = makeServer(options);
     container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
     await act(async () => root.render(
       <MemoryRouter initialEntries={['/hiring-pipeline/assessment/1']}>
@@ -348,24 +493,90 @@ describe('Assessment Builder integration', () => {
       </MemoryRouter>,
     ));
   }
+  const questionCards = () => $$('.ab-question-card');
 
-  test('generated coding questions appear in the question list with their prompt', async () => {
+  test('the Add Coding Question panel sits after the last question card', async () => {
     await mountBuilder();
-    expect($('#ab-coding-title')).toBeTruthy();
-    await addAndGenerate('Builder-level requirement');
-    const card = $$('.ab-question-card').find(c => c.textContent.includes('Generated for: Builder-level requirement'));
-    expect(card.textContent).toContain('Custom prompt');
-    expect(card.textContent).toContain('Recruiter prompt: Builder-level requirement');
-    expect(card.id).toMatch(/^ab-q-\d+$/);
+    const lastCard = questionCards().at(-1);
+    const panel = $('.ab-coding-panel');
+    expect(lastCard.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(button('+ Add Coding Question', panel)).toBeTruthy();
   });
 
-  test('sending warns about entries that were never generated', async () => {
+  test('saved coding questions get the next number and existing questions are kept as they were', async () => {
     await mountBuilder();
-    await addAndGenerate('Generated one');
-    await click(button('+ Add Coding Question'));
+    const before = questionCards().map(c => c.textContent);
+    await addGenerateAndSave('Builder-level requirement', { topic: 'Intervals', time: 30 });
+    await addGenerateAndSave('Second builder requirement');
+    await addGenerateAndSave('Third builder requirement');
+    const cards = questionCards();
+    expect(cards).toHaveLength(5);
+    expect(cards.slice(0, 2).map(c => c.textContent)).toEqual(before);
+    expect(cards.map(c => c.querySelector('.ab-q-num').textContent)).toEqual(['Q1', 'Q2', 'Q3', 'Q4', 'Q5']);
+    expect(cards[2].textContent).toContain('Generated for: Builder-level requirement');
+    expect(cards[2].textContent).toContain('Custom prompt');
+    expect(cards[2].textContent).toContain('Recruiter prompt: Builder-level requirement');
+    expect(cards[2].textContent).toContain('Constraints: 1 <= n <= 10^5');
+    expect(cards[2].textContent).toContain('30 min');
+    expect(cards[2].id).toMatch(/^ab-q-\d+$/);
+    expect($('.ab-notice').textContent).toContain('saved as Q5');
+  });
+
+  test('an invited (SENT) assessment can still get coding questions; questions lock once started', async () => {
+    await mountBuilder({ status: 'SENT' });
+    expect(button('+ Add Coding Question').disabled).toBe(false);
+    expect($('.ab-add-bar')).toBeTruthy();
+    expect(questionCards()[0].querySelector('[title="Edit"]')).toBeTruthy();
+    act(() => root.unmount()); container.remove();
+    await mountBuilder({ status: 'IN_PROGRESS' });
+    expect(button('+ Add Coding Question').disabled).toBe(true);
+    expect($('.ab-add-bar')).toBeNull();
+    expect(questionCards()[0].querySelector('[title="Edit"]')).toBeNull();
+  });
+
+  test('sending warns about entries that were not saved to the assessment', async () => {
+    await mountBuilder();
+    await addGenerateAndSave('Saved one');
+    await addAndGenerate('Generated but not saved');
     window.confirm.mockReturnValueOnce(false);
     await click(button('Send Assessment'));
-    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('1 coding question entry has no generated question'));
-    expect(apiPost.mock.calls.filter(([path]) => path.endsWith('/generate-email'))).toHaveLength(0);
+    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('1 coding question entry has an unsaved or ungenerated question'));
+    expect(calls(apiPost, '/generate-email')).toHaveLength(0);
+  });
+
+  test('a new MCQ needs four options, exactly one correct answer and an explanation', async () => {
+    await mountBuilder();
+    await click(button('MCQ', $('.ab-add-bar')));
+    const form = $('.ab-edit-form');
+    type(form.querySelector('textarea'), 'Which retry policy keeps the payment API idempotent?');
+    ['Retry with idempotency key', 'Retry blindly', 'Never retry', 'Retry only GETs'].forEach((text, i) => {
+      type(form.querySelector(`[aria-label="Option ${'ABCD'[i]}"]`), text);
+    });
+    await click(button('Save', form));
+    expect($('[role="alert"]').textContent).toContain('exactly one of the four options');
+    await click(form.querySelector('[aria-label="Option A is correct"]'));
+    await click(button('Save', form));
+    expect($('[role="alert"]').textContent).toContain('explanation');
+    const explanation = [...form.querySelectorAll('textarea')].at(-1);
+    type(explanation, 'The idempotency key makes retries safe.');
+    // Editing the text of the correct option keeps it correct.
+    type(form.querySelector('[aria-label="Option A"]'), 'Retry with an idempotency key');
+    await click(button('Save', form));
+    const [path, body] = apiPost.mock.calls.find(([p]) => p === '/api/assessment/question');
+    expect(path).toBe('/api/assessment/question');
+    expect(body.options).toHaveLength(4);
+    expect(body.correct_answer).toBe('Retry with an idempotency key');
+    expect(body.explanation).toBe('The idempotency key makes retries safe.');
+    expect(body).not.toHaveProperty('sort_order');
+  });
+
+  test('mcqProblem mirrors the server rules', () => {
+    const good = { question_type: 'mcq', question_text: 'Q', options: ['a', 'b', 'c', 'd'], correct_answer: 'c', explanation: 'why' };
+    expect(mcqProblem(good)).toBe('');
+    expect(mcqProblem({ ...good, options: ['a', 'b', 'c'] })).toContain('four');
+    expect(mcqProblem({ ...good, options: ['a', 'A ', 'c', 'd'] })).toContain('different');
+    expect(mcqProblem({ ...good, correct_answer: 'z' })).toContain('exactly one');
+    expect(mcqProblem({ ...good, explanation: '' })).toContain('explanation');
+    expect(mcqProblem({ question_type: 'coding' })).toBe('');
   });
 });

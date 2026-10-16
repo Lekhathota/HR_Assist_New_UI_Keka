@@ -514,3 +514,29 @@
   .ab-coding-summary { flex-wrap: wrap; }
   .ab-coding-title { flex-basis: 100%; order: -1; white-space: normal; }
 }
+
+/* Coding question review (generate → review → save) and the panel below the question cards */
+.ab-coding-panel { margin-top: 0.25rem; }
+.ab-coding-card.ab-coding-review { border-left-color: #f97316; }
+.ab-coding-status-review { background: #ffedd5; color: #c2410c; }
+.ab-required { color: #dc2626; }
+.ab-success-text { color: #15803d; font-weight: 600; margin: 0.5rem 0; }
+.ab-coding-fields input[type="number"] { min-width: 0; }
+.ab-draft-review { margin: 0.85rem 0; padding: 0.9rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
+.ab-draft-review-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.75rem; margin-bottom: 0.75rem; color: #1e293b; }
+.ab-draft-review-head i { color: var(--accent-color, #f97316); }
+.ab-draft-field { flex: 1; min-width: 0; margin-bottom: 0.6rem; }
+.ab-draft-field textarea, .ab-draft-test textarea { width: 100%; box-sizing: border-box; }
+.ab-draft-tests { margin-top: 0.25rem; }
+.ab-draft-tests-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+.ab-draft-test { display: grid; grid-template-columns: auto 1fr 1fr auto auto; align-items: end; gap: 0.5rem; padding: 0.5rem 0; border-top: 1px solid #e2e8f0; }
+.ab-draft-test-io { display: flex; flex-direction: column; min-width: 0; }
+.ab-type-summary { margin: -0.6rem 0 1rem; color: #64748b; font-size: 0.85rem; }
+.ab-options-editor { border: 0; padding: 0; margin: 0 0 0.75rem; }
+.ab-options-editor .ab-option-row { align-items: center; }
+.ab-options-editor .ab-option-row input[type="radio"] { flex: 0 0 auto; width: auto; accent-color: #16a34a; }
+.ab-option-letter { font-weight: 700; color: #475569; width: 1.25rem; text-align: center; }
+.ab-options-editor .ab-option-row.ab-option-correct input[type="text"] { border-color: #16a34a; background: #f0fdf4; }
+@media (max-width: 640px) {
+  .ab-draft-test { grid-template-columns: 1fr; }
+}
