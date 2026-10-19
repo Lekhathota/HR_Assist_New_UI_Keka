@@ -262,7 +262,7 @@
 .az-result.tone-rejected { --tone: #d92d20; --tone-soft: var(--az-bad-soft); }
 .az-result:hover { box-shadow: 0 6px 18px rgba(16, 24, 40, .07); }
 .az-result-main { display: flex; align-items: center; gap: 14px; }
-.az-avatar { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 50%; background: #f3f4f6; color: #374151; font-size: 14px; font-weight: 700; }
+.az-avatar { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 50%; background: #eef2ff; color: #3b4fd8; font-size: 14px; font-weight: 700; }
 .az-result-who { flex: 1; min-width: 0; }
 .analyze-page .az-result-who h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .az-status { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--tone-soft); color: var(--tone); font-size: 12px; font-weight: 600; text-transform: capitalize; }

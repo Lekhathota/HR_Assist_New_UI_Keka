@@ -105,7 +105,7 @@
 .um-page .um-table tbody tr:hover td { background: #fcfcfd; }
 .um-row-inactive .um-user strong, .um-row-inactive .um-avatar { opacity: .55; }
 .um-user { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.um-avatar { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: #1f2937; color: #fff; font-size: 13px; font-weight: 700; }
+.um-avatar { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: #eef2ff; color: #3b4fd8; font-size: 13px; font-weight: 700; }
 .um-user > span:last-child { display: grid; min-width: 0; }
 .um-user strong { display: flex; align-items: center; gap: 8px; color: var(--um-ink); font-size: 14px; font-weight: 600; }
 .um-user small { overflow: hidden; color: var(--um-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }

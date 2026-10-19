@@ -97,7 +97,7 @@
 .vn-page .vn-table .vn-num { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
 .vn-row-inactive .vn-vendor strong, .vn-row-inactive .vn-avatar { opacity: .55; }
 .vn-vendor { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
-.vn-avatar { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 11px; background: #1f2937; color: #fff; font-size: 13px; font-weight: 700; }
+.vn-avatar { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 11px; background: #eef2ff; color: #3b4fd8; font-size: 13px; font-weight: 700; }
 .vn-vendor > span:last-child { display: grid; gap: 2px; min-width: 0; }
 .vn-vendor strong { color: var(--vn-ink); font-size: 14px; font-weight: 600; }
 .vn-vendor small { color: var(--vn-muted); font-size: 12.5px; }
