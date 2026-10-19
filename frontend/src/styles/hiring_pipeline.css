@@ -289,3 +289,36 @@ body.theme-shimento .app-shell .hp-page .hp-empty p { margin: 0; font-size: 14px
   .app-shell .hp-page .hp-status-menu { justify-items: start; }
   .app-shell .hp-page .hp-status-error { text-align: left; }
 }
+
+/* Assessments tab: Candidate · Contact · Scores · Progress · Next step.
+   Scoped to .hp-row-assessment so interview rows keep their own layout. */
+.app-shell .hp-page .hp-row-assessment {
+  grid-template-columns: minmax(220px, 1.3fr) minmax(190px, 1.1fr) 140px minmax(190px, 1fr) 270px;
+}
+.app-shell .hp-page .hp-row-assessment .hp-sub { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.app-shell .hp-page .hp-row-assessment .hp-sub i { flex: none; color: #9ca3af; font-size: 10.5px; }
+.app-shell .hp-page .hp-row-assessment .hp-match.is-empty { color: #c4c7cc; font-weight: 600; }
+.app-shell .hp-page .hp-row-assessment .hp-match.hp-match-test.is-empty { background: var(--hp-soft); }
+
+.app-shell .hp-page .hp-progress { display: grid; gap: 5px; min-width: 0; }
+.app-shell .hp-page .hp-progress-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.app-shell .hp-page .hp-progress-note {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--hp-muted); font-size: 12px;
+}
+.app-shell .hp-page .hp-progress-note i { flex: none; width: 12px; color: #9ca3af; font-size: 10.5px; text-align: center; }
+.app-shell .hp-page .hp-progress-note.is-bad,
+.app-shell .hp-page .hp-progress-note.is-bad i { color: #c6382d; }
+.app-shell .hp-page .hp-progress-note .hp-dot { color: #d1d5db; }
+
+.app-shell .hp-page .hp-row-assessment .hp-actions { flex-wrap: nowrap; }
+
+@media (max-width: 1280px) {
+  .app-shell .hp-page .hp-row-assessment { grid-template-columns: minmax(180px, 1fr) minmax(170px, 1fr) 140px; row-gap: 12px; }
+  .app-shell .hp-page .hp-row-assessment .hp-progress { grid-column: 1 / 2; }
+  .app-shell .hp-page .hp-row-assessment .hp-actions { grid-column: 2 / 4; flex-wrap: wrap; }
+}
+@media (max-width: 760px) {
+  .app-shell .hp-page .hp-row-assessment { grid-template-columns: minmax(0, 1fr); }
+}

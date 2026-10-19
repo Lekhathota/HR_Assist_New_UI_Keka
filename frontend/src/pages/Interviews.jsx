@@ -957,7 +957,8 @@ function HiringPipeline() {
             <>
               <div className="hp-toolbar">
                 <div className="hp-chips" role="group" aria-label="Assessment filters">
-                  {ASSESSMENT_FILTERS.map(([value, label]) => (
+                  {/* Hide empty statuses so the bar only shows stages that have candidates. */}
+                  {ASSESSMENT_FILTERS.filter(([value]) => value === 'all' || value === assessmentFilter || assessmentCounts[value] > 0).map(([value, label]) => (
                     <button key={value} type="button" aria-pressed={assessmentFilter === value}
                       className={`hp-chip${assessmentFilter === value ? ' active' : ''}`} onClick={() => setAssessmentFilter(value)}>
                       {label}<span>{value === 'all' ? assessmentRows.length : assessmentCounts[value] || 0}</span>
@@ -977,8 +978,8 @@ function HiringPipeline() {
                 <div className="hp-empty"><i className="fas fa-clipboard" aria-hidden="true"></i><p>No candidates match this view.</p></div>
               ) : (
                 <>
-                <div className="hp-row hp-row-head" aria-hidden="true">
-                  <span>Candidate</span><span>Contact</span><span>Scores</span><span>Status</span><span className="hp-head-actions">Actions</span>
+                <div className="hp-row hp-row-assessment hp-row-head" aria-hidden="true">
+                  <span>Candidate</span><span>Contact</span><span>Scores</span><span>Progress</span><span className="hp-head-actions">Next step</span>
                 </div>
                 <ul className="hp-list" aria-label="Assessment queue">
                   {filteredAssessments.map(row => {
@@ -986,33 +987,48 @@ function HiringPipeline() {
                     const generatedKey = `${row.candidate_id}-${row.jd_id}`;
                     const activeInterview = hasActiveInterview(row);
                     const status = row.assessment_status || 'NOT_CREATED';
+                    const phone = realValue(row.candidate_phone);
+                    const milestone = row.completed_at ? ['fa-flag-checkered', `Completed ${formatAssessmentDate(row.completed_at)}`]
+                      : row.started_at ? ['fa-play', `Started ${formatAssessmentDate(row.started_at)}`]
+                        : row.sent_at ? ['fa-paper-plane', `Sent ${formatAssessmentDate(row.sent_at)}`] : null;
+                    const linkNote = !activeInterview && status !== 'NOT_CREATED' && status !== 'DRAFT'
+                      ? `Link ${String(row.link_status || 'not sent').toLowerCase()}` : null;
+                    const testScore = showScore && row.assessment_percentage != null;
                     return (
-                      <li key={generatedKey} className="hp-row">
+                      <li key={generatedKey} className="hp-row hp-row-assessment">
                         <div className="hp-person">
                           <span className="hp-avatar" aria-hidden="true">{initials(row.candidate_name || row.candidate_email || '?')}</span>
                           <div>
                             <Link to={`/talent/${row.candidate_id}`} className="hp-name">{row.candidate_name || row.candidate_email}</Link>
-                            <span className="hp-sub">{row.jd_title || 'No job'}</span>
+                            <span className="hp-sub" title={row.jd_title || undefined}><i className="fas fa-briefcase" aria-hidden="true"></i>{row.jd_title || 'No job'}</span>
                           </div>
                         </div>
                         <div className="hp-meta">
-                          {row.candidate_email && <span><i className="fas fa-envelope" aria-hidden="true"></i>{row.candidate_email}</span>}
-                          {realValue(row.candidate_phone) && <span><i className="fas fa-phone" aria-hidden="true"></i>{realValue(row.candidate_phone)}</span>}
-                          {row.completed_at ? <span><i className="fas fa-flag-checkered" aria-hidden="true"></i>Completed {formatAssessmentDate(row.completed_at)}</span>
-                            : row.started_at ? <span><i className="fas fa-play" aria-hidden="true"></i>Started {formatAssessmentDate(row.started_at)}</span>
-                              : row.sent_at ? <span><i className="fas fa-paper-plane" aria-hidden="true"></i>Sent {formatAssessmentDate(row.sent_at)}</span> : null}
+                          {row.candidate_email && <span title={row.candidate_email}><i className="fas fa-envelope" aria-hidden="true"></i>{row.candidate_email}</span>}
+                          {phone && <span><i className="fas fa-phone" aria-hidden="true"></i>{phone}</span>}
+                          {!row.candidate_email && !phone && <span className="hp-note">No contact details</span>}
                         </div>
                         <div className="hp-score">
-                          {row.match_score != null && <span className="hp-match" title="Resume match score">{pct(row.match_score)}<small>match</small></span>}
-                          {showScore && row.assessment_percentage != null && <span className="hp-match hp-match-test" title="Assessment score">{pct(row.assessment_percentage)}<small>test</small></span>}
+                          <span className={`hp-match${row.match_score == null ? ' is-empty' : ''}`} title="Resume match score">{row.match_score != null ? pct(row.match_score) : '—'}<small>match</small></span>
+                          <span className={`hp-match hp-match-test${testScore ? '' : ' is-empty'}`} title="Assessment score">{testScore ? pct(row.assessment_percentage) : '—'}<small>test</small></span>
                         </div>
-                        <div className="hp-pills">
-                          <span className={`hp-pill ${ASSESSMENT_TONE[status] || 'muted'}`}
-                            title={status === 'TERMINATED' ? row.termination_reason || undefined : undefined}>{formatAssessmentStatus(status)}</span>
-                          {status === 'TERMINATED' && row.termination_reason && <span className="hp-pill bad">{row.termination_reason}</span>}
-                          {activeInterview
-                            ? <span className={`hp-pill ${toneOf(row.interview_status)}`}>{interviewLabel(row.interview_status)}</span>
-                            : status !== 'NOT_CREATED' && status !== 'DRAFT' && <span className={`hp-pill ${toneOf(row.link_status)}`}>Link {String(row.link_status || 'not sent').toLowerCase()}</span>}
+                        <div className="hp-progress">
+                          <div className="hp-progress-pills">
+                            <span className={`hp-pill ${ASSESSMENT_TONE[status] || 'muted'}`}>{formatAssessmentStatus(status)}</span>
+                            {activeInterview && <span className={`hp-pill ${toneOf(row.interview_status)}`}>{interviewLabel(row.interview_status)}</span>}
+                          </div>
+                          {(milestone || linkNote) && (
+                            <span className="hp-progress-note">
+                              {milestone && <><i className={`fas ${milestone[0]}`} aria-hidden="true"></i>{milestone[1]}</>}
+                              {milestone && linkNote && <span className="hp-dot" aria-hidden="true">·</span>}
+                              {linkNote}
+                            </span>
+                          )}
+                          {status === 'TERMINATED' && row.termination_reason && (
+                            <span className="hp-progress-note is-bad" title={row.termination_reason}>
+                              <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>{row.termination_reason}
+                            </span>
+                          )}
                         </div>
                         <div className="hp-actions">
                           {status === 'NOT_CREATED' && (
@@ -1022,8 +1038,9 @@ function HiringPipeline() {
                             </button>
                           )}
                           {row.assessment_id && ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'PASSED', 'FAILED', 'TERMINATED'].includes(status) && (
-                            <button type="button" className={`hp-btn ${status === 'DRAFT' ? 'hp-btn-primary' : 'hp-btn-ghost'}`} onClick={() => reviewAssessment(row)}>
-                              <i className={`fas ${status === 'DRAFT' ? 'fa-clipboard-check' : 'fa-user-shield'}`} aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'View candidate test'}
+                            <button type="button" className={`hp-btn ${status === 'DRAFT' ? 'hp-btn-primary' : 'hp-btn-ghost'}`} onClick={() => reviewAssessment(row)}
+                              title={status === 'DRAFT' ? undefined : 'View candidate test'}>
+                              <i className={`fas ${status === 'DRAFT' ? 'fa-clipboard-check' : 'fa-user-shield'}`} aria-hidden="true"></i> {status === 'DRAFT' ? 'Review & send' : 'View test'}
                             </button>
                           )}
                           {row.eligible_for_interview && !activeInterview && (
