@@ -156,7 +156,7 @@ function CodingCard({ question, number, total, editable, editing, busy, error, o
         Tests: {samples.length} public sample{samples.length === 1 ? '' : 's'}, {hidden.length} hidden (inputs and outputs are never shown to the candidate)
         {cases.some(c => Number(c.weight ?? 1) !== 1) && ' · weighted'}
         {cases.some(c => c.mandatory) && ` · ${cases.filter(c => c.mandatory).length} mandatory`}.
-        {' '}Qualifies with at least {scoring.min_tests_passed} test(s) and {scoring.min_score_percent}% of the marks
+        {' '}Qualifies with {Number(scoring.min_tests_passed) > 0 ? `at least ${scoring.min_tests_passed} test(s) and ` : ''}{scoring.min_score_percent}% of the marks
         {scoring.partial_credit === false ? ' (all-or-nothing marks)' : ' (partial credit)'}.
       </p>
       {question.correct_answer && (
@@ -315,6 +315,14 @@ function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSa
     setChecking(true);
     setNotice('');
     try {
+      // Run references that were never executed (or could not be) so validation reflects real results.
+      const pending = sorted.filter(q => isCodingType(q.question_type) && ['not_verified', 'unavailable'].includes(verifyState(q)));
+      await Promise.all(pending.map(async q => {
+        try {
+          const { ok, data } = (await apiPost(`/api/assessment/question/${q.id}/verify`, {})) || {};
+          if (ok && data?.verification) replaceQuestion({ id: q.id, verification: data.verification, test_cases: data.test_cases });
+        } catch { /* publish-check below still reports the question as unverified */ }
+      }));
       const data = await apiGet(`/api/assessment/${assessment.id}/publish-check`);
       setCheck(isValidEmail(email) ? data
         : { ...data, ready: false, problems: [...(data.problems || []), 'Enter a valid candidate email address.'] });

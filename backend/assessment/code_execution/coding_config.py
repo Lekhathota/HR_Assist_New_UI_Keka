@@ -242,11 +242,15 @@ def config_problems(question: dict) -> list[str]:
             problems.append("Memory limit is out of range.")
     verification = verification_view(question)
     if verification["status"] != "verified":
-        reason = {"failed": "The reference solution fails one or more test cases.",
-                  "unavailable": "The reference solution could not be executed (code execution unavailable).",
-                  }.get(verification["status"], "The reference solution has not been verified against the current tests.")
-        problems.append(reason)
+        problems.append(_VERIFICATION_REASONS.get(verification["status"], NOT_VERIFIED_REASON))
     return problems
+
+
+NOT_VERIFIED_REASON = "The reference solution has not been verified against the current tests."
+_VERIFICATION_REASONS = {"failed": "The reference solution fails one or more test cases.",
+                         "unavailable": "The reference solution could not be executed (code execution unavailable)."}
+# Reasons that only mean "not executed yet", as opposed to a solution that ran and failed.
+UNVERIFIED_REASONS = frozenset({NOT_VERIFIED_REASON, _VERIFICATION_REASONS["unavailable"]})
 
 
 def score_outcomes(question: dict, outcomes: list[Any]) -> dict:
