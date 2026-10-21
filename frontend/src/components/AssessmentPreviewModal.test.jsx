@@ -25,6 +25,7 @@ const CODING = { id: 40, question_type: 'coding', sort_order: 40, points: 20, di
   ] };
 const SQL = { id: 41, question_type: 'sql', sort_order: 41, points: 10, question_text: 'Latest status per order.', difficulty: 'Medium',
   sql_schema: 'CREATE TABLE orders (id INTEGER);', test_cases: [{ id: 's1', hidden: false, setup_sql: 'INSERT INTO orders VALUES (1);' }], tests_verified: true };
+const VERIFIED = [...Array.from({ length: 30 }, (_, i) => mcq(i + 1)), { ...CODING, verification: { status: 'verified', message: 'Verified.' } }, SQL];
 const READY = { ready: true, problems: [], questions: [], fingerprint: 'fp-1', mcq_questions: 30, coding_questions: 1, approval: {} };
 
 let root, container, props, current;
@@ -106,6 +107,16 @@ test('Validate Code runs the reference in the sandbox and updates the status', a
   expect($('#pv-q-40').textContent).toContain('fails 1 test run');
 });
 
+test('Validate Assessment first runs references that were never verified', async () => {
+  apiPost.mockResolvedValue({ ok: true, data: { verification: { status: 'verified', message: 'Every reference solution passed.' }, test_cases: CODING.test_cases } });
+  await mount();
+  await click(button('Validate Assessment'));
+  expect(apiPost).toHaveBeenCalledTimes(1);  // the coding question only; the SQL one is already verified
+  expect(apiPost).toHaveBeenCalledWith('/api/assessment/question/40/verify', {});
+  expect(current.find(q => q.id === 40).verification.status).toBe('verified');
+  expect($('.pv-valid').textContent).toContain('Ready to send');
+});
+
 test('Edit Question opens the coding configuration and its unsaved changes block sending', async () => {
   await mount();
   await click(button('Validate Assessment'));
@@ -180,7 +191,7 @@ test('sending needs validation and an explicit confirmation, then publishes the 
   apiPost.mockResolvedValueOnce({ ok: false, data: { error: 'SMTP authentication failed.' } })
     .mockResolvedValueOnce({ ok: true, data: { status: 'SENT', published_version: 1, assessment_link: 'https://hr.example.com/assessment/tok',
       sent_at: '2026-10-16T10:00:00Z', email: { to_email: 'asha@example.com' } } });
-  await mount();
+  await mount({ questions: VERIFIED });
   expect(button('Send Assessment').disabled).toBe(true);
   await click(button('Validate Assessment'));
   expect($('.pv-valid').textContent).toContain('Ready to send');
@@ -206,7 +217,7 @@ test('sending needs validation and an explicit confirmation, then publishes the 
 });
 
 test('cancelling the confirmation sends nothing', async () => {
-  await mount();
+  await mount({ questions: VERIFIED });
   await click(button('Validate Assessment'));
   await click(button('Send Assessment'));
   await click(button('Cancel', $('.pv-confirm')));

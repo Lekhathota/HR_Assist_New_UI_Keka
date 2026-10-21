@@ -166,6 +166,13 @@ class GenerationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_exam(data, normalized_jd(JD), total=TOTAL)
 
+    def test_rejects_a_coding_question_that_asks_for_a_decision(self):
+        data = exam()
+        data["questions"][CODING]["question"] = ("A Python service returns incorrect totals when multiple orders are processed "
+                                                 "simultaneously. What is the most effective first step to resolve this concurrency issue?")
+        with self.assertRaisesRegex(ValueError, "asks for a decision"):
+            validate_exam(data, normalized_jd(JD), total=TOTAL)
+
     def test_rejects_duplicates_and_previous_question_reuse(self):
         data = exam(); data["questions"][1]["question"] = MCQ_TEXTS[0]
         with self.assertRaises(ValueError): validate_exam(data, normalized_jd(JD), total=TOTAL)

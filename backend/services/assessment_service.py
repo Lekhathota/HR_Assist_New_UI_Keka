@@ -869,12 +869,23 @@ def publication_check(assessment_id: int) -> dict[str, Any]:
     pending = [spec for spec in assessment.get("coding_specs") or [] if spec.get("draft_question")]
     if pending:
         general.append(f"{len(pending)} generated coding question(s) are still awaiting review: save or cancel them.")
+    from assessment.code_execution.judge0 import Judge0Runner
+    from assessment.code_execution.coding_config import UNVERIFIED_REASONS
+
+    # Without a sandbox no coding reference can be executed: report that once, not as a per-question fault.
+    execution_missing = any(q.get("question_type") == "coding" for q in questions) and Judge0Runner.from_env() is None
+    if execution_missing:
+        general.append("Code execution is not configured on the server, so coding reference solutions cannot be "
+                       "verified. Set JUDGE0_URL (and JUDGE0_AUTH_TOKEN or JUDGE0_RAPIDAPI_KEY) and redeploy; "
+                       "see docs/code_execution.md.")
     issues = []
     for number, question in enumerate(questions, start=1):
         kind = str(question.get("question_type") or "")
         problems: list[str] = []
         if kind in {"coding", "sql"}:
             problems = config_problems(question)
+            if execution_missing and kind == "coding":
+                problems = [p for p in problems if p not in UNVERIFIED_REASONS]
         elif kind == "mcq":
             try:
                 validate_mcq(question)

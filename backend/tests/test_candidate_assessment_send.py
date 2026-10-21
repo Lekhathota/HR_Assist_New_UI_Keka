@@ -335,6 +335,25 @@ class PreviewSendTests(WorkflowTestBase):
                 self.review_and_send(confirm=confirm)
         self.assertEqual((self.sent, self.only["status"]), ([], S.DRAFT))
 
+    def test_missing_code_sandbox_is_reported_once_and_blocks_sending(self):
+        from assessment.code_execution.coding_config import UNVERIFIED_REASONS
+        from assessment.code_execution.judge0 import Judge0Runner
+
+        coding = {"id": 99, "question_type": "coding", "points": 10, "sort_order": 99, "correct_answer": "print(1)",
+                  "question_text": "Write a program that prints 1.",
+                  "test_cases": [{"id": "t1", "input": "", "expected_output": "1\n", "hidden": False},
+                                 {"id": "t2", "input": "", "expected_output": "1\n", "hidden": True}]}
+        self.repo.questions[1].append(coding)
+        with patch.object(Judge0Runner, "from_env", return_value=None):
+            check = assessment_service.publication_check(1)
+            self.assertFalse(check["ready"])
+            self.assertEqual(sum("Code execution is not configured" in p for p in check["problems"]), 1)
+            reasons = [p for q in check["questions"] for p in q["problems"]]
+            self.assertFalse(UNVERIFIED_REASONS.intersection(reasons))
+            with self.assertRaises(assessment_service.AssessmentServiceError):
+                self.review_and_send()
+        self.assertEqual(self.sent, [])
+
     def test_changes_after_validation_require_validating_again(self):
         stale = assessment_service.publication_check(1)["fingerprint"]
         self.repo.questions[1][0]["question_text"] = "Edited after the recruiter validated"

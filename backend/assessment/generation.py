@@ -20,6 +20,8 @@ MCQ_BATCH_FOCUS = (
     "implementation practice, testing, security, data quality, deployment and day-to-day operations from the JD",
 )
 DUPLICATE_RATIO = .88
+# A coding question must ask for a program, not a choice between approaches.
+CODING_TASK = re.compile(r"\b(write|implement|build|develop|create|code)\b", re.I)
 
 METADATA = ("difficulty", "scenario_type", "explanation", "evaluation_focus", "jd_requirement")
 
@@ -191,6 +193,9 @@ def validate_exam(exam, jd, total=None, previous_questions=(), require_tests=Tru
                 answer = options[ord(label.group(1).upper()) - ord("A")]
         if qtype == "mcq" and (len(options) != 4 or not all(isinstance(v, str) and v.strip() for v in options) or len({_text(v) for v in options}) != 4 or answer not in options):
             raise ValueError(f"Q{index+1}: MCQ requires four distinct options and correct_answer must be the full text of exactly one option.")
+        if qtype == "coding" and not CODING_TASK.search(text):
+            raise ValueError(f"Q{index+1} is a coding question but asks for a decision instead of a program. "
+                             "State the task explicitly: 'Write a program that reads ... and prints ...'.")
         executable = {}
         if qtype in {"coding", "sql"}:
             try:
