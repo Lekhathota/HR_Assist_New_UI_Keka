@@ -82,9 +82,11 @@ MAX_CODING_PROMPT_CHARS = 4000
 MAX_CLIENT_CODING_PROMPT_CHARS = 4000
 MAX_CODING_TOPIC_CHARS = 200
 MAX_CODING_TIME_LIMIT_MINUTES = 240
-# Question fields that record how a recruiter-defined coding question was generated.
+# Question fields that record how a recruiter-defined (AI-generated) question was generated.
+# client_request_id makes a repeated "save" of the same generated question a no-op.
 CUSTOM_CODING_FIELDS = ("source", "coding_spec_id", "generation_prompt", "client_prompt_snapshot",
-                        "constraints", "time_limit_minutes")
+                        "constraints", "time_limit_minutes", "client_request_id")
+MAX_ASSESSMENT_MINUTES = 480  # publication_check accepts 5-480 minutes
 
 
 def _env_limit(name: str, default: int, *, low: int, high: int) -> int:

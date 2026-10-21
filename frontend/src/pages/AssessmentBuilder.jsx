@@ -217,6 +217,7 @@ function AssessmentBuilder() {
   const [notice, setNotice] = useState('');
   const [assessment, setAssessment] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const [codingPanelVersion, setCodingPanelVersion] = useState(0); // remount the coding panel after preview changes
   const [draft, setDraft] = useState({ title: '', passing_score: 70, time_limit_minutes: 90, scoring_policy: { ...DEFAULT_POLICY } });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
@@ -477,6 +478,13 @@ function AssessmentBuilder() {
   const openPreview = (validate = false) => {
     setPreviewValidate(validate);
     setPreviewOpen(true);
+  };
+
+  // A question added in the preview can lengthen the assessment; keep the settings form in step so a
+  // later "Save as Draft" does not write the old duration back.
+  const handlePreviewAssessmentChange = (next) => {
+    setAssessment(prev => ({ ...prev, ...next }));
+    setDraft(prev => ({ ...prev, time_limit_minutes: next.time_limit_minutes ?? prev.time_limit_minutes }));
   };
 
   const handlePreviewSent = (data) => {
@@ -923,7 +931,7 @@ function AssessmentBuilder() {
         {/* Below the last question card, so it stays reachable however many questions there are. */}
         {assessment && (
           // Keyed by status: the panel reloads its editable state when the assessment is sent or returned to draft.
-          <CodingQuestionsPanel key={assessment.status} assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} />
+          <CodingQuestionsPanel key={`${assessment.status}-${codingPanelVersion}`} assessmentId={assessmentId} onQuestionsChanged={refreshQuestions} />
         )}
 
         {previewOpen && assessment && (
@@ -931,6 +939,8 @@ function AssessmentBuilder() {
             assessment={assessment}
             questions={questions}
             onQuestionsChange={setQuestions}
+            onAssessmentChange={handlePreviewAssessmentChange}
+            onQuestionAdded={type => { if (type === 'coding') setCodingPanelVersion(v => v + 1); }}
             onSaveDraft={handleSaveDraft}
             onClose={() => { setPreviewOpen(false); setPublishCheck(null); }}
             onSent={handlePreviewSent}

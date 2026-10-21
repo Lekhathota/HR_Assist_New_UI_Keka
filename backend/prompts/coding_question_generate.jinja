@@ -26,8 +26,11 @@ Fixed settings chosen by the recruiter (these override anything in the prompts):
 {% endif %}{% if time_limit_minutes %}- Time limit: {{ time_limit_minutes }} minutes (size the problem so a competent candidate at this difficulty can read, solve and test it within this time)
 {% endif %}
 Answers are graded automatically by running them, so the task must be a program that reads standard input and prints to standard output. Describe the exact stdin layout in input_format and the exact stdout layout in output_format. List the input bounds in constraints (and in the question text), cover the edge cases the recruiter asked for, and include sample input/output inside the question text.
-Provide test_cases: at least 3 visible examples (hidden=false) and at least 5 hidden tests (hidden=true) covering edge cases (empty/minimal input, duplicates, large values, ties, and any edge cases the prompts name). Each test is {"input": exact stdin text, "expected_output": exact stdout text, "hidden": bool}.
+Provide test_cases: at least 3 visible examples (hidden=false) and at least 5 hidden tests (hidden=true) covering edge cases (empty/minimal input, duplicates, large values, ties, and any edge cases the prompts name). Each test is {"input": exact stdin text, "expected_output": exact stdout text, "hidden": bool, "weight": number, "mandatory": bool}. weight (0.5-10, default 1) reflects how much the test matters: give core-behaviour tests more weight than trivial ones. Mark mandatory=true only for tests every acceptable solution must pass (at most 3).
+scoring sets the qualification threshold for this question: min_tests_passed (0 up to the number of tests) and min_score_percent (0-100) of the marks needed to qualify.
 correct_answer must be a complete Python 3 reference program that reads stdin and prints exactly expected_output for every test (it is used to verify the tests, whatever the candidate language). Leave starter_code empty; per-language templates are supplied.
+{% if language and language != "python" %}Also provide reference_solutions with one entry, "{{ language }}": a complete {{ language_label }} program that reads stdin and prints exactly expected_output for every test, so the tests are also verified in the candidate's language.
+{% endif %}
 evaluation_focus lists what the grader should reward (correctness, edge cases, complexity, code quality, or criteria from the prompts).
 Generation variation seed: {{ generation_nonce }}.
 {% if previous_questions %}Do not repeat or closely paraphrase these existing questions in the assessment:
@@ -36,6 +39,7 @@ Generation variation seed: {{ generation_nonce }}.
 {% endif %}
 Return ONLY JSON:
 {
+ "title": "Short problem title (at most 10 words)",
  "question": "Full problem statement with scenario, expected behaviour, constraints and sample input/output",
  "question_type": "coding",
  "difficulty": "{{ difficulty }}",
@@ -46,11 +50,15 @@ Return ONLY JSON:
  "evaluation_focus": ["Correctness"],
  "input_format": "...",
  "constraints": "Bounds on input sizes and values, e.g. 1 <= n <= 10^5",
+ "edge_cases": "The edge cases the tests cover, one per line",
  "output_format": "...",
  "default_language": "{{ language or 'python' }}",
- "test_cases": [{"input": "3\n1 2 3\n", "expected_output": "6\n", "hidden": false}],
+ "test_cases": [{"input": "3\n1 2 3\n", "expected_output": "6\n", "hidden": false, "weight": 1, "mandatory": false}],
+ "scoring": {"min_tests_passed": 0, "min_score_percent": 50},
  "options": [],
  "correct_answer": "<Python 3 reference program>",
+{% if language and language != "python" %} "reference_solutions": {"{{ language }}": "<{{ language_label }} reference program>"},
+{% endif %}
  "starter_code": "",
  "points": {{ points }}
 }

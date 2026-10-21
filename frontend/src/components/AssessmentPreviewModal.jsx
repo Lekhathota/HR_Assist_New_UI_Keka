@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiGet, apiPost, apiPut } from '../api.js';
 import ReferenceSolutionPanel from './ReferenceSolutionPanel.jsx';
+import AiQuestionGenerator from './AiQuestionGenerator.jsx';
 import { isValidEmail, mcqProblem } from '../utils/assessmentValidation.js';
 import '../styles/assessment_preview.css';
 
@@ -19,6 +20,13 @@ const STATUS_BADGES = {
 const isCodingType = type => type === 'coding' || type === 'sql';
 const marksLabel = points => `${points} mark${Number(points) === 1 ? '' : 's'}`;
 const newRequestId = () => `preview-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+// Marks a new question starts with: the marks most MCQs in this assessment already carry, 15 for coding.
+function usualPoints(list, fallback) {
+  const counts = new Map();
+  list.forEach(q => counts.set(Number(q.points) || 0, (counts.get(Number(q.points) || 0) || 0) + 1));
+  const [best] = [...counts.entries()].filter(([p]) => p > 0).sort((a, b) => b[1] - a[1])[0] || [];
+  return best || fallback;
+}
 
 function verifyState(question) {
   if (question.verification?.status) return question.verification.status;
@@ -189,7 +197,9 @@ function CodingCard({ question, number, total, editable, editing, busy, error, o
  * Preview & Send: review every saved question as the recruiter will publish it, edit, regenerate and
  * validate, then send the exact validated version after an explicit confirmation.
  */
-function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSaveDraft, onClose, onSent, autoValidate = false }) {
+function AssessmentPreviewModal({ assessment: assessmentProp, questions, onQuestionsChange, onAssessmentChange, onQuestionAdded, onSaveDraft, onClose, onSent, autoValidate = false }) {
+  const [assessmentPatch, setAssessmentPatch] = useState({}); // e.g. a longer duration after adding a timed question
+  const assessment = { ...assessmentProp, ...assessmentPatch };
   const editable = assessment?.status === 'DRAFT';
   const sorted = useMemo(() => [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id), [questions]);
   const mcqs = sorted.filter(q => !isCodingType(q.question_type));
@@ -210,6 +220,8 @@ function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSa
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [sent, setSent] = useState(null);
+  const [adding, setAdding] = useState(null);   // 'mcq' | 'coding' while the AI question generator is open
+  const [generatorDirty, setGeneratorDirty] = useState(false);
   const requestId = useRef(newRequestId());
 
   const original = id => sorted.find(q => q.id === id);
@@ -220,14 +232,14 @@ function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSa
     return ['question_text', 'correct_answer', 'explanation', 'difficulty', 'points'].some(k => String(form[k] ?? '') !== String(q[k] ?? ''))
       || JSON.stringify(form.options) !== JSON.stringify([0, 1, 2, 3].map(i => q.options?.[i] ?? ''));
   };
-  const unsaved = Object.keys(forms).some(id => formDirty(Number(id))) || dirtyPanels.size > 0;
+  const unsaved = Object.keys(forms).some(id => formDirty(Number(id))) || dirtyPanels.size > 0 || generatorDirty;
   const setQBusy = (id, value) => setBusy(prev => ({ ...prev, [id]: value }));
   const setQError = (id, value) => setErrors(prev => ({ ...prev, [id]: value }));
   const invalidate = () => setCheck(null); // any change needs a new validation before sending
   const replaceQuestion = (updated) => { onQuestionsChange(prev => prev.map(q => (q.id === updated.id ? { ...q, ...updated } : q))); invalidate(); };
 
   useEffect(() => {
-    const onKey = event => { if (event.key === 'Escape' && !confirming && !sending) requestClose(); };
+    const onKey = event => { if (event.key === 'Escape' && !confirming && !sending && !adding) requestClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   });
@@ -337,6 +349,26 @@ function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSa
     if (saved !== false) setNotice('Draft saved. Nothing has been sent.');
   };
 
+  // A generated question was saved to the draft: take the stored list (numbers, order, marks) from the server.
+  const questionAdded = ({ question, questions: list, assessment: saved, type }) => {
+    onQuestionsChange(() => list);
+    if (saved && saved.time_limit_minutes !== assessment.time_limit_minutes) {
+      setAssessmentPatch({ time_limit_minutes: saved.time_limit_minutes });
+      onAssessmentChange?.({ ...assessment, ...saved });
+    }
+    invalidate();
+    onQuestionAdded?.(type);
+    setAdding(null);
+    setGeneratorDirty(false);
+    const ofType = list.filter(q => (type === 'coding' ? isCodingType(q.question_type) : !isCodingType(q.question_type)))
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+    const number = ofType.findIndex(q => q.id === question.id) + 1;
+    setNotice(`${type === 'coding' ? 'Coding question' : 'MCQ'} saved to the draft as question ${number} of ${ofType.length}. `
+      + 'Nothing was sent. Validate the assessment again before sending.');
+    setTab(type);
+    window.setTimeout(() => document.getElementById(`pv-q-${question.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 0);
+  };
+
   const goTo = (questionId) => {
     const q = original(questionId);
     if (!q) return;
@@ -422,6 +454,14 @@ function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSa
               </div>
             )
           )}
+          {editable && !sent && (
+            <div className="pv-tab-toolbar">
+              <span className="pv-muted">{tab === 'mcq' ? `${mcqs.length} MCQ${mcqs.length === 1 ? '' : 's'}` : `${coding.length} coding question${coding.length === 1 ? '' : 's'}`} in this draft</span>
+              <button type="button" className="btn pv-add" onClick={() => { setNotice(''); setAdding(tab); }}>
+                <i className="fas fa-plus" aria-hidden="true" /> {tab === 'mcq' ? 'Add MCQ' : 'Add Coding Question'}
+              </button>
+            </div>
+          )}
           {tab === 'coding' && sqlCount > 0 && <p className="pv-muted">Includes {sqlCount} SQL question{sqlCount === 1 ? '' : 's'}, executed in an SQLite sandbox.</p>}
           {list.length === 0 && <p className="pv-empty">No {tab === 'mcq' ? 'MCQ' : 'coding'} questions in this assessment.</p>}
           {list.map((q, index) => (tab === 'mcq' ? (
@@ -453,6 +493,13 @@ function AssessmentPreviewModal({ assessment, questions, onQuestionsChange, onSa
             </>
           )}
         </footer>
+
+        {adding && (
+          <AiQuestionGenerator assessment={assessment} initialType={adding}
+            defaultPoints={{ mcq: usualPoints(mcqs, 5), coding: 15 }}
+            onClose={() => { setAdding(null); setGeneratorDirty(false); }}
+            onSaved={questionAdded} onDirtyChange={setGeneratorDirty} />
+        )}
 
         {confirming && (
           <div className="pv-confirm-overlay" role="presentation">

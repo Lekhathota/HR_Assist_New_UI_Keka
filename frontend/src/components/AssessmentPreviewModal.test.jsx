@@ -232,4 +232,161 @@ test('a sent assessment is read-only in the preview', async () => {
   expect(button('Send Assessment')).toBeUndefined();
   expect(button('Edit', $('#pv-q-1'))).toBeUndefined();
   expect(button('Regenerate')).toBeUndefined();
+  expect(button('Add MCQ')).toBeUndefined();
+});
+
+describe('Generate Question with AI', () => {
+  const CONTEXT = { jd: { id: 7, title: 'Senior Full Stack Engineer' }, client: { id: 3, name: 'Uber' }, client_prompt: 'Prefer clean Java.',
+    languages: [{ key: 'python', label: 'Python' }, { key: 'java', label: 'Java' }], execution: { available: false } };
+  const MCQ_DRAFT = { question_text: 'Your API latency doubled after a deploy. What do you check first?', question_type: 'mcq',
+    options: ['Slow query log', 'Restart pods', 'Add RAM', 'Rollback DNS'], correct_answer: 'Slow query log',
+    explanation: 'Latency after a deploy usually comes from a new query.', difficulty: 'Medium', points: 1, skill_tag: 'SQL' };
+  const CODING_DRAFT = { title: 'Order totals',
+    question_text: 'Read n order amounts from standard input and print their total, handling empty input and very large values.',
+    input_format: 'n then n integers', output_format: 'total', constraints: 'n <= 10^5', explanation: 'Sum in one pass.',
+    correct_answer: 'print(sum(map(int, open(0).read().split()[1:])))', scoring: { min_tests_passed: 2, min_score_percent: 50 },
+    test_cases: [
+      { id: 't1', input: '1\n5\n', expected_output: '5\n', hidden: false, weight: 1 },
+      { id: 't2', input: '2\n1 2\n', expected_output: '3\n', hidden: false, weight: 1 },
+      { id: 't3', input: '0\n', expected_output: '0\n', hidden: true, weight: 2, mandatory: true },
+      { id: 't4', input: '1\n9\n', expected_output: '9\n', hidden: true, weight: 1 },
+      { id: 't5', input: '3\n1 1 1\n', expected_output: '3\n', hidden: true, weight: 1 }],
+    verification: { status: 'unavailable', message: 'Code execution is not configured, so the reference solution has not been run.' } };
+  const allQuestions = () => [...Array.from({ length: 30 }, (_, i) => mcq(i + 1)), CODING, SQL];
+  const posted = suffix => apiPost.mock.calls.filter(([p]) => p.endsWith(suffix));
+
+  beforeEach(() => {
+    apiGet.mockImplementation(path => Promise.resolve(path.endsWith('/coding') ? CONTEXT : READY));
+  });
+
+  test('adds a reviewed AI MCQ to the draft, updates counts and requires re-validation without sending', async () => {
+    const saved = mcq(99, { ...MCQ_DRAFT, id: 99, sort_order: 30, source: 'custom_mcq' });
+    apiPost.mockImplementation(path => Promise.resolve(path.endsWith('/mcq/generate') ? { ok: true, data: { draft: MCQ_DRAFT } }
+      : path.endsWith('/mcq/save') ? { ok: true, data: { question: saved, questions: [...allQuestions(), saved],
+        assessment: { ...ASSESSMENT, time_limit_minutes: 92 } } }
+        : { ok: false, data: { error: 'unexpected' } }));
+    await mount();
+    await click(button('Validate Assessment'));
+    expect(button('Send Assessment').disabled).toBe(false);
+    await click(button('Add MCQ'));
+    const dialog = $('.ag-dialog');
+    expect(dialog.textContent).toContain('Generate Question with AI');
+    expect(dialog.querySelector('select').value).toBe('mcq');
+    expect(dialog.textContent).toContain('Senior Full Stack Engineer · Uber');
+    expect(button('Save to Draft', dialog).disabled).toBe(true);
+    await click(button('Generate Question', dialog));
+    expect(dialog.querySelector('[role="alert"]').textContent).toContain('custom prompt or a topic');
+    type(dialog.querySelector('#ag-prompt'), 'Debugging API latency');
+    type(dialog.querySelectorAll('input[type="number"]')[1], '2');
+    await click(button('Generate Question', dialog));
+    expect(apiPost).toHaveBeenCalledWith('/api/assessment/1/mcq/generate',
+      expect.objectContaining({ prompt: 'Debugging API latency', difficulty: 'Medium', points: 1, time_limit_minutes: 2 }));
+    expect(dialog.querySelector('.ag-review .pv-correct').textContent).toContain('Slow query log');
+    expect(dialog.textContent).toContain('Add 2 min to the assessment duration (90 → 92 min)');
+    expect(button('Send Assessment').disabled).toBe(true); // an unsaved generated question blocks sending
+    await click(button('Edit Question', dialog));
+    type(dialog.querySelector('#ag-mcq-expl'), 'Edited explanation.');
+    await click(button('Save to Draft', dialog));
+    const [[, body]] = posted('/mcq/save');
+    expect(body).toEqual(expect.objectContaining({ extend_duration: true, time_limit_minutes: 2, prompt: 'Debugging API latency' }));
+    expect(body.question).toEqual(expect.objectContaining({ explanation: 'Edited explanation.', correct_answer: 'Slow query log', points: 1 }));
+    expect(body.request_id).toMatch(/^mcq-/);
+    expect($('.ag-dialog')).toBeNull();
+    expect($$('.pv-tabs button').map(b => b.textContent)).toEqual(['MCQ Questions (31)', 'Coding Questions (2)']);
+    expect($('.pv-summary').textContent).toContain('33 (31 MCQ + 2 Coding)');
+    expect($('.pv-summary').textContent).toContain('92 min');
+    expect($('.pv-notice').textContent).toContain('question 31 of 31');
+    expect($('#pv-q-99')).toBeTruthy();
+    expect(button('Send Assessment').disabled).toBe(true); // the validated version changed
+    expect(apiPost.mock.calls.some(([p]) => p.includes('/send'))).toBe(false);
+  });
+
+  test('a failed save can be retried with the same request id', async () => {
+    const saved = mcq(99, { ...MCQ_DRAFT, id: 99 });
+    apiPost.mockImplementation(path => Promise.resolve(path.endsWith('/mcq/generate') ? { ok: true, data: { draft: MCQ_DRAFT } }
+      : { ok: false, data: { error: 'Network hiccup' } }));
+    await mount();
+    await click(button('Add MCQ'));
+    type($('#ag-prompt'), 'Latency');
+    await click(button('Generate Question', $('.ag-dialog')));
+    await click(button('Save to Draft', $('.ag-dialog')));
+    expect($('.ag-dialog [role="alert"]').textContent).toContain('Network hiccup');
+    apiPost.mockImplementation(() => Promise.resolve({ ok: true, data: { question: saved, questions: [...allQuestions(), saved], assessment: ASSESSMENT } }));
+    await click(button('Save to Draft', $('.ag-dialog')));
+    const saves = posted('/mcq/save');
+    expect(saves).toHaveLength(2);
+    expect(saves[1][1].request_id).toBe(saves[0][1].request_id);
+  });
+
+  test('generation errors are shown and keep the form', async () => {
+    apiPost.mockResolvedValue({ ok: false, data: { error: 'AI question generation is unavailable.' } });
+    await mount();
+    await click(button('Add MCQ'));
+    type($('#ag-prompt'), 'Kafka consumer lag');
+    await click(button('Generate Question', $('.ag-dialog')));
+    expect($('.ag-dialog [role="alert"]').textContent).toContain('unavailable');
+    expect($('#ag-prompt').value).toBe('Kafka consumer lag');
+  });
+
+  test('adds a coding question: generate, validate the reference, edit, save', async () => {
+    const saved = { ...CODING, id: 77, sort_order: 42, title: 'Order totals', source: 'custom_coding' };
+    const failed = { ...CODING_DRAFT, verification: { status: 'failed', message: 'The reference solution fails 1 test run(s).',
+      results: [{ id: 't3', hidden: true, passed: false, status: 'wrong_answer', actual: null }] } };
+    apiPost.mockImplementation(path => Promise.resolve(
+      path.endsWith('/coding/specs') ? { ok: true, data: { spec: { id: 'spec1' } } }
+        : path.endsWith('/generate') ? { ok: true, data: { draft: CODING_DRAFT } }
+          : path.endsWith('/draft/verify') ? { ok: true, data: { draft: failed } }
+            : path.endsWith('/save') ? { ok: true, data: { question: saved, questions: [...allQuestions(), saved], assessment: ASSESSMENT } }
+              : { ok: false, data: {} }));
+    await mount();
+    await click(button('Coding Questions (2)'));
+    await click(button('Add Coding Question'));
+    const dialog = $('.ag-dialog');
+    expect(dialog.querySelector('select').value).toBe('coding');
+    expect(dialog.textContent).toContain('Prefer clean Java.');
+    expect(dialog.textContent).toContain('Code execution is not configured');
+    type(dialog.querySelector('#ag-prompt'), 'Total order amounts');
+    type([...dialog.querySelectorAll('select')].pop(), 'java');
+    await click(button('Generate Question', dialog));
+    expect(apiPost).toHaveBeenCalledWith('/api/assessment/1/coding/specs',
+      expect.objectContaining({ prompt: 'Total order amounts', language: 'java', points: 15 }));
+    expect(posted('/spec1/generate')).toHaveLength(1);
+    expect(dialog.textContent).toContain('Order totals');
+    expect(dialog.textContent).toContain('Execution unavailable');
+    await click(button('Validate Reference Solution', dialog));
+    expect(posted('/spec1/draft/verify')).toHaveLength(1);
+    expect(dialog.textContent).toContain('Reference fails tests');
+    expect(dialog.textContent).toContain('Test t3: wrong answer');
+    await click(button('Edit Question', dialog));
+    type(dialog.querySelector('[aria-label="Test 3 weight"]'), '3');
+    expect(dialog.textContent).toContain('Edited since the last validation');
+    window.confirm.mockReturnValueOnce(false);
+    await click(button('Regenerate Question', dialog));
+    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('edits'));
+    expect(posted('/generate')).toHaveLength(1);
+    await click(button('Save to Draft', dialog));
+    const [[, body]] = posted('/spec1/save');
+    expect(body.question.test_cases[2].weight).toBe(3);
+    expect(body.question.title).toBe('Order totals');
+    expect($$('.pv-tabs button').map(b => b.textContent)).toEqual(['MCQ Questions (30)', 'Coding Questions (3)']);
+    expect($('#pv-q-77')).toBeTruthy();
+    expect(posted('/coding/specs')).toHaveLength(1);
+    expect(apiPost.mock.calls.some(([p]) => p.includes('/send'))).toBe(false);
+  });
+
+  test('cancelling a coding question removes its unsaved entry', async () => {
+    const { apiDelete } = jest.requireMock('../api.js');
+    apiDelete.mockResolvedValue({ ok: true, data: {} });
+    apiPost.mockImplementation(path => Promise.resolve(path.endsWith('/coding/specs') ? { ok: true, data: { spec: { id: 'spec9' } } }
+      : { ok: true, data: { draft: CODING_DRAFT } }));
+    await mount();
+    await click(button('Coding Questions (2)'));
+    await click(button('Add Coding Question'));
+    type($('#ag-prompt'), 'Anything');
+    await click(button('Generate Question', $('.ag-dialog')));
+    await click(button('Cancel', $('.ag-foot')));
+    expect(apiDelete).toHaveBeenCalledWith('/api/assessment/1/coding/specs/spec9');
+    expect($('.ag-dialog')).toBeNull();
+    expect($$('.pv-tabs button').map(b => b.textContent)).toEqual(['MCQ Questions (30)', 'Coding Questions (2)']);
+  });
 });

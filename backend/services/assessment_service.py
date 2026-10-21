@@ -770,6 +770,10 @@ def regenerate_question(question_id: int, *, actor: str = "") -> dict[str, Any]:
         from services.coding_question_service import regenerate_custom_question
 
         row = regenerate_custom_question(assessment, question, others)
+    elif question.get("source") == "custom_mcq":
+        from services.mcq_question_service import regenerate_custom_mcq
+
+        row = regenerate_custom_mcq(assessment, question, others)
     else:
         jd = db.get_jd_by_id(int(assessment.get("jd_id") or 0), include_raw_text=True)
         if not jd:

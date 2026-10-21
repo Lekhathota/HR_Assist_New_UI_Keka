@@ -65,6 +65,9 @@ def ensure_assessment_indexes() -> None:
 
     mongo.questions.create_index([("id", ASCENDING)], unique=True)
     mongo.questions.create_index([("assessment_id", ASCENDING), ("sort_order", ASCENDING)])
+    # A generated question saved twice (double click, network retry) is stored once.
+    mongo.questions.create_index([("assessment_id", ASCENDING), ("client_request_id", ASCENDING)], unique=True,
+                                 partialFilterExpression={"client_request_id": {"$type": "string"}})
 
     mongo.candidate_answers.create_index([("id", ASCENDING)], unique=True)
     mongo.candidate_answers.create_index(

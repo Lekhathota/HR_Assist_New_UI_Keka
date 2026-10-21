@@ -21,8 +21,10 @@ from typing import Any
 
 import database as db
 from assessment import repository as assessment_repo
+from assessment.code_execution.coding_config import normalize_case_scoring, normalize_config
 from assessment.code_execution.languages import LANGUAGES, normalize_language
 from assessment.code_execution.preparation import MIN_HIDDEN, MIN_VISIBLE, prepare_executable_questions, validate_test_fields
+from assessment.code_execution.verification import execution_status, fingerprint, verification_view, verify_question
 from assessment.generation import is_duplicate, normalized_jd, requirement_catalog
 from assessment.models import (
     CODING_DIFFICULTIES,
@@ -37,6 +39,7 @@ from assessment.models import (
 from assessment.utilities import recruiter_question_payload, utc_now
 from services.assessment_service import AssessmentServiceError
 from services.json_parser import parse_json_response
+from services.mcq_question_service import assessment_state, extend_duration
 from services.llm_service import LLMService
 from services.prompt_service import PromptService
 
@@ -45,13 +48,14 @@ GENERATION_ATTEMPTS = 3
 DEFAULT_POINTS = 15
 SPEC_KEYS = ("prompt", "language", "difficulty", "points", "topic", "time_limit_minutes")
 # Generated-question fields the recruiter can change while reviewing a draft.
-DRAFT_EDIT_KEYS = ("question_text", "input_format", "output_format", "constraints", "explanation", "correct_answer", "test_cases")
+DRAFT_EDIT_KEYS = ("question_text", "input_format", "output_format", "constraints", "explanation", "correct_answer", "test_cases",
+                   "title", "edge_cases", "scoring", "reference_solutions")
 DRAFT_VIEW_KEYS = (*DRAFT_EDIT_KEYS, "skill_tag", "difficulty", "points", "time_limit_minutes", "evaluation_focus",
                    "jd_requirement", "allowed_languages", "default_language", "tests_verified", "generation_prompt")
 # Question fields cleared when a saved question is replaced, so stale tests never survive.
 EXECUTABLE_RESET = ("test_cases", "input_format", "output_format", "allowed_languages", "default_language",
                     "tests_verified", "reference_language", "verification", "config_fingerprint", "jd_requirement",
-                    "constraints", "time_limit_minutes")
+                    "constraints", "time_limit_minutes", "title", "edge_cases", "reference_solutions")
 
 
 def _now() -> str:
@@ -170,6 +174,7 @@ def validate_generated_coding_question(
         executable["allowed_languages"] = [language]
         executable["default_language"] = language
     return {
+        **_generated_extras(item, executable, language),
         "question_text": text,
         "question_type": "coding",
         "options": [],
@@ -185,6 +190,42 @@ def validate_generated_coding_question(
         **({"jd_requirement": catalog[ref]} if ref in catalog else {}),
         **executable,
     }
+
+
+def _generated_extras(item: dict[str, Any], executable: dict[str, Any], language: str) -> dict[str, Any]:
+    """Optional parts of a generated question (title, edge cases, test weights, qualification, extra reference).
+
+    The model's values are suggestions the recruiter reviews, so unusable ones are dropped rather than
+    failing the generation. Test weights are attached in place to the validated test cases.
+    """
+    extras: dict[str, Any] = {}
+    for key, limit in (("title", 120), ("edge_cases", 5000)):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            extras[key] = value.strip()[:limit]
+    raw_by_input = {c.get("input"): c for c in item.get("test_cases") or [] if isinstance(c, dict) and isinstance(c.get("input"), str)}
+    for case in executable.get("test_cases") or []:
+        raw = raw_by_input.get(case.get("input")) or {}
+        try:
+            weight = float(raw.get("weight", 1))
+        except (TypeError, ValueError):
+            weight = 1.0
+        case["weight"] = weight if 0.01 <= weight <= 100 else 1.0
+        case["mandatory"] = raw.get("mandatory") is True
+    scoring = item.get("scoring")
+    if isinstance(scoring, dict):
+        try:
+            rules = normalize_config("coding", {"scoring": scoring}, {})["scoring"]
+            rules["min_tests_passed"] = min(rules["min_tests_passed"], len(executable.get("test_cases") or []))
+            extras["scoring"] = rules
+        except ValueError:
+            pass
+    references = item.get("reference_solutions")
+    if language and language != "python" and isinstance(references, dict):
+        code = references.get(language)
+        if isinstance(code, str) and code.strip() and len(code) <= 50_000:
+            extras["reference_solutions"] = {language: code}
+    return extras
 
 
 # ---------------------------------------------------------------- loading helpers
@@ -229,7 +270,29 @@ def _linked_questions(assessment_id: int) -> dict[str, dict]:
 def _draft_view(draft: dict[str, Any] | None) -> dict[str, Any] | None:
     if not draft:
         return None
-    return {key: draft.get(key) for key in DRAFT_VIEW_KEYS if draft.get(key) is not None}
+    view = {key: draft.get(key) for key in DRAFT_VIEW_KEYS if draft.get(key) is not None}
+    view["verification"] = _draft_verification(draft)
+    return view
+
+
+def _draft_verification(draft: dict[str, Any]) -> dict[str, Any]:
+    """What has actually been executed for this draft; generation alone never counts as validation."""
+    if not draft.get("test_cases"):
+        return {"status": "not_verified", "results": [],
+                "message": "No automatic test cases: add tests before this question can be published."}
+    if draft.get("verification"):
+        return verification_view(draft)
+    if draft.get("tests_verified") is True:
+        if draft.get("reference_solutions"):
+            return {"status": "not_verified", "results": [],
+                    "message": "The Python reference passed every test during generation; the other reference solutions have not been run. Validate the reference solution."}
+        return {"status": "verified", "results": [],
+                "message": "The Python reference solution was executed and passed every test during generation."}
+    if not execution_status()["coding"]["available"]:
+        return {"status": "unavailable", "results": [],
+                "message": "Code execution is not configured, so the reference solution has not been run. "
+                           "The question stays unvalidated until it is (set JUDGE0_URL)."}
+    return {"status": "not_verified", "results": [], "message": "The reference solution has not been validated against the tests."}
 
 
 def _spec_view(spec: dict[str, Any], question: dict[str, Any] | None) -> dict[str, Any]:
@@ -282,6 +345,7 @@ def get_coding_config(assessment_id: int) -> dict[str, Any]:
         },
         "languages": [{"key": key, "label": spec["label"]} for key, spec in LANGUAGES.items()],
         "difficulties": list(CODING_DIFFICULTIES),
+        "execution": execution_status()["coding"],
     }
 
 
@@ -384,6 +448,34 @@ def save_spec_question(assessment_id: int, spec_id: str, data: dict[str, Any] | 
     A first save appends the question after all existing ones; saving a regenerated draft replaces
     the entry's own question in place (same id and position). Other questions are never touched.
     """
+    assessment, specs, spec, draft, edits, existing = _reviewed_draft(assessment_id, spec_id, data)
+    row = _validated_draft({**draft, **edits}, spec, edits, _other_question_texts(assessment_id, existing))
+    row.pop("verification", None)
+    _carry_verification(row, draft)
+
+    row.update(source=SOURCE, coding_spec_id=spec_id)
+    if existing:
+        assessment_repo.update_question(int(existing["id"]), {**{key: None for key in EXECUTABLE_RESET}, **row})
+        question_id = int(existing["id"])
+    else:
+        others = assessment_repo.get_questions_for_assessment(assessment_id)
+        row["sort_order"] = max((int(q.get("sort_order") or 0) for q in others), default=-1) + 1
+        question_id = assessment_repo.create_question({"assessment_id": assessment_id, **row})
+    spec.pop("draft_question", None)
+    spec.update(status="generated", question_id=question_id, last_error="", generated_at=_now(), updated_at=_now())
+    assessment_repo.update_assessment(assessment_id, {"coding_specs": specs})
+    if (data or {}).get("extend_duration") is True and not existing:
+        extend_duration(assessment, spec.get("time_limit_minutes"))
+    db.log_audit("Coding Question Saved", "",
+                 f"Saved coding question #{question_id} for assessment #{assessment_id} from a recruiter prompt.",
+                 int(assessment.get("jd_id") or 0) or None)
+    question = assessment_repo.get_question_by_id(question_id) or {}
+    return {"spec": _spec_view(spec, question), "question": recruiter_question_payload(question),
+            "config": get_coding_config(assessment_id), **assessment_state(assessment_id)}
+
+
+def _reviewed_draft(assessment_id: int, spec_id: str, data: dict[str, Any] | None):
+    """Load an entry's draft and apply the recruiter's review edits and settings (not yet stored)."""
     assessment = _editable(assessment_id)
     specs = list(assessment.get("coding_specs") or [])
     spec = _find_spec(specs, spec_id)
@@ -398,25 +490,37 @@ def save_spec_question(assessment_id: int, spec_id: str, data: dict[str, Any] | 
     existing = _linked_questions(assessment_id).get(spec_id)
     _check_room(assessment_id, existing)
     spec.update(spec_fields)
-    row = _validated_draft({**draft, **edits}, spec, edits, _other_question_texts(assessment_id, existing))
+    return assessment, specs, spec, draft, edits, existing
 
-    row.update(source=SOURCE, coding_spec_id=spec_id)
-    if existing:
-        assessment_repo.update_question(int(existing["id"]), {**{key: None for key in EXECUTABLE_RESET}, **row})
-        question_id = int(existing["id"])
-    else:
-        others = assessment_repo.get_questions_for_assessment(assessment_id)
-        row["sort_order"] = max((int(q.get("sort_order") or 0) for q in others), default=-1) + 1
-        question_id = assessment_repo.create_question({"assessment_id": assessment_id, **row})
-    spec.pop("draft_question", None)
-    spec.update(status="generated", question_id=question_id, last_error="", generated_at=_now(), updated_at=_now())
+
+def verify_spec_draft(assessment_id: int, spec_id: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Run the reviewed draft's reference solution(s) against its test cases in the code sandbox.
+
+    Nothing is added to the assessment. The edited draft and the real execution result are stored on
+    the entry, so a later save of the unchanged draft keeps the result; any edit makes it stale.
+    """
+    assessment, specs, spec, draft, edits, existing = _reviewed_draft(assessment_id, spec_id, data)
+    row = _normalized_draft({**draft, **edits}, spec, edits, _other_question_texts(assessment_id, existing))
+    if not row.get("test_cases"):
+        raise AssessmentServiceError("Add test cases before validating the reference solution.")
+    verification, _ = verify_question(row)
+    row["verification"] = verification
+    row["tests_verified"] = verification["status"] == "verified"
+    spec.update(draft_question=row, updated_at=_now())
     assessment_repo.update_assessment(assessment_id, {"coding_specs": specs})
-    db.log_audit("Coding Question Saved", "",
-                 f"Saved coding question #{question_id} for assessment #{assessment_id} from a recruiter prompt.",
-                 int(assessment.get("jd_id") or 0) or None)
-    question = assessment_repo.get_question_by_id(question_id) or {}
-    return {"spec": _spec_view(spec, question), "question": recruiter_question_payload(question),
-            "config": get_coding_config(assessment_id)}
+    return {"spec": _spec_view(spec, existing), "draft": _draft_view(row)}
+
+
+def _carry_verification(row: dict[str, Any], draft: dict[str, Any]) -> None:
+    """Keep a draft's execution result only if it ran on exactly what is being saved."""
+    stored = draft.get("verification") or {}
+    if row.get("test_cases") and stored.get("fingerprint") and stored["fingerprint"] == fingerprint(row):
+        row["verification"] = stored
+        row["tests_verified"] = stored.get("status") == "verified"
+    elif row.get("reference_solutions"):
+        row["tests_verified"] = False  # generation executed only the Python reference
+    if row.get("test_cases"):
+        row["config_fingerprint"] = fingerprint(row)
 
 
 def discard_draft(assessment_id: int, spec_id: str) -> dict[str, Any]:
@@ -461,10 +565,23 @@ _TEXT_KEYS = ("question_text", "input_format", "output_format", "constraints", "
 
 def _validated_draft(row: dict[str, Any], spec: dict[str, Any], edits: dict[str, Any], others: list[str]) -> dict[str, Any]:
     """Check a reviewed draft before it is written to the assessment; raises AssessmentServiceError."""
-    for key in _TEXT_KEYS:
+    row = _normalized_draft(row, spec, edits, others)
+    if row.get("test_cases") and ({"test_cases", "correct_answer"} & set(edits) or "tests_verified" not in row):
+        try:
+            row = prepare_executable_questions([row], strict=True)[0]
+        except ValueError as exc:
+            raise AssessmentServiceError(f"The reference solution does not pass the test cases: {str(exc).replace('Q1: ', '')}") from exc
+    return row
+
+
+def _normalized_draft(row: dict[str, Any], spec: dict[str, Any], edits: dict[str, Any], others: list[str]) -> dict[str, Any]:
+    """The draft as it would be stored, without executing anything; raises AssessmentServiceError."""
+    for key in (*_TEXT_KEYS, "title", "edge_cases"):
         if row.get(key) is not None and not isinstance(row[key], str):
             raise AssessmentServiceError(f"{key.replace('_', ' ').capitalize()} must be text.")
-    row = {**row, **{key: row[key].strip() for key in _TEXT_KEYS[:-1] if isinstance(row.get(key), str)}}
+    row = {**row, **{key: row[key].strip() for key in (*_TEXT_KEYS[:-1], "title", "edge_cases") if isinstance(row.get(key), str)}}
+    if len(row.get("title") or "") > 120:
+        raise AssessmentServiceError("The title is too long (max 120 characters).")
     if len((row.get("question_text") or "").split()) < 12:
         raise AssessmentServiceError("The problem statement must describe the task, behaviour, constraints and samples (at least 12 words).")
     if not (row.get("correct_answer") or "").strip():
@@ -483,17 +600,20 @@ def _validated_draft(row: dict[str, Any], spec: dict[str, Any], edits: dict[str,
         return row
     if "test_cases" in edits:
         _check_recruiter_tests(row["test_cases"])
+    # validate_test_fields rebuilds the cases; keep each test's weight / mandatory flag by its input.
+    raw_by_input = {c["input"]: c for c in row["test_cases"] if isinstance(c, dict) and isinstance(c.get("input"), str)}
     try:
         row.update(validate_test_fields(row, "coding", "Question"))
+        row["test_cases"] = normalize_case_scoring(row["test_cases"], [raw_by_input.get(c["input"], {}) for c in row["test_cases"]])
+        config = {key: row[key] for key in ("scoring", "reference_solutions") if row.get(key) is not None}
+        row.update(normalize_config("coding", config, row) if config else {})
     except ValueError as exc:
         raise AssessmentServiceError(str(exc).replace("Question: ", "")) from exc
+    if (row.get("scoring") or {}).get("min_tests_passed", 0) > len(row["test_cases"]):
+        raise AssessmentServiceError(f"Minimum tests passed ({row['scoring']['min_tests_passed']}) cannot exceed the "
+                                     f"{len(row['test_cases'])} test cases.")
     if spec.get("language"):
         row.update(allowed_languages=[spec["language"]], default_language=spec["language"])
-    if {"test_cases", "correct_answer"} & set(edits) or "tests_verified" not in row:
-        try:
-            row = prepare_executable_questions([row], strict=True)[0]
-        except ValueError as exc:
-            raise AssessmentServiceError(f"The reference solution does not pass the test cases: {str(exc).replace('Q1: ', '')}") from exc
     return row
 
 

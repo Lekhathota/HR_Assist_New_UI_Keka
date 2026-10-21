@@ -66,7 +66,9 @@ from services.coding_question_service import (
     save_client_prompt,
     save_spec_question,
     update_spec,
+    verify_spec_draft,
 )
+from services.mcq_question_service import generate_mcq_draft, save_mcq_question
 from services.candidate_assessment_service import (
     AssessmentWorkflowError,
     list_candidate_assessments,
@@ -186,8 +188,8 @@ def api_candidate_assessment_send(candidate_id: int):
     return jsonify(result), 202 if result.get("code") == "delivery_unknown" else 200
 
 
-def _coding_call(action):
-    """Shared error mapping for the Coding Questions endpoints."""
+def _coding_call(action, failure: str = "Could not update coding questions. Please retry."):
+    """Shared error mapping for the Coding Questions and AI question endpoints."""
     if not current_user():
         return _json_error("Unauthorized", 401)
     try:
@@ -195,7 +197,7 @@ def _coding_call(action):
     except AssessmentServiceError as exc:
         return _json_error(str(exc), getattr(exc, "status_code", 400))
     except Exception:
-        return _json_error("Could not update coding questions. Please retry.", 500)
+        return _json_error(failure, 500)
 
 
 @assessment_bp.route("/api/assessment/<int:assessment_id>/coding", methods=["GET"], endpoint="api_assessment_coding_config")
@@ -253,6 +255,31 @@ def api_assessment_coding_spec_save(assessment_id: int, spec_id: str):
 @api_login_required
 def api_assessment_coding_spec_discard_draft(assessment_id: int, spec_id: str):
     return _coding_call(lambda: discard_draft(assessment_id, spec_id))
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/coding/specs/<spec_id>/draft/verify", methods=["POST"],
+                     endpoint="api_assessment_coding_spec_verify_draft")
+@api_login_required
+def api_assessment_coding_spec_verify_draft(assessment_id: int, spec_id: str):
+    """Execute the reviewed draft's reference solution against its tests; nothing is added or sent."""
+    return _coding_call(lambda: verify_spec_draft(assessment_id, spec_id, request.get_json(silent=True) or {}),
+                        "Could not validate the reference solution. Please retry.")
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/mcq/generate", methods=["POST"], endpoint="api_assessment_mcq_generate")
+@api_login_required
+def api_assessment_mcq_generate(assessment_id: int):
+    """Generate one MCQ draft for review. Nothing is stored or sent."""
+    return _coding_call(lambda: generate_mcq_draft(assessment_id, request.get_json(silent=True) or {}),
+                        "Could not generate the question. Please retry.")
+
+
+@assessment_bp.route("/api/assessment/<int:assessment_id>/mcq/save", methods=["POST"], endpoint="api_assessment_mcq_save")
+@api_login_required
+def api_assessment_mcq_save(assessment_id: int):
+    """Add the reviewed MCQ to the draft assessment (idempotent per request_id). Nothing is sent."""
+    return _coding_call(lambda: save_mcq_question(assessment_id, request.get_json(silent=True) or {}),
+                        "Could not save the question. Please retry.")
 
 
 @assessment_bp.route("/api/assessment/exam/generate", methods=["POST"])
